@@ -14,6 +14,7 @@ class TestHelperTest < Id58TestBase
   ) do
     klass = Class.new(Id58TestBase) { serial! }
     assert_equal :random, klass.run_order
+
     assert_equal klass.singleton_class, klass.method(:run).owner
   end
 
@@ -21,6 +22,7 @@ class TestHelperTest < Id58TestBase
   | a running test can read its own id58 and description
   ) do
     assert_equal 'Fb7A10', id58
+
     words = '| a running test can read its own id58 and description'
     assert_equal words, name58
   end

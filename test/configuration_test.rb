@@ -32,7 +32,7 @@ class ConfigurationTest < Id58TestBase
     end
     expected = [
       'unknown reporter htm in ConditionCoverage.start',
-      'the reporters are: gaps'
+      'the reporters are: gaps, html'
     ].join("\n")
     assert_equal expected, error.message
   end

@@ -14,10 +14,13 @@ class HtmlIndexTest < Id58TestBase
     }
     html = REXML::Document.new(ConditionCoverage::HtmlIndex.row(row))
     cells = html.elements.to_a('//td')
+
     sorts = cells.map { |cell| cell.attributes['data-sort'] }
     assert_equal %w(source/kata.rb 2 38 5), sorts
+
     texts = cells.map { |cell| text_of(cell) }
     assert_equal ['source/kata.rb', '2', '3 / 8 · 38%', '5'], texts
+
     href = html.elements['//a'].attributes['href']
     assert_equal 'files/source/kata.rb.html', href
   end
@@ -31,9 +34,11 @@ class HtmlIndexTest < Id58TestBase
       percent: 100, missing: 0
     }
     html = REXML::Document.new(ConditionCoverage::HtmlIndex.row(row))
+
     first = html.elements['//td']
     assert_equal 'source/q&a.rb', first.attributes['data-sort']
     assert_equal 'source/q&a.rb', text_of(first)
+
     href = html.elements['//a'].attributes['href']
     assert_equal 'files/source/q&a.rb.html', href
   end
@@ -49,20 +54,15 @@ class HtmlIndexTest < Id58TestBase
         percent: 100, missing: 0 }
     ]
     html = REXML::Document.new(ConditionCoverage::HtmlIndex.page(rows))
+
     buttons = html.elements.to_a('//thead//th/button')
     expected = ['File', 'Sites', 'Outcomes seen', 'Missing']
     actual = buttons.map { |button| text_of(button) }
     assert_equal expected, actual
+
     files = html.elements.to_a('//tbody/tr/td[1]')
     expected = ['source/kata.rb', 'source/team.rb']
     actual = files.map { |cell| text_of(cell) }
     assert_equal expected, actual
-  end
-
-  private
-
-  # All the text inside element, its children's included.
-  def text_of(element)
-    REXML::XPath.match(element, './/text()').map(&:value).join
   end
 end

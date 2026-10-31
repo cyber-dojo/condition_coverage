@@ -1,5 +1,6 @@
 require_relative 'configuration'
 require_relative 'gaps'
+require_relative 'html_report'
 require_relative 'json_writer'
 require_relative 'manifest'
 require_relative 'recorder'
@@ -12,8 +13,9 @@ require_relative 'rewriter'
 module ConditionCoverage
   @recorder = Recorder.new
   @config = nil
-  # { full path => sites } of each covered file parsed as it
-  # loaded, so the exit report need not read it again.
+  # { full path => {source:, sites:} } of each covered file
+  # parsed as it loaded, so the exit report need not read it
+  # again.
   @parsed = {}
 
   # The one recorder that every instrumented operand reports to.
@@ -59,29 +61,48 @@ module ConditionCoverage
   def self.instrumented(path, config)
     return unless config.covers?(path)
 
-    source = File.read(path)
-    sites = Manifest.sites(source, config.relative(path))
-    @parsed[path] = sites
-    rewritten = Rewriter.rewrite(source, sites)
+    parsed = @parsed[path] = parse(path, config)
+    rewritten = Rewriter.rewrite(parsed[:source], parsed[:sites])
     RubyVM::InstructionSequence.compile(rewritten, path, path)
   end
 
-  # Writes the JSON report and prints the gaps, for every
-  # covered file whether or not the run loaded it.
-  def self.report(config)
-    result = Result.new(sites(config), @recorder.counts)
-    JsonWriter.write(result, config.json_path)
-    Gaps.lines(result).each { |line| puts line }
+  # The source and sites of the covered file at path.
+  def self.parse(path, config)
+    source = File.read(path)
+    { source:, sites: Manifest.sites(source, config.relative(path)) }
   end
 
-  # The manifest of every covered file, merged: as parsed when
-  # it loaded, or parsed now for a file the run never loaded.
-  def self.sites(config)
-    config.files.each_with_object({}) do |path, all|
-      sites = @parsed.fetch(path) do
-        Manifest.sites(File.read(path), config.relative(path))
-      end
-      all.merge!(sites)
+  # Writes the JSON report, then runs the chosen reporters, for
+  # every covered file whether or not the run loaded it.
+  def self.report(config)
+    files = parsed_files(config)
+    result = Result.new(merged_sites(files), @recorder.counts)
+    JsonWriter.write(result, config.json_path)
+    run_reporters(result, files, config)
+  end
+
+  # Runs each reporter chosen in the start block.
+  def self.run_reporters(result, files, config)
+    reporters = config.reporters
+    if reporters.include?(:gaps)
+      Gaps.lines(result).each { |line| puts line }
     end
+    return unless reporters.include?(:html)
+
+    HtmlReport.write(result, files, config)
+  end
+
+  # { full path => {source:, sites:} } for every covered file:
+  # as parsed when it loaded, or parsed now for a file the run
+  # never loaded.
+  def self.parsed_files(config)
+    config.files.to_h do |path|
+      [path, @parsed.fetch(path) { parse(path, config) }]
+    end
+  end
+
+  # The sites of every covered file, in one manifest.
+  def self.merged_sites(files)
+    files.values.map { |parsed| parsed[:sites] }.reduce({}, :merge)
   end
 end

@@ -6,12 +6,21 @@ module ConditionCoverage
   class Configuration
     GLOB_FLAGS = File::FNM_PATHNAME | File::FNM_EXTGLOB
     SETTINGS = %w[cover coverage_dir report root].freeze
-    REPORTERS = %w[gaps].freeze
+    REPORTERS = %w[gaps html].freeze
 
     # Evaluates the settings block against a new configuration.
     def initialize(&)
       @globs = []
+      @reporters = [:gaps]
       instance_eval(&)
+    end
+
+    # The reporters chosen with report, :gaps when none were.
+    attr_reader :reporters
+
+    # The dir the reports are written to.
+    def output_dir
+      @coverage_dir
     end
 
     # Sets the dir that cover globs and site names are
@@ -36,6 +45,7 @@ module ConditionCoverage
           "the reporters are: #{REPORTERS.join(', ')}"
         ].join("\n")
       end
+      @reporters = names.map(&:to_sym)
     end
 
     # Sets the dir the condition_coverage.json report is
@@ -52,7 +62,7 @@ module ConditionCoverage
 
     # Where the JSON report goes.
     def json_path
-      "#{@coverage_dir}/condition_coverage.json"
+      "#{output_dir}/condition_coverage.json"
     end
 
     # True when path is under root and matches a cover glob.

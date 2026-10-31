@@ -1,33 +1,19 @@
 require 'cgi/escape'
+require_relative 'html_template'
 
 module ConditionCoverage
   # The HTML index page: one sortable row per covered file,
   # each linking to that file's own page.
   module HtmlIndex
-    ASSETS = File.join(__dir__, 'html')
-
     # The whole index page: the files table, sortable by any
     # column, with one row per Summary.files row.
     def self.page(rows)
-      fill(
-        asset('index.html'),
-        'style' => asset('style.css'),
-        'script' => asset('sort.js'),
+      HtmlTemplate.fill(
+        HtmlTemplate.asset('index.html'),
+        'style' => HtmlTemplate.asset('style.css'),
+        'script' => HtmlTemplate.asset('sort.js'),
         'rows' => rows.map { |row| row(row) }.join("\n")
       )
-    end
-
-    # The text of one of the page's template, style or script
-    # files.
-    def self.asset(name)
-      File.read(File.join(ASSETS, name))
-    end
-
-    # template with each {{name}} replaced by values[name].
-    def self.fill(template, values)
-      template.gsub(/\{\{(\w+)\}\}/) do
-        values.fetch(Regexp.last_match(1))
-      end
     end
 
     # The table row of one Summary.files row; each cell has a

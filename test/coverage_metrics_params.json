@@ -2,17 +2,17 @@
   "bounds": {
     "code": {
       "lines": {
-        "total":  {"min": 1, "max": 242},
+        "total":  {"min": 1, "max": 340},
         "missed": {"min": 0, "max": 0}
       },
       "branches": {
-        "total":  {"min": 1, "max": 22},
+        "total":  {"min": 1, "max": 30},
         "missed": {"min": 0, "max": 0}
       }
     },
     "test": {
       "lines": {
-        "total":  {"min": 1, "max": 502},
+        "total":  {"min": 1, "max": 594},
         "missed": {"min": 0, "max": 0}
       },
       "branches": {

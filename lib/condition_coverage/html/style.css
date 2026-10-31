@@ -46,3 +46,46 @@ th button::after { content: " \2195"; color: var(--muted); }
 th[aria-sort="ascending"] button::after { content: " \25B2"; color: var(--fg); }
 th[aria-sort="descending"] button::after { content: " \25BC"; color: var(--fg); }
 th button:focus-visible { outline: 3px solid var(--link); outline-offset: 2px; }
+
+/* A file's page: plain source; on lines holding a condition the
+   line numbers are one button. Every number has the same box, so
+   digits stay aligned whether or not they are on a button. */
+.back { margin: 0; font-size: 14px; }
+h1.path { font-family: var(--font-code); font-size: 20px; }
+.code { font-family: var(--font-code); font-size: 14px; line-height: 32px; padding: 10px 0; min-width: 720px; }
+.line, .block { display: flex; align-items: flex-start; }
+.srcs { display: flex; flex-direction: column; }
+.src { white-space: pre; }
+.lineno {
+  display: block; width: 52px; padding-right: 20px; text-align: right;
+  color: var(--muted); font-variant-numeric: tabular-nums; flex-shrink: 0;
+}
+button.lnum {
+  display: flex; flex-direction: column; flex-shrink: 0; margin: 4px 0; padding: 0;
+  border: 1px solid transparent; border-radius: 6px; cursor: pointer;
+  font: 600 14px/24px var(--font-code); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+}
+button.lnum { position: relative; }
+button.lnum::before {
+  content: "\25B8"; position: absolute; left: 7px; top: 4px;
+  font-size: 11px; line-height: 24px; transition: transform 120ms;
+}
+button.lnum[aria-expanded="true"]::before { transform: rotate(90deg); }
+button.lnum .lineno { width: 50px; padding-right: 19px; color: inherit; line-height: 32px; margin: -4px 0; }
+button.lnum[data-status="covered"] { background: var(--ok-tint); color: var(--ok); border-color: var(--ok); }
+button.lnum[data-status="gaps"] { background: var(--bad); color: var(--on-status); border-color: var(--bad); }
+button.lnum:hover { filter: brightness(1.1); }
+button.lnum:focus-visible { outline: 3px solid var(--link); outline-offset: 2px; }
+.tree {
+  margin: 4px 20px 12px 72px; padding: 10px 16px; border: 1px solid var(--rule);
+  border-radius: 8px; background: var(--panel); line-height: 30px;
+}
+.row { display: grid; grid-template-columns: auto minmax(200px, 1fr) 70px 70px 160px; column-gap: 16px; }
+.row.headings { font-family: var(--font-body); font-size: 12px; color: var(--muted); }
+.row.headings span:first-child { grid-column: span 2; }
+.row.headings span:nth-child(2), .row.headings span:nth-child(3) { text-align: right; }
+.operator { grid-column: span 2; font-weight: 600; }
+.branch { white-space: pre; color: var(--muted); margin-right: -16px; }
+.row .text { white-space: pre; }
+.row .truthy, .row .falsy { text-align: right; font-variant-numeric: tabular-nums; }
+.row .gap { color: var(--bad); }

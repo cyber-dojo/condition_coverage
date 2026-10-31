@@ -16,6 +16,7 @@ class KernelTest < Id58TestBase
     site = 'kernel_test.rb:6rTS10:0' # used by no other test
     kata = { 'id' => 'Kp9sA2' }
     assert_same kata, ConditionCoverage.record(site, 0, kata)
+
     expected = { truthy: 1, falsy: 0 }
     actual = ConditionCoverage.recorder.counts[[site, 0]]
     assert_equal expected, actual
@@ -90,6 +91,7 @@ class KernelTest < Id58TestBase
       'group.rb:3:24 operand 1 never false'
     ].join("\n")
     assert_output("#{expected}\n") { report.call }
+
     json = JSON.parse(File.read("#{dir}/condition_coverage.json"))
     expected = {
       'group.rb:3:24' => [
@@ -151,6 +153,35 @@ class KernelTest < Id58TestBase
       coverage_dir dir
     end
     assert_output("squad.rb:3:24 never reached\n") { report.call }
+  end
+
+  test '6rTS48', %w(
+  | with report :html the exit report writes the index page
+  | and a page per covered file into coverage_dir, and
+  | prints no gaps, since :gaps was not chosen
+  ) do
+    dir = Dir.mktmpdir('6rTS48')
+    File.write("#{dir}/crew.rb", <<~RUBY)
+      module Crew6rTS48
+        def self.ok?(id) = !id.empty?
+        def self.crew?(id) = ok?(id) && id.size == 6
+      end
+    RUBY
+    exit_report = nil
+    on_exit = ->(&block) { exit_report = block }
+    ConditionCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+      report :html
+    end
+    require "#{dir}/crew.rb"
+    Crew6rTS48.crew?('Kp9sA2')
+
+    assert_output('', '') { exit_report.call }
+
+    assert File.file?("#{dir}/index.html")
+    assert File.file?("#{dir}/files/crew.rb.html")
   end
 
   test '6rTS50', %w(

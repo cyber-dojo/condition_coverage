@@ -149,6 +149,12 @@ class Id58TestBase < Minitest::Test
     puts $ERROR_INFO.message unless $ERROR_INFO.nil?
   end
 
+  # All the text inside a parsed REXML element, its children's
+  # included, unescaped.
+  def text_of(element)
+    REXML::XPath.match(element, './/text()').map(&:value).join
+  end
+
   # Hook for subclasses; runs before each test body.
   def id58_setup; end
 
