@@ -1,0 +1,24 @@
+{
+  "bounds": {
+    "code": {
+      "lines": {
+        "total":  {"min": 1, "max": 33},
+        "missed": {"min": 0, "max": 0}
+      },
+      "branches": {
+        "total":  {"min": 0, "max": 0},
+        "missed": {"min": 0, "max": 0}
+      }
+    },
+    "test": {
+      "lines": {
+        "total":  {"min": 1, "max": 175},
+        "missed": {"min": 0, "max": 0}
+      },
+      "branches": {
+        "total":  {"min": 1, "max": 26},
+        "missed": {"min": 0, "max": 0}
+      }
+    }
+  }
+}

@@ -1,0 +1,15 @@
+inherit_from: ../.rubocop.yml
+
+# Test descriptions are free-form English written as
+# %w(...), so quotes and commas in them are intended.
+Lint/PercentStringArray:
+  Enabled: false
+
+# A test class grows a test at a time, each spelling out its
+# own fixture in full so it reads on its own.
+Metrics/ClassLength:
+  Enabled: false
+
+Style/PercentLiteralDelimiters:
+  PreferredDelimiters:
+    '%w': '()'

@@ -1,0 +1,14 @@
+AllCops:
+  NewCops: enable
+  TargetRubyVersion: 3.2
+  Exclude:
+    - reports/**/*
+
+Layout/LineLength:
+  Max: 70
+
+# The tests run with RUBYOPT=--enable-frozen-string-literal
+# (bin/run_tests.sh), so no literal is mutated; the gem
+# then behaves the same whatever its consumer sets.
+Style/FrozenStringLiteralComment:
+  Enabled: false
