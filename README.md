@@ -3,7 +3,7 @@
 Condition coverage for Ruby, to run alongside SimpleCov's line and branch
 coverage.
 
-Status: 0.0.2 covers `&&`, `||`, `and` and `or`: each leaf operand of a
+Status: 0.0.3 covers `&&`, `||`, `and` and `or`: each leaf operand of a
 condition, however its operators are chained, nested or grouped. Decisions
 hidden inside calls come next (see Roadmap).
 
@@ -96,11 +96,15 @@ the file:
 ```ruby
 ok?(id) && new?(id)
 # compiles as
-ConditionCoverage.record("k.rb:2:2", 0, (ok?(id))) && ConditionCoverage.record("k.rb:2:2", 1, (new?(id)))
+ConditionCoverage.record("k.rb:2:2", 0, ok?(id)) && ConditionCoverage.record("k.rb:2:2", 1, new?(id))
 ```
 
-Each operand gets parentheses of its own, since one such as `ok? id` (after
-`and`) is not valid as a bare argument.
+A command call such as `ok? id` (after `and`) is not valid as a bare
+argument, so that operand alone gets parentheses of its own. No other operand
+does: parentheses make a statement, and a statement on a continuation line
+gives that line a line-coverage count of its own, which would change
+SimpleCov's line totals. With that one exception, an instrumented file has
+the same relevant lines as an uninstrumented one.
 
 `record` counts whether the operand was truthy or falsy and returns it
 unchanged, so short-circuiting and the value of the expression are

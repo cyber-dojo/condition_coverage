@@ -184,6 +184,32 @@ class KernelTest < Id58TestBase
     assert File.file?("#{dir}/files/crew.rb.html")
   end
 
+  test '6rTS49', %w(
+  | a coverage_dir that does not exist yet is created,
+  | parents and all, before the exit report writes into it
+  ) do
+    dir = Dir.mktmpdir('6rTS49')
+    File.write("#{dir}/pair.rb", <<~RUBY)
+      module Pair6rTS49
+        def self.ok?(id) = !id.empty?
+        def self.pair?(id) = ok?(id) && id.size == 6
+      end
+    RUBY
+    out = "#{dir}/reports/condition"
+    exit_report = nil
+    on_exit = ->(&block) { exit_report = block }
+    ConditionCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir out
+      report :html
+    end
+    exit_report.call
+
+    assert File.file?("#{out}/condition_coverage.json")
+    assert File.file?("#{out}/index.html")
+  end
+
   test '6rTS50', %w(
   | starting a second time swaps the configuration silently,
   | with no warning that the load hook was redefined

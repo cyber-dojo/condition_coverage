@@ -40,14 +40,26 @@ class ProjectsTest < Id58TestBase
     assert status.success?
   end
 
+  test '4WXv30', %w(
+  | an instrumented file has the same relevant lines for
+  | line coverage as it has uninstrumented, so SimpleCov's
+  | line totals do not change when condition coverage runs,
+  | even for a condition written over several lines
+  ) do
+    off, = run_project('multiline_condition', 'CONDITIONS' => 'off')
+    on, = run_project('multiline_condition', 'CONDITIONS' => 'on')
+    assert_equal off, on
+  end
+
   private
 
   # Runs test/projects/name/run.rb in its own ruby process,
-  # returning its stdout, stderr and exit status.
-  def run_project(name)
+  # with env added to its environment, returning its stdout,
+  # stderr and exit status.
+  def run_project(name, env = {})
     run_rb = File.expand_path("projects/#{name}/run.rb", __dir__)
     lib = File.expand_path('../lib', __dir__)
-    env = { 'COVERAGE_DIR' => Dir.mktmpdir(name) }
+    env = env.merge('COVERAGE_DIR' => Dir.mktmpdir(name))
     Open3.capture3(env, 'ruby', '-I', lib, run_rb)
   end
 end

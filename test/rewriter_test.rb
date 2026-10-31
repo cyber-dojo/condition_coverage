@@ -6,9 +6,7 @@ class RewriterTest < Id58TestBase
   | each operand of an && is wrapped in a record call
   | keyed by the && site's path:line:column
   | and the operand's index, at the byte ranges
-  | the manifest found, with no parse of its own;
-  | the operand is parenthesised, as a command call
-  | such as ok? id is no bare argument
+  | the manifest found, with no parse of its own
   ) do
     source = <<~RUBY
       def kata?(id)
@@ -18,8 +16,8 @@ class RewriterTest < Id58TestBase
     sites = { 'k.rb:2:2' => condition('&&', 16...23, 27...35) }
     expected = [
       'def kata?(id)',
-      '  ConditionCoverage.record("k.rb:2:2", 0, (ok?(id))) && ' \
-      'ConditionCoverage.record("k.rb:2:2", 1, (new?(id)))',
+      '  ConditionCoverage.record("k.rb:2:2", 0, ok?(id)) && ' \
+      'ConditionCoverage.record("k.rb:2:2", 1, new?(id))',
       'end',
       ''
     ].join("\n")
@@ -41,9 +39,33 @@ class RewriterTest < Id58TestBase
     sites = { 'k.rb:2:2' => condition('&&', 16...23, either) }
     expected = [
       'def kata?(id)',
-      '  ConditionCoverage.record("k.rb:2:2", 0, (ok?(id))) && ' \
-      '(ConditionCoverage.record("k.rb:2:2", 1, (new?(id))) || ' \
-      'ConditionCoverage.record("k.rb:2:2", 2, (id.size == 6)))',
+      '  ConditionCoverage.record("k.rb:2:2", 0, ok?(id)) && ' \
+      '(ConditionCoverage.record("k.rb:2:2", 1, new?(id)) || ' \
+      'ConditionCoverage.record("k.rb:2:2", 2, id.size == 6))',
+      'end',
+      ''
+    ].join("\n")
+    rewriter = ConditionCoverage::Rewriter
+    assert_equal expected, rewriter.rewrite(source, sites)
+  end
+
+  test '6D1Ka9', %w(
+  | a command-call leaf is also wrapped in parentheses of its
+  | own, since id.include? 'N' is no bare argument; other
+  | leaves are not, as parentheses would give a continuation
+  | line a line-coverage count of its own
+  ) do
+    source = <<~RUBY
+      def kata?(id)
+        ok?(id) and id.include? 'N'
+      end
+    RUBY
+    site = condition('and', 16...23, 28...43, commands: [28...43])
+    sites = { 'k.rb:2:2' => site }
+    expected = [
+      'def kata?(id)',
+      '  ConditionCoverage.record("k.rb:2:2", 0, ok?(id)) and ' \
+      "ConditionCoverage.record(\"k.rb:2:2\", 1, (id.include? 'N'))",
       'end',
       ''
     ].join("\n")

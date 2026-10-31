@@ -19,6 +19,7 @@ module ConditionCoverage
       def initialize(path)
         @path = path
         @sites = {}
+        @commands = []
         super()
       end
 
@@ -43,7 +44,11 @@ module ConditionCoverage
       def add_site(node)
         site = Site.of(@path, node)
         @sites[site] = nil
-        @sites[site] = condition_of(node)
+        outer = @commands
+        @commands = []
+        condition = condition_of(node)
+        @sites[site] = condition.with(commands: @commands)
+        @commands = outer
       end
 
       # node as a Condition, operands and all, named by its
@@ -72,11 +77,21 @@ module ConditionCoverage
       end
 
       # The byte range of a leaf operand, once any site inside
-      # it is noted too.
+      # it is noted too, and the range among its site's commands
+      # if it is a command call.
       def leaf(operand)
         operand.accept(self)
         loc = operand.location
-        loc.start_offset...loc.end_offset
+        range = loc.start_offset...loc.end_offset
+        @commands << range if command?(operand)
+        range
+      end
+
+      # True for a call to a named method with arguments and no
+      # parentheses, eg `id.include? 'N'`, but not `id.size == 6`.
+      def command?(node)
+        node.type == :call_node && node.arguments &&
+          node.opening_loc.nil? && node.name.match?(/\A[a-z_]/i)
       end
 
       # The one statement inside a parenthesised operand, or the

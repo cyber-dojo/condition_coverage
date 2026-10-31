@@ -151,9 +151,10 @@ class Id58TestBase < Minitest::Test
   end
 
   # A site's condition as the manifest finds it, eg
-  # condition('&&', 16...23, 27...35).
-  def condition(operator, *operands)
-    ConditionCoverage::Condition.new(operator:, operands:)
+  # condition('&&', 16...23, 27...35), with commands naming
+  # the leaves that are command calls.
+  def condition(operator, *operands, commands: [])
+    ConditionCoverage::Condition.new(operator:, operands:, commands:)
   end
 
   # All the text inside a parsed REXML element, its children's

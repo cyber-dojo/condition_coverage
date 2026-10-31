@@ -126,6 +126,22 @@ class ManifestTest < Id58TestBase
     assert_equal expected, actual
   end
 
+  test '6asy77', %w(
+  | a leaf that is a command call, eg id.include? 'N' after
+  | an and, is named among the condition's commands, since
+  | it needs parentheses of its own to be an argument
+  ) do
+    source = <<~RUBY
+      def kata?(id)
+        ok?(id) and id.include? 'N'
+      end
+    RUBY
+    site = condition('and', 16...23, 28...43, commands: [28...43])
+    expected = { 'k.rb:2:2' => site }
+    actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
+    assert_equal expected, actual
+  end
+
   test '6asy80', %w(
   | a condition inside a leaf operand, eg in a block,
   | decides something else, so it is a site of its own

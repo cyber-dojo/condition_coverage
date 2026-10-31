@@ -1,3 +1,4 @@
+require 'fileutils'
 require_relative 'configuration'
 require_relative 'gaps'
 require_relative 'html_report'
@@ -73,10 +74,12 @@ module ConditionCoverage
   end
 
   # Writes the JSON report, then runs the chosen reporters, for
-  # every covered file whether or not the run loaded it.
+  # every covered file whether or not the run loaded it, into
+  # coverage_dir, created first if need be.
   def self.report(config)
     files = parsed_files(config)
     result = Result.new(merged_sites(files), @recorder.counts)
+    FileUtils.mkdir_p(config.output_dir)
     JsonWriter.write(result, config.json_path)
     run_reporters(result, files, config)
   end
