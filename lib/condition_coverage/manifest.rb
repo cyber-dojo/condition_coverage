@@ -89,9 +89,11 @@ module ConditionCoverage
         range
       end
 
+      # A constant is taken to be truthy, as one holding nil or
+      # false is rare.
       TRUTHY_TYPES = %i[
         string_node integer_node symbol_node array_node hash_node
-        true_node lambda_node
+        true_node lambda_node constant_read_node constant_path_node
       ].freeze
       FALSY_TYPES = %i[nil_node false_node].freeze
 

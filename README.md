@@ -3,7 +3,7 @@
 Condition coverage for Ruby, to run alongside SimpleCov's line and branch
 coverage.
 
-Status: 0.0.4 covers `&&`, `||`, `and` and `or`: each leaf operand of a
+Status: 0.0.5 covers `&&`, `||`, `and` and `or`: each leaf operand of a
 condition, however its operators are chained, nested or grouped. Decisions
 hidden inside calls come next (see Roadmap).
 
@@ -77,8 +77,9 @@ nothing.
 
 An operand whose form allows one outcome only needs only to be evaluated:
 its other outcome is impossible, not a gap. `Foo.new`, literals (`'s'`,
-`1`, `:k`, `[]`, `{}`, `true`) and lambdas can only be truthy; `nil` and
-`false` only falsy:
+`1`, `:k`, `[]`, `{}`, `true`), lambdas and constants (`LATEST`,
+`Config::DEFAULT`, since one holding nil or false is rare) can only be
+truthy; `nil` and `false` only falsy:
 
 ```ruby
 @clock = options[:clock] || MonotonicClock.new  # operand 1: never evaluated, or no gap
@@ -92,7 +93,10 @@ its other outcome is impossible, not a gap. `Foo.new`, literals (`'s'`,
   missing) that opens a tree of the condition: its operators, nested as
   Ruby groups them, and each leaf operand's true and false counts and its
   gap. A condition written over several lines has one button over all of
-  its line numbers.
+  its line numbers. Trees with gaps start open. A header that stays at
+  the top of the page lists every site as a link to its line, covered
+  sites first, then those with gaps, and arrows beside each site with
+  gaps jump to the previous and next one, wrapping round at either end.
 
 ## How it works
 

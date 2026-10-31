@@ -7,7 +7,7 @@ class HtmlFileTest < Id58TestBase
   | a file's listing shows every line's code in order;
   | a line with no condition has a plain number, and a line
   | with one has its number on a button giving its status,
-  | closed, and naming the tree it opens
+  | closed when covered, and naming the tree it opens
   ) do
     lines = [
       { number: 1, text: 'module Kata', status: nil, span: nil },
@@ -15,7 +15,7 @@ class HtmlFileTest < Id58TestBase
         status: nil, span: nil },
       { number: 3,
         text: "  def self.kata?(id) = ok?(id) && id.start_with?('N')",
-        status: :gaps, span: 3..3 },
+        status: :covered, span: 3..3 },
       { number: 4, text: 'end', status: nil, span: nil }
     ]
     listing = ConditionCoverage::HtmlFile.listing(lines)
@@ -34,7 +34,7 @@ class HtmlFileTest < Id58TestBase
     button = html.elements.to_a('//button')
     assert_equal 1, button.size
     expected = {
-      'data-status' => 'gaps',
+      'data-status' => 'covered',
       'aria-expanded' => 'false',
       'aria-controls' => 'tree-3'
     }
@@ -77,7 +77,7 @@ class HtmlFileTest < Id58TestBase
   end
 
   test 'gae530', %w(
-  | a span's tree is hidden until its button opens it,
+  | a covered span's tree is hidden until its button opens it,
   | and sits straight after the span, so it never splits it;
   | it has one row per operand: text, true, false and gap
   ) do
@@ -85,15 +85,15 @@ class HtmlFileTest < Id58TestBase
       { number: 1, text: 'module Kata', status: nil, span: nil },
       { number: 2,
         text: "  def self.kata?(id) = ok?(id) && id.start_with?('N')",
-        status: :gaps, span: 2..2 },
+        status: :covered, span: 2..2 },
       { number: 3, text: 'end', status: nil, span: nil }
     ]
     trees = {
       2 => [
         { operator: '&&', operands: [
           { text: 'ok?(id)', truthy: 1, falsy: 1, gap: nil },
-          { text: "id.start_with?('N')", truthy: 1, falsy: 0,
-            gap: 'never false' }
+          { text: "id.start_with?('N')", truthy: 1, falsy: 1,
+            gap: nil }
         ] }
       ]
     }
@@ -114,7 +114,7 @@ class HtmlFileTest < Id58TestBase
     end
     expected = [
       ['ok?(id)', '1', '1', ''],
-      ["id.start_with?('N')", '1', '0', 'never false']
+      ["id.start_with?('N')", '1', '1', '']
     ]
     assert_equal expected, actual
   end
@@ -245,6 +245,111 @@ class HtmlFileTest < Id58TestBase
 
     groups = html.elements.to_a("//*[@id='tree-1']/*[@data-site]")
     assert_equal 2, groups.size
+  end
+
+  test 'gae532', %w(
+  | a site with gaps has its tree open as the page loads,
+  | so the gaps show without a click; a covered site's tree
+  | stays closed
+  ) do
+    lines = [
+      { number: 1, text: '  ok?(a) && new?(a)', status: :gaps,
+        span: 1..1 },
+      { number: 2, text: '  ok?(b) && new?(b)', status: :covered,
+        span: 2..2 }
+    ]
+    listing = ConditionCoverage::HtmlFile.listing(lines)
+    html = REXML::Document.new(listing)
+
+    buttons = html.elements.to_a('//button')
+    actual = buttons.map { |b| b.attributes['aria-expanded'] }
+    assert_equal %w(true false), actual
+
+    trees = html.elements.to_a("//*[@class='tree']")
+    actual = trees.map { |tree| tree.attributes['hidden'] }
+    assert_equal [nil, 'hidden'], actual
+  end
+
+  test 'gae534', %w(
+  | every row has a cell left of its number, so the numbers
+  | stay aligned; at a site with gaps it links to the previous
+  | and next site with gaps, wrapping round at either end
+  ) do
+    lines = [
+      { number: 1, text: '  ok?(a) && new?(a)', status: :gaps,
+        span: 1..1 },
+      { number: 2, text: '  log(a)', status: nil, span: nil },
+      { number: 3, text: '  ok?(b) && new?(b)', status: :gaps,
+        span: 3..3 },
+      { number: 4, text: '  ok?(c) && new?(c)', status: :covered,
+        span: 4..4 },
+      { number: 5, text: '  ok?(d) && new?(d)', status: :gaps,
+        span: 5..5 }
+    ]
+    listing = ConditionCoverage::HtmlFile.listing(lines)
+    html = REXML::Document.new(listing)
+
+    cells = html.elements.to_a('//*[@data-nav]')
+    actual = cells.map do |cell|
+      %w(prev next).map do |way|
+        link = cell.elements["a[@data-#{way}]"]
+        link&.attributes&.[]('href')
+      end
+    end
+    expected = [
+      ['#L5', '#L3'], [nil, nil], ['#L1', '#L5'], [nil, nil],
+      ['#L3', '#L1']
+    ]
+    assert_equal expected, actual
+  end
+
+  test 'gae537', %w(
+  | every line number, on a button or not, is the target
+  | L<number> that a link to that line names
+  ) do
+    lines = [
+      { number: 1, text: 'module Kata', status: nil, span: nil },
+      { number: 2, text: '  ok?(id) && new?(id)', status: :gaps,
+        span: 2..2 },
+      { number: 3, text: 'end', status: nil, span: nil }
+    ]
+    listing = ConditionCoverage::HtmlFile.listing(lines)
+    html = REXML::Document.new(listing)
+
+    numbers = html.elements.to_a('//*[@data-line]')
+    actual = numbers.map { |element| element.attributes['id'] }
+    assert_equal %w(L1 L2 L3), actual
+  end
+
+  test 'gae545', %w(
+  | a file's page opens with one header, sticky in the page,
+  | holding the back link, the path, and two lists of links to
+  | the first line of each site: those covered, then those
+  | with gaps
+  ) do
+    lines = [
+      { number: 1, text: '  ok?(a) && new?(a)', status: :gaps,
+        span: 1..1 },
+      { number: 2, text: '  ok?(b) && new?(b)', status: :covered,
+        span: 2..2 },
+      { number: 3, text: '  log(b)', status: nil, span: nil },
+      { number: 4, text: '  ok?(c) && new?(c)', status: :gaps,
+        span: 4..4 }
+    ]
+    html_file = ConditionCoverage::HtmlFile
+    page = html_file.page('source/kata.rb', lines, {})
+    html = REXML::Document.new(page)
+    head = html.elements['//*[@data-head]']
+
+    assert_equal 'source/kata.rb', text_of(head.elements['.//h1'])
+    refute_nil head.elements['.//a[@data-index]']
+
+    expected = { 'covered' => %w(#L2), 'gaps' => %w(#L1 #L4) }
+    actual = expected.keys.to_h do |status|
+      links = head.elements.to_a(".//*[@data-jumps='#{status}']/a")
+      [status, links.map { |link| link.attributes['href'] }]
+    end
+    assert_equal expected, actual
   end
 
   test 'gae540', %w(

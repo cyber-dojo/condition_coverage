@@ -187,6 +187,24 @@ class ManifestTest < Id58TestBase
     assert_equal expected, actual
   end
 
+  test '6asy7a', %w(
+  | a constant, eg LATEST or Config::DEFAULT, is taken to be
+  | truthy only, as a constant holding nil or false is rare
+  ) do
+    source = <<~RUBY
+      def tagged(match)
+        tag = match[8] || LATEST
+        host = match[2] || Config::DEFAULT
+        "\#{host}:\#{tag}"
+      end
+    RUBY
+    sites = ConditionCoverage::Manifest.sites(source, 'k.rb')
+    actual = sites.values.map(&:fixed).reduce({}, :merge)
+                  .transform_keys { |range| source.byteslice(range) }
+    expected = { 'LATEST' => :truthy, 'Config::DEFAULT' => :truthy }
+    assert_equal expected, actual
+  end
+
   test '6asy80', %w(
   | a condition inside a leaf operand, eg in a block,
   | decides something else, so it is a site of its own
