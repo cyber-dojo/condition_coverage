@@ -74,6 +74,31 @@ class SourceLinesTest < Id58TestBase
     assert_equal :gaps, line[:status]
   end
 
+  test 'MDBw16', %w(
+  | a line whose only unseen outcome is the impossible one
+  | of a leaf that can have one outcome only is covered
+  ) do
+    source = <<~RUBY
+      def initialize(options)
+        @clock = options[:clock] || MonotonicClock.new
+      end
+    RUBY
+    fixed = { 54...72 => :truthy }
+    sites = {
+      'source/clock.rb:2:11' =>
+        condition('||', 35...50, 54...72, fixed:)
+    }
+    operands = {
+      'source/clock.rb:2:11' => [
+        { truthy: 1, falsy: 1 },
+        { truthy: 1, falsy: 0, only: :truthy }
+      ]
+    }
+    source_lines = ConditionCoverage::SourceLines
+    line = source_lines.of(source, sites, operands)[1]
+    assert_equal :covered, line[:status]
+  end
+
   test 'MDBw17', %w(
   | sites whose lines overlap merge into one span,
   | so all the lines they cover form a single button

@@ -10,7 +10,7 @@ module ConditionCoverage
     # The summary row of one file's sites.
     def self.row(path, sites)
       operands = sites.flat_map { |_, counts| counts }
-      outcomes = operands.size * 2
+      outcomes = operands.sum { |counts| counts[:only] ? 1 : 2 }
       seen = operands.sum { |counts| seen_in(counts) }
       {
         path:, sites: sites.size, seen:, outcomes:,

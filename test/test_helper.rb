@@ -152,9 +152,12 @@ class Id58TestBase < Minitest::Test
 
   # A site's condition as the manifest finds it, eg
   # condition('&&', 16...23, 27...35), with commands naming
-  # the leaves that are command calls.
-  def condition(operator, *operands, commands: [])
-    ConditionCoverage::Condition.new(operator:, operands:, commands:)
+  # the leaves that are command calls, and fixed the leaves
+  # that can have one outcome only.
+  def condition(operator, *operands, commands: [], fixed: {})
+    ConditionCoverage::Condition.new(
+      operator:, operands:, commands:, fixed:
+    )
   end
 
   # All the text inside a parsed REXML element, its children's

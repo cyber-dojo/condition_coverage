@@ -2,10 +2,12 @@ module ConditionCoverage
   # One site's condition as the manifest found it: its operator
   # and its operands, each the byte range of a leaf or a nested
   # Condition. A site's commands are the byte ranges of its
-  # leaves that are command calls, eg `ok? id`.
-  Condition = Data.define(:operator, :operands, :commands) do
-    # A condition with no command-call leaves by default.
-    def initialize(operator:, operands:, commands: [])
+  # leaves that are command calls, eg `ok? id`; its fixed are
+  # { byte range => :truthy } for leaves that can have that one
+  # outcome only, eg `Clock.new`.
+  Condition = Data.define(:operator, :operands, :commands, :fixed) do
+    # A condition with no command-call or fixed leaves by default.
+    def initialize(operator:, operands:, commands: [], fixed: {})
       super
     end
 

@@ -1,3 +1,5 @@
+require_relative 'gaps'
+
 module ConditionCoverage
   # The lines of one file's page, each with the status of the
   # conditions on it.
@@ -58,14 +60,10 @@ module ConditionCoverage
       [one, other].include?(:gaps) ? :gaps : :covered
     end
 
-    # :covered when every operand was seen both ways, else :gaps.
+    # :covered when no operand has a gap, else :gaps.
     def self.status_of(counts)
-      counts.all? { |operand| seen_both?(operand) } ? :covered : :gaps
-    end
-
-    # True when the operand was seen both true and false.
-    def self.seen_both?(counts)
-      counts[:truthy].positive? && counts[:falsy].positive?
+      gaps = counts.flat_map { |operand| Gaps.operand_gap(operand) }
+      gaps.empty? ? :covered : :gaps
     end
 
     # The line a site starts on, from its path:line:column name.

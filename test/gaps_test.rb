@@ -31,4 +31,20 @@ class GapsTest < Id58TestBase
     actual = ConditionCoverage::Gaps.lines(result)
     assert_equal expected, actual
   end
+
+  test 'ngWa20', %w(
+  | a leaf that can have one outcome only has no gap once
+  | it is evaluated, its other outcome being impossible
+  ) do
+    fixed = { 54...72 => :truthy }
+    sites = {
+      'k.rb:2:11' => condition('||', 35...50, 54...72, fixed:)
+    }
+    counts = {
+      ['k.rb:2:11', 0] => { truthy: 1, falsy: 1 },
+      ['k.rb:2:11', 1] => { truthy: 1, falsy: 0 }
+    }
+    result = ConditionCoverage::Result.new(sites, counts)
+    assert_equal [], ConditionCoverage::Gaps.lines(result)
+  end
 end

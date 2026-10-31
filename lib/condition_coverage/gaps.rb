@@ -25,9 +25,11 @@ module ConditionCoverage
       end
     end
 
-    # The one outcome this operand is missing, if any.
+    # The one outcome this operand is missing, if any; a fixed
+    # leaf, which can have one outcome only, needs only to run.
     def self.operand_gap(counts)
       return ['never evaluated'] if never_ran?(counts)
+      return [] if counts[:only]
       return ['never true'] if counts[:truthy].zero?
       return ['never false'] if counts[:falsy].zero?
 

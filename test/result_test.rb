@@ -28,4 +28,26 @@ class ResultTest < Id58TestBase
     actual = ConditionCoverage::Result.new(sites, counts).operands
     assert_equal expected, actual
   end
+
+  test 'DYTY20', %w(
+  | the counts of a leaf that can have one outcome only
+  | say which, so reporters demand that outcome alone
+  ) do
+    fixed = { 54...72 => :truthy }
+    sites = {
+      'k.rb:2:11' => condition('||', 35...50, 54...72, fixed:)
+    }
+    counts = {
+      ['k.rb:2:11', 0] => { truthy: 1, falsy: 1 },
+      ['k.rb:2:11', 1] => { truthy: 1, falsy: 0 }
+    }
+    expected = {
+      'k.rb:2:11' => [
+        { truthy: 1, falsy: 1 },
+        { truthy: 1, falsy: 0, only: :truthy }
+      ]
+    }
+    actual = ConditionCoverage::Result.new(sites, counts).operands
+    assert_equal expected, actual
+  end
 end

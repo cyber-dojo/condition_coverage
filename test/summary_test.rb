@@ -29,4 +29,27 @@ class SummaryTest < Id58TestBase
     actual = ConditionCoverage::Summary.files(result)
     assert_equal expected, actual
   end
+
+  test 'SEye20', %w(
+  | a leaf that can have one outcome only adds one possible
+  | outcome, not two, so a site seen every way it can be
+  | is at 100 percent
+  ) do
+    fixed = { 54...72 => :truthy }
+    sites = {
+      'source/clock.rb:2:11' =>
+        condition('||', 35...50, 54...72, fixed:)
+    }
+    counts = {
+      ['source/clock.rb:2:11', 0] => { truthy: 1, falsy: 1 },
+      ['source/clock.rb:2:11', 1] => { truthy: 1, falsy: 0 }
+    }
+    result = ConditionCoverage::Result.new(sites, counts)
+    expected = [
+      { path: 'source/clock.rb', sites: 1, seen: 3, outcomes: 3,
+        percent: 100, missing: 0 }
+    ]
+    actual = ConditionCoverage::Summary.files(result)
+    assert_equal expected, actual
+  end
 end

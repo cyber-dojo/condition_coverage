@@ -19,7 +19,7 @@ module ConditionCoverage
       def initialize(path)
         @path = path
         @sites = {}
-        @commands = []
+        @notes = nil
         super()
       end
 
@@ -44,11 +44,11 @@ module ConditionCoverage
       def add_site(node)
         site = Site.of(@path, node)
         @sites[site] = nil
-        outer = @commands
-        @commands = []
+        outer = @notes
+        @notes = { commands: [], fixed: {} }
         condition = condition_of(node)
-        @sites[site] = condition.with(commands: @commands)
-        @commands = outer
+        @sites[site] = condition.with(**@notes)
+        @notes = outer
       end
 
       # node as a Condition, operands and all, named by its
@@ -77,14 +77,36 @@ module ConditionCoverage
       end
 
       # The byte range of a leaf operand, once any site inside
-      # it is noted too, and the range among its site's commands
-      # if it is a command call.
+      # it is noted too, and the range noted among its site's
+      # commands and fixed leaves where it is one.
       def leaf(operand)
         operand.accept(self)
         loc = operand.location
         range = loc.start_offset...loc.end_offset
-        @commands << range if command?(operand)
+        @notes[:commands] << range if command?(operand)
+        outcome = fixed_outcome(operand)
+        @notes[:fixed][range] = outcome if outcome
         range
+      end
+
+      TRUTHY_TYPES = %i[
+        string_node integer_node symbol_node array_node hash_node
+        true_node lambda_node
+      ].freeze
+      FALSY_TYPES = %i[nil_node false_node].freeze
+
+      # The one outcome a leaf can have, eg :truthy for `Clock.new`
+      # or a literal, :falsy for `nil`; nil for a leaf that can
+      # have either.
+      def fixed_outcome(node)
+        return :falsy if FALSY_TYPES.include?(node.type)
+
+        :truthy if TRUTHY_TYPES.include?(node.type) || new_call?(node)
+      end
+
+      # True for a call to new, eg `Clock.new`.
+      def new_call?(node)
+        node.type == :call_node && node.name == :new
       end
 
       # True for a call to a named method with arguments and no

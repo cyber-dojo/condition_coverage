@@ -142,6 +142,51 @@ class ManifestTest < Id58TestBase
     assert_equal expected, actual
   end
 
+  test '6asy78', %w(
+  | a leaf that can only be truthy, eg MonotonicClock.new,
+  | is named among the condition's fixed leaves, so its
+  | never false is not reported as a gap
+  ) do
+    source = <<~RUBY
+      def initialize(options)
+        @clock = options[:clock] || MonotonicClock.new
+      end
+    RUBY
+    fixed = { 54...72 => :truthy }
+    site = condition('||', 35...50, 54...72, fixed:)
+    expected = { 'k.rb:2:11' => site }
+    actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
+    assert_equal expected, actual
+  end
+
+  test '6asy79', %w(
+  | literals and lambdas can only be truthy, and nil and false
+  | only falsy, so each is a fixed leaf with that outcome
+  ) do
+    source = <<~RUBY
+      def defaults(o)
+        @a = o[:a] || 'anon'
+        @b = o[:b] || 1
+        @c = o[:c] || :none
+        @d = o[:d] || []
+        @e = o[:e] || {}
+        @f = o[:f] || true
+        @g = o[:g] || -> { 0 }
+        @h = o[:h] || nil
+        @i = o[:i] || false
+      end
+    RUBY
+    sites = ConditionCoverage::Manifest.sites(source, 'k.rb')
+    actual = sites.values.map(&:fixed).reduce({}, :merge)
+                  .transform_keys { |range| source.byteslice(range) }
+    expected = {
+      "'anon'" => :truthy, '1' => :truthy, ':none' => :truthy,
+      '[]' => :truthy, '{}' => :truthy, 'true' => :truthy,
+      '-> { 0 }' => :truthy, 'nil' => :falsy, 'false' => :falsy
+    }
+    assert_equal expected, actual
+  end
+
   test '6asy80', %w(
   | a condition inside a leaf operand, eg in a block,
   | decides something else, so it is a site of its own

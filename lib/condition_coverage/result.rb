@@ -13,15 +13,25 @@ module ConditionCoverage
     end
 
     # { site => [counts of operand 0, counts of operand 1, ...] },
-    # with zero counts for an operand that never ran.
+    # with zero counts for an operand that never ran, and
+    # only: naming the one outcome a fixed leaf can have.
     def operands
       @sites.to_h do |site, condition|
-        size = condition.leaves.size
-        [site, Array.new(size) { |i| counts_of(site, i) }]
+        leaves = condition.leaves.each_with_index.map do |range, i|
+          leaf(site, condition, range, i)
+        end
+        [site, leaves]
       end
     end
 
     private
+
+    # The counts of one leaf, with only: when it is fixed.
+    def leaf(site, condition, range, index)
+      counts = counts_of(site, index)
+      only = condition.fixed[range]
+      only ? counts.merge(only:) : counts
+    end
 
     # The recorded counts of one operand, or zeros.
     def counts_of(site, index)

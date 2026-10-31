@@ -3,7 +3,7 @@
 Condition coverage for Ruby, to run alongside SimpleCov's line and branch
 coverage.
 
-Status: 0.0.3 covers `&&`, `||`, `and` and `or`: each leaf operand of a
+Status: 0.0.4 covers `&&`, `||`, `and` and `or`: each leaf operand of a
 condition, however its operators are chained, nested or grouped. Decisions
 hidden inside calls come next (see Roadmap).
 
@@ -74,6 +74,15 @@ ids.any? { |k| k && k.ok? } && ok?(id)  # two sites: the block's is its own
 A chain of one operator is flat; a change of operator, by precedence or by
 parentheses, nests. Parentheses are not part of the tree, since they decide
 nothing.
+
+An operand whose form allows one outcome only needs only to be evaluated:
+its other outcome is impossible, not a gap. `Foo.new`, literals (`'s'`,
+`1`, `:k`, `[]`, `{}`, `true`) and lambdas can only be truthy; `nil` and
+`false` only falsy:
+
+```ruby
+@clock = options[:clock] || MonotonicClock.new  # operand 1: never evaluated, or no gap
+```
 
 - `:html` writes `index.html` to `coverage_dir`: the covered files with
   their sites, outcomes seen (with a percent) and outcomes missing, each
