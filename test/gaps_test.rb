@@ -9,10 +9,10 @@ class GapsTest < Id58TestBase
   | and a site never reached at all
   ) do
     sites = {
-      'k.rb:2:2' => 2,
-      'k.rb:6:4' => 2,
-      'k.rb:9:4' => 2,
-      'k.rb:12:4' => 2
+      'k.rb:2:2' => [16...23, 27...35],
+      'k.rb:6:4' => [57...64, 68...77],
+      'k.rb:9:4' => [95...102, 106...118],
+      'k.rb:12:4' => [136...143, 147...156]
     }
     counts = {
       ['k.rb:2:2', 0] => { truthy: 3, falsy: 0 },

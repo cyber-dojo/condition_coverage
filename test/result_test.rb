@@ -7,7 +7,10 @@ class ResultTest < Id58TestBase
   | with the counts of each of its operands,
   | zero for an operand or a whole site that never ran
   ) do
-    sites = { 'k.rb:2:2' => 2, 'k.rb:6:4' => 2 }
+    sites = {
+      'k.rb:2:2' => [16...23, 27...35],
+      'k.rb:6:4' => [57...64, 68...77]
+    }
     counts = {
       ['k.rb:2:2', 0] => { truthy: 2, falsy: 1 },
       ['k.rb:2:2', 1] => { truthy: 1, falsy: 1 }

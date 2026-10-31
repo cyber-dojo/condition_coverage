@@ -12,6 +12,9 @@ require_relative 'rewriter'
 module ConditionCoverage
   @recorder = Recorder.new
   @config = nil
+  # { full path => sites } of each covered file parsed as it
+  # loaded, so the exit report need not read it again.
+  @parsed = {}
 
   # The one recorder that every instrumented operand reports to.
   def self.recorder
@@ -56,9 +59,11 @@ module ConditionCoverage
   def self.instrumented(path, config)
     return unless config.covers?(path)
 
-    site_path = config.relative(path)
-    source = Rewriter.rewrite(File.read(path), site_path)
-    RubyVM::InstructionSequence.compile(source, path, path)
+    source = File.read(path)
+    sites = Manifest.sites(source, config.relative(path))
+    @parsed[path] = sites
+    rewritten = Rewriter.rewrite(source, sites)
+    RubyVM::InstructionSequence.compile(rewritten, path, path)
   end
 
   # Writes the JSON report and prints the gaps, for every
@@ -69,11 +74,14 @@ module ConditionCoverage
     Gaps.lines(result).each { |line| puts line }
   end
 
-  # The manifest of every covered file, merged.
+  # The manifest of every covered file, merged: as parsed when
+  # it loaded, or parsed now for a file the run never loaded.
   def self.sites(config)
     config.files.each_with_object({}) do |path, all|
-      source = File.read(path)
-      all.merge!(Manifest.sites(source, config.relative(path)))
+      sites = @parsed.fetch(path) do
+        Manifest.sites(File.read(path), config.relative(path))
+      end
+      all.merge!(sites)
     end
   end
 end

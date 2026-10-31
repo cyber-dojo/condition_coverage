@@ -1,18 +1,24 @@
-require 'prism'
-require_relative 'site'
-
 module ConditionCoverage
-  # Instruments source text so that each condition
-  # records its outcome when the code runs.
+  # Instruments source text so that each && operand records its
+  # outcome when the code runs. It inserts text at the byte
+  # ranges the manifest found, and never parses.
   module Rewriter
-    # Returns source with each && operand wrapped in a
-    # record call. Only text is inserted, never a
-    # newline, so backtrace line numbers still match.
-    def self.rewrite(source, path)
-      inserts = []
-      collector = AndCollector.new(path, inserts)
-      Prism.parse(source).value.accept(collector)
+    # Returns source with each operand in sites wrapped in a
+    # record call. Only text is inserted, never a newline, so
+    # backtrace line numbers still match the file on disk.
+    def self.rewrite(source, sites)
+      inserts = sites.flat_map do |site, ranges|
+        ranges.each_with_index.flat_map do |range, index|
+          wrap(site, index, range)
+        end
+      end
       apply(source.dup, inserts)
+    end
+
+    # The two inserts that wrap one operand in a record call.
+    def self.wrap(site, index, range)
+      call = "ConditionCoverage.record(#{site.inspect}, #{index}, "
+      [[range.begin, call], [range.end, ')']]
     end
 
     # Splices each [offset, text] insert into source,
@@ -23,33 +29,6 @@ module ConditionCoverage
         source.bytesplice(offset, 0, text)
       end
       source
-    end
-
-    # Collects the inserts that wrap each && operand.
-    class AndCollector < Prism::Visitor
-      # Appends [byte offset, text] pairs to inserts.
-      def initialize(path, inserts)
-        @path = path
-        @inserts = inserts
-        super()
-      end
-
-      # Wraps both operands of an &&.
-      def visit_and_node(node)
-        site = Site.of(@path, node)
-        wrap(site, 0, node.left)
-        wrap(site, 1, node.right)
-      end
-
-      private
-
-      # Inserts the record call around one operand.
-      def wrap(site, index, operand)
-        loc = operand.location
-        call = "ConditionCoverage.record(#{site.inspect}, "
-        @inserts << [loc.start_offset, "#{call}#{index}, "]
-        @inserts << [loc.end_offset, ')']
-      end
     end
   end
 end

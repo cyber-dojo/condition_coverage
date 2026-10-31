@@ -4,9 +4,9 @@ require 'json'
 require 'tmpdir'
 
 class KernelTest < Id58TestBase
-  # Serial: start replaces the one global load_iseq hook, and
-  # assert_output captures the one $stdout.
-  def self.run_order = :random
+  # Its tests swap the configuration of the one global load
+  # hook, and capture $stdout.
+  serial!
 
   test '6rTS10', %w(
   | ConditionCoverage.record, the call rewritten code makes,
@@ -98,6 +98,59 @@ class KernelTest < Id58TestBase
       ]
     }
     assert_equal expected, json['sites']
+  end
+
+  test '6rTS45', %w(
+  | a file loaded during the run is not read again for the
+  | exit report: the sites parsed as it loaded are reused,
+  | so each covered file is read and parsed at most once
+  ) do
+    dir = Dir.mktmpdir('6rTS45')
+    path = "#{dir}/team.rb"
+    File.write(path, <<~RUBY)
+      module Team6rTS45
+        def self.ok?(id) = !id.empty?
+        def self.team?(id) = ok?(id) && id.size == 6
+      end
+    RUBY
+    report = nil
+    on_exit = ->(&block) { report = block }
+    ConditionCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+    end
+    require path
+    Team6rTS45.team?('Kp9sA2')
+    # A re-read of the file now would find no &&.
+    File.write(path, "module Team6rTS45; end\n")
+    expected = [
+      'team.rb:3:23 operand 0 never false',
+      'team.rb:3:23 operand 1 never false'
+    ].join("\n")
+    assert_output("#{expected}\n") { report.call }
+  end
+
+  test '6rTS47', %w(
+  | a covered file the run never loads is parsed for the
+  | exit report, so each of its && sites is reported
+  | as never reached
+  ) do
+    dir = Dir.mktmpdir('6rTS47')
+    File.write("#{dir}/squad.rb", <<~RUBY)
+      module Squad6rTS47
+        def self.ok?(id) = !id.empty?
+        def self.squad?(id) = ok?(id) && id.size == 6
+      end
+    RUBY
+    report = nil
+    on_exit = ->(&block) { report = block }
+    ConditionCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+    end
+    assert_output("squad.rb:3:24 never reached\n") { report.call }
   end
 
   test '6rTS50', %w(

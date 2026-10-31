@@ -1,13 +1,21 @@
 require_relative 'test_helper'
 
 class TestHelperTest < Id58TestBase
-  # Serial, so assert_output's capture of $stdout cannot catch
-  # another thread's output: Minitest runs serial suites before
-  # parallel ones.
-  def self.run_order = :random
+  # Its tests capture $stdout and set ENV['SHOW_TEST_IDS'].
+  serial!
 
   # The body of a throwaway test that is defined, never run.
   NO_OP = proc { :no_op }
+
+  test 'Fb7A05', %w(
+  | a class that calls serial! opts out of parallel running
+  | on both counts: it is ordered with the serial suites,
+  | and its tests are run in place, not sent to the pool
+  ) do
+    klass = Class.new(Id58TestBase) { serial! }
+    assert_equal :random, klass.run_order
+    assert_equal klass.singleton_class, klass.method(:run).owner
+  end
 
   test 'Fb7A10', %w(
   | a running test can read its own id58 and description

@@ -21,6 +21,18 @@ class Id58TestBase < Minitest::Test
 
   parallelize_me!
 
+  # Opts a class out of parallel running, for tests that swap
+  # process-wide state ($stdout, ENV, a global hook). Both of
+  # the class methods parallelize_me! added are undone: the
+  # ordering, and run, which would still send each test to the
+  # thread pool.
+  def self.serial!
+    singleton_class.define_method(:run_order) { :random }
+    singleton_class.define_method(:run) do |klass, name, reporter|
+      Minitest::Runnable.run(klass, name, reporter)
+    end
+  end
+
   ARGS = (ARGV.sort.uniq - ['--']).freeze # eg 2m4
 
   @seen_ids = []
