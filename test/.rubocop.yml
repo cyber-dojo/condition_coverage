@@ -10,9 +10,12 @@ Layout/FirstArrayElementIndentation:
 Lint/PercentStringArray:
   Enabled: false
 
-# A test class grows a test at a time, each spelling out its
-# own fixture in full so it reads on its own.
+# A test class grows a test at a time, and each test block
+# spells out its own fixture in full so it reads on its own.
 Metrics/ClassLength:
+  Enabled: false
+
+Metrics/BlockLength:
   Enabled: false
 
 Style/PercentLiteralDelimiters:

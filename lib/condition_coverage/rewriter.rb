@@ -1,4 +1,5 @@
 require 'prism'
+require_relative 'site'
 
 module ConditionCoverage
   # Instruments source text so that each condition
@@ -35,18 +36,12 @@ module ConditionCoverage
 
       # Wraps both operands of an &&.
       def visit_and_node(node)
-        site = site_of(node)
+        site = Site.of(@path, node)
         wrap(site, 0, node.left)
         wrap(site, 1, node.right)
       end
 
       private
-
-      # Returns "path:line:column" of the && itself.
-      def site_of(node)
-        loc = node.location
-        "#{@path}:#{loc.start_line}:#{loc.start_column}"
-      end
 
       # Inserts the record call around one operand.
       def wrap(site, index, operand)

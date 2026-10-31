@@ -60,7 +60,7 @@ class Id58TestBase < Minitest::Test
 
   # The name Minitest reports, id58 and words included.
   def self.test_name(id58, name58)
-    :"test_\nid='#{id58}'\n'#{name58}'"
+    :"test_\nid='#{id58}'\n#{name58}"
   end
 
   # Leaves out i I o O, which read too like 1 and 0.

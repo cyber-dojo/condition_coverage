@@ -1,3 +1,2 @@
-module ConditionCoverage
-  VERSION = '0.0.1'.freeze
-end
+require_relative 'condition_coverage/version'
+require_relative 'condition_coverage/kernel'

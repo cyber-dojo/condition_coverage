@@ -1,4 +1,9 @@
+require_relative 'configuration'
+require_relative 'gaps'
+require_relative 'json_writer'
+require_relative 'manifest'
 require_relative 'recorder'
+require_relative 'result'
 require_relative 'rewriter'
 
 # Condition coverage for Ruby. This file is the kernel: it loads
@@ -6,10 +11,17 @@ require_relative 'rewriter'
 # an instrumented recorder would record itself.
 module ConditionCoverage
   @recorder = Recorder.new
+  @config = nil
 
   # The one recorder that every instrumented operand reports to.
   def self.recorder
     @recorder
+  end
+
+  # The configuration of the latest start, which the load
+  # hook consults; nil before the first start.
+  def self.config
+    @config
   end
 
   # The call rewritten code makes around each operand; returns
@@ -18,21 +30,50 @@ module ConditionCoverage
     @recorder.record(site, index, value)
   end
 
-  # Instruments every file later required from under cover,
-  # rewriting its source in memory as it loads.
-  def self.start(cover:)
+  # Instruments every file later required that the settings
+  # block covers, and reports when the process exits. on_exit
+  # is Kernel#at_exit except in tests, which must not print
+  # a report as their own process exits.
+  def self.start(on_exit: method(:at_exit), &)
+    config = Configuration.new(&)
+    install_hook if @config.nil?
+    @config = config
+    on_exit.call { report(config) }
+  end
+
+  # Routes every later load through instrumented, under
+  # whichever configuration is current. Installed once: a
+  # second definition would warn that it was redefined.
+  def self.install_hook
     iseq = RubyVM::InstructionSequence
     iseq.singleton_class.define_method(:load_iseq) do |path|
-      ConditionCoverage.instrumented(path, cover)
+      ConditionCoverage.instrumented(path, ConditionCoverage.config)
     end
   end
 
   # The compiled, rewritten code of path, or nil for a path
-  # outside cover, which Ruby then loads as normal.
-  def self.instrumented(path, cover)
-    return unless path.start_with?(cover)
+  # config does not cover, which Ruby then loads as normal.
+  def self.instrumented(path, config)
+    return unless config.covers?(path)
 
-    source = Rewriter.rewrite(File.read(path), path)
+    site_path = config.relative(path)
+    source = Rewriter.rewrite(File.read(path), site_path)
     RubyVM::InstructionSequence.compile(source, path, path)
+  end
+
+  # Writes the JSON report and prints the gaps, for every
+  # covered file whether or not the run loaded it.
+  def self.report(config)
+    result = Result.new(sites(config), @recorder.counts)
+    JsonWriter.write(result, config.json_path)
+    Gaps.lines(result).each { |line| puts line }
+  end
+
+  # The manifest of every covered file, merged.
+  def self.sites(config)
+    config.files.each_with_object({}) do |path, all|
+      source = File.read(path)
+      all.merge!(Manifest.sites(source, config.relative(path)))
+    end
   end
 end

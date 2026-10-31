@@ -1,4 +1,4 @@
-require_relative 'lib/condition_coverage'
+require_relative 'lib/condition_coverage/version'
 
 Gem::Specification.new do |s|
   s.name = 'condition_coverage'

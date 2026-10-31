@@ -56,6 +56,21 @@ class TestHelperTest < Id58TestBase
     assert_equal expected, instance.name58
   end
 
+  test 'Fb7A18', %w(
+  | the name a failure reports puts every bar line
+  | in the same column, so the description reads as written
+  ) do
+    name58 = "| POST /kata_create(manifest)\n| has status 200"
+    expected = [
+      'test_',
+      "id='Fb7Ax8'",
+      '| POST /kata_create(manifest)',
+      '| has status 200'
+    ].join("\n").to_sym
+    actual = Id58TestBase.test_name('Fb7Ax8', name58)
+    assert_equal expected, actual
+  end
+
   test 'Fb7A20', %w(
   | an empty id58 is refused, pointing at the offending test
   ) do

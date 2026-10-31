@@ -63,7 +63,10 @@ require 'condition_coverage'
 SimpleCov.start do
   # ...
 end
-ConditionCoverage.start(root: APP_DIR, cover: 'source/**/*.rb')
+ConditionCoverage.start do
+  root APP_DIR             # cover globs and site names are relative to it
+  cover 'source/**/*.rb'   # each matching file is instrumented as it loads
+end
 ```
 
 The figure is gathered and reported, not gated.
