@@ -15,7 +15,24 @@ class ConfigurationTest < Id58TestBase
     end
     expected = [
       'unknown setting covr in ConditionCoverage.start',
-      'the settings are: cover, coverage_dir, root'
+      'the settings are: cover, coverage_dir, report, root'
+    ].join("\n")
+    assert_equal expected, error.message
+  end
+
+  test 'A9MJ15', %w(
+  | an unknown reporter in the start block is refused,
+  | naming it and listing the reporters there are
+  ) do
+    error = assert_raises(ConditionCoverage::ConfigurationError) do
+      ConditionCoverage::Configuration.new do
+        root '/app'
+        report :gaps, :htm
+      end
+    end
+    expected = [
+      'unknown reporter htm in ConditionCoverage.start',
+      'the reporters are: gaps'
     ].join("\n")
     assert_equal expected, error.message
   end

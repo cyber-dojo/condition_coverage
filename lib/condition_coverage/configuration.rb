@@ -5,7 +5,8 @@ module ConditionCoverage
   # The settings given in a ConditionCoverage.start block.
   class Configuration
     GLOB_FLAGS = File::FNM_PATHNAME | File::FNM_EXTGLOB
-    SETTINGS = %w[cover coverage_dir root].freeze
+    SETTINGS = %w[cover coverage_dir report root].freeze
+    REPORTERS = %w[gaps].freeze
 
     # Evaluates the settings block against a new configuration.
     def initialize(&)
@@ -22,6 +23,19 @@ module ConditionCoverage
     # Adds a glob, relative to root, of files to instrument.
     def cover(glob)
       @globs << glob
+    end
+
+    # Chooses the reporters run at exit, eg report :gaps;
+    # refuses a name there is no reporter for.
+    def report(*names)
+      names.each do |name|
+        next if REPORTERS.include?(name.to_s)
+
+        raise ConfigurationError, [
+          "unknown reporter #{name} in ConditionCoverage.start",
+          "the reporters are: #{REPORTERS.join(', ')}"
+        ].join("\n")
+      end
     end
 
     # Sets the dir the condition_coverage.json report is
