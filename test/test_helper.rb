@@ -38,11 +38,19 @@ class Id58TestBase < Minitest::Test
     id58 = checked_id58(id58, lines)
     return unless selected?(id58)
 
-    name58 = lines.join(' ')
+    name58 = described(lines)
     file = File.basename(body.source_location[0])
     define_method(test_name(id58, name58)) do
       run_id58_test(id58, name58, file, body)
     end
+  end
+
+  # The description as written: each word that is exactly |
+  # starts a new line, so a || stays a word.
+  def self.described(lines)
+    words = lines.join(' ').split
+    bar_lines = words.slice_before('|').map { |line| line.join(' ') }
+    bar_lines.join("\n")
   end
 
   # True when no ids were given, or one is in id58.
@@ -68,9 +76,10 @@ class Id58TestBase < Minitest::Test
       str.chars.all? { |char| ID58_ALPHABET.include?(char) }
   end
 
-  # Returns id58, or raises naming what is wrong with it.
+  # Returns id58, or raises naming what is wrong with it or
+  # with its description.
   def self.checked_id58(id58, lines)
-    problem = id58_problem(id58)
+    problem = id58_problem(id58) || description_problem(lines)
     raise id58_error(problem, id58, lines) if problem
 
     Id58TestBase.seen_ids << id58
@@ -83,6 +92,13 @@ class Id58TestBase < Minitest::Test
     return 'not id58' unless id58?(id58)
 
     'duplicate' if Id58TestBase.seen_ids.include?(id58)
+  end
+
+  # Why the description cannot be used, or nil if it can.
+  def self.description_problem(lines)
+    return if lines.join(' ').split.first == '|'
+
+    'description lines must start with |'
   end
 
   # A message with a ! pointing at the offending id58.

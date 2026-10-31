@@ -1,5 +1,10 @@
 inherit_from: ../.rubocop.yml
 
+# Each | line of a test description sits in the same column
+# as the test it describes, as in the other cyber-dojo repos.
+Layout/FirstArrayElementIndentation:
+  Enabled: false
+
 # Test descriptions are free-form English written as
 # %w(...), so quotes and commas in them are intended.
 Lint/PercentStringArray:

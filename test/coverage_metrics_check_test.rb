@@ -3,8 +3,8 @@ require_relative 'coverage_metrics_check'
 
 class CoverageMetricsCheckTest < Id58TestBase
   test 'p0Kj10', %w(
-    a missed count above its max is a breach
-    naming the metric, its value and its range
+  | a missed count above its max is a breach
+  | naming the metric, its value and its range
   ) do
     report = {
       'code' => {
@@ -30,8 +30,8 @@ class CoverageMetricsCheckTest < Id58TestBase
   end
 
   test 'p0Kj20', %w(
-    a total below its min is a breach, so an all-zeros report
-    from a run that loaded no code cannot pass
+  | a total below its min is a breach, so an all-zeros report
+  | from a run that loaded no code cannot pass
   ) do
     report = {
       'test' => {
@@ -60,8 +60,8 @@ class CoverageMetricsCheckTest < Id58TestBase
   end
 
   test 'p0Kj30', %w(
-    a bounded metric absent from the report is a breach
-    saying so, rather than passing unchecked
+  | a bounded metric absent from the report is a breach
+  | saying so, rather than passing unchecked
   ) do
     report = {
       'code' => {
@@ -85,8 +85,8 @@ class CoverageMetricsCheckTest < Id58TestBase
   end
 
   test 'p0Kj40', %w(
-    a bound naming only its min is a breach saying so,
-    since applying the one side it has would half check it
+  | a bound naming only its min is a breach saying so,
+  | since applying the one side it has would half check it
   ) do
     report = {
       'code' => {
@@ -107,8 +107,8 @@ class CoverageMetricsCheckTest < Id58TestBase
   end
 
   test 'p0Kj50', %w(
-    a bound naming only its max is a breach saying so,
-    since an all-zeros report would satisfy it
+  | a bound naming only its max is a breach saying so,
+  | since an all-zeros report would satisfy it
   ) do
     report = {
       'code' => {
