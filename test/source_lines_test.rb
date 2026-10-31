@@ -15,8 +15,8 @@ class SourceLinesTest < Id58TestBase
       end
     RUBY
     sites = {
-      'source/kata.rb:3:23' => [67...74, 78...97],
-      'source/kata.rb:4:23' => [121...128, 132...144]
+      'source/kata.rb:3:23' => condition('&&', 67...74, 78...97),
+      'source/kata.rb:4:23' => condition('&&', 121...128, 132...144)
     }
     operands = {
       'source/kata.rb:3:23' => [
@@ -56,8 +56,8 @@ class SourceLinesTest < Id58TestBase
       end
     RUBY
     sites = {
-      'source/kata.rb:2:26' => [38...44, 48...55],
-      'source/kata.rb:2:45' => [57...63, 67...74]
+      'source/kata.rb:2:26' => condition('&&', 38...44, 48...55),
+      'source/kata.rb:2:45' => condition('&&', 57...63, 67...74)
     }
     operands = {
       'source/kata.rb:2:26' => [
@@ -85,8 +85,8 @@ class SourceLinesTest < Id58TestBase
       end
     RUBY
     sites = {
-      'source/kata.rb:2:26' => [38...44, 52...59],
-      'source/kata.rb:3:13' => [61...67, 71...78]
+      'source/kata.rb:2:26' => condition('&&', 38...44, 52...59),
+      'source/kata.rb:3:13' => condition('&&', 61...67, 71...78)
     }
     operands = {
       'source/kata.rb:2:26' => [
@@ -118,7 +118,9 @@ class SourceLinesTest < Id58TestBase
         end
       end
     RUBY
-    sites = { 'source/kata.rb:3:4' => [37...44, 54...73] }
+    sites = {
+      'source/kata.rb:3:4' => condition('&&', 37...44, 54...73)
+    }
     operands = {
       'source/kata.rb:3:4' => [
         { truthy: 1, falsy: 1 },

@@ -13,8 +13,8 @@ module ConditionCoverage
     # has no entry.
     attr_reader :counts
 
-    # Counts value's outcome and returns it unchanged, so the &&
-    # around it behaves exactly as it would uninstrumented.
+    # Counts value's outcome and returns it unchanged, so the
+    # condition around it behaves exactly as uninstrumented.
     def record(site, index, value)
       outcome = value ? :truthy : :falsy
       @counts[[site, index]][outcome] += 1

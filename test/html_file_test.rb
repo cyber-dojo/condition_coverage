@@ -151,6 +151,75 @@ class HtmlFileTest < Id58TestBase
     assert_equal ['├─ ', '└─ '], actual
   end
 
+  test 'gae538', %w(
+  | a nested condition's operator branches from its parent
+  | like an operand, and its own operands branch below it,
+  | indented under its branch so the tree reads as one
+  ) do
+    lines = [
+      { number: 1, text: '  ok?(id) && (new?(id) || id.size == 6)',
+        status: :gaps, span: 1..1 }
+    ]
+    either = { operator: '||', operands: [
+      { text: 'new?(id)', truthy: 1, falsy: 1, gap: nil },
+      { text: 'id.size == 6', truthy: 0, falsy: 1, gap: 'never true' }
+    ] }
+    trees = {
+      1 => [
+        { operator: '&&', operands: [
+          { text: 'ok?(id)', truthy: 2, falsy: 1, gap: nil },
+          either
+        ] }
+      ]
+    }
+    listing = ConditionCoverage::HtmlFile.listing(lines, trees)
+    html = REXML::Document.new(listing)
+    tree = html.elements["//*[@id='tree-1']"]
+
+    operators = tree.elements.to_a('.//*[@data-operator]')
+    actual = operators.map { |element| text_of(element) }
+    assert_equal ['&&', '||'], actual
+
+    branches = tree.elements.to_a('.//*[@data-branch]')
+    actual = branches.map { |element| text_of(element) }
+    expected = ['├─ ', '└─ ', '   ├─ ', '   └─ ']
+    assert_equal expected, actual
+
+    texts = tree.elements.to_a('.//*[@data-operand]/*[@data-text]')
+    actual = texts.map { |element| text_of(element) }
+    assert_equal ['ok?(id)', 'new?(id)', 'id.size == 6'], actual
+  end
+
+  test 'gae539', %w(
+  | a nested condition that is not the last operand keeps its
+  | parent's branch line running down beside its own operands
+  ) do
+    lines = [
+      { number: 1, text: '  (ok?(id) || new?(id)) && id.size == 6',
+        status: :covered, span: 1..1 }
+    ]
+    either = { operator: '||', operands: [
+      { text: 'ok?(id)', truthy: 1, falsy: 1, gap: nil },
+      { text: 'new?(id)', truthy: 1, falsy: 1, gap: nil }
+    ] }
+    trees = {
+      1 => [
+        { operator: '&&', operands: [
+          either,
+          { text: 'id.size == 6', truthy: 1, falsy: 1, gap: nil }
+        ] }
+      ]
+    }
+    listing = ConditionCoverage::HtmlFile.listing(lines, trees)
+    html = REXML::Document.new(listing)
+    tree = html.elements["//*[@id='tree-1']"]
+
+    branches = tree.elements.to_a('.//*[@data-branch]')
+    actual = branches.map { |element| text_of(element) }
+    expected = ['├─ ', '│  ├─ ', '│  └─ ', '└─ ']
+    assert_equal expected, actual
+  end
+
   test 'gae536', %w(
   | a button over two or more sites shows how many,
   | and its tree keeps each site's rows in a group of their own,

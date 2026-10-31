@@ -30,8 +30,9 @@ module ConditionCoverage
     # [span, status] for each site: from the line it starts on
     # to the line its last operand ends on.
     def self.spans_of(source, sites, operands)
-      sites.map do |site, ranges|
-        span = line_of(site)..end_line(source, ranges.last)
+      sites.map do |site, condition|
+        last = condition.leaves.last
+        span = line_of(site)..end_line(source, last)
         [span, status_of(operands.fetch(site))]
       end
     end

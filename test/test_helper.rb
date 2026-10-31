@@ -1,4 +1,5 @@
 require 'English'
+require 'condition_coverage/condition'
 require 'etc'
 require 'minitest/autorun'
 require 'minitest/reporters'
@@ -147,6 +148,12 @@ class Id58TestBase < Minitest::Test
   # Prints the message of the error the body raised.
   def report_error
     puts $ERROR_INFO.message unless $ERROR_INFO.nil?
+  end
+
+  # A site's condition as the manifest finds it, eg
+  # condition('&&', 16...23, 27...35).
+  def condition(operator, *operands)
+    ConditionCoverage::Condition.new(operator:, operands:)
   end
 
   # All the text inside a parsed REXML element, its children's

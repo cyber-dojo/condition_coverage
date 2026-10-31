@@ -81,16 +81,37 @@ module ConditionCoverage
       %(<div class="row headings" data-heading="">#{cells}</div>)
     end
 
-    # A site's operator row, then one row per operand, each
-    # branching from the operator.
+    # A site's operator row, then the rows of its operands.
     def self.site_rows(site)
-      name = CGI.escapeHTML(site[:operator])
-      cell = %(<span class="operator" data-operator="">#{name}</span>)
-      last = site[:operands].size - 1
-      rows = site[:operands].each_with_index.map do |operand, index|
-        operand_row(operand, index == last ? '└─ ' : '├─ ')
+      row = %(<div class="row">#{operator(site)}</div>)
+      [row, *operand_rows(site, '')]
+    end
+
+    # The rows of a condition's operands, each branching from
+    # its operator after indent; a nested condition's operands
+    # follow its own row, indented under its branch.
+    def self.operand_rows(condition, indent)
+      last = condition[:operands].size - 1
+      condition[:operands].each_with_index.flat_map do |operand, i|
+        tip = i == last
+        branch = indent + (tip ? '└─ ' : '├─ ')
+        next [operand_row(operand, branch)] unless operand[:operator]
+
+        nested = operand_rows(operand, indent + (tip ? '   ' : '│  '))
+        [subtree_row(operand, branch), *nested]
       end
-      [%(<div class="row">#{cell}</div>), *rows]
+    end
+
+    # A nested condition's row: its branch and its operator.
+    def self.subtree_row(condition, branch)
+      cells = branch_cell(branch) + operator(condition)
+      %(<div class="row" data-subtree="">#{cells}</div>)
+    end
+
+    # The cell naming a condition's operator.
+    def self.operator(condition)
+      name = CGI.escapeHTML(condition[:operator])
+      %(<span class="operator" data-operator="">#{name}</span>)
     end
 
     # One operand's row: its branch, text, true and false
@@ -100,8 +121,13 @@ module ConditionCoverage
         value = CGI.escapeHTML(operand[name].to_s)
         %(<span class="#{name}" data-#{name}="">#{value}</span>)
       end
-      lead = %(<span class="branch" data-branch="">#{branch}</span>)
+      lead = branch_cell(branch)
       %(<div class="row" data-operand="">#{lead}#{cells.join}</div>)
+    end
+
+    # The cell drawing a row's branch from its operator.
+    def self.branch_cell(branch)
+      %(<span class="branch" data-branch="">#{branch}</span>)
     end
 
     # A line with no condition: its number, then its code.

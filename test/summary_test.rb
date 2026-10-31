@@ -9,9 +9,9 @@ class SummaryTest < Id58TestBase
   | as a percent too, and the outcomes missing
   ) do
     sites = {
-      'source/kata.rb:3:23' => [72...79, 83...102],
-      'source/kata.rb:4:24' => [127...134, 138...150],
-      'source/team.rb:2:20' => [30...37, 41...52]
+      'source/kata.rb:3:23' => condition('&&', 72...79, 83...102),
+      'source/kata.rb:4:24' => condition('&&', 127...134, 138...150),
+      'source/team.rb:2:20' => condition('&&', 30...37, 41...52)
     }
     counts = {
       ['source/kata.rb:3:23', 0] => { truthy: 1, falsy: 1 },

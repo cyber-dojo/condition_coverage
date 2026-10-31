@@ -35,9 +35,9 @@ module ConditionCoverage
     # sites of one file, each under the span its line is in.
     def self.trees(source, sites, lines, operands)
       trees = Hash.new { |all, first| all[first] = [] }
-      sites.each do |site, ranges|
+      sites.each do |site, condition|
         first = lines[SourceLines.line_of(site) - 1][:span].begin
-        tree = SiteTree.of(source, ranges, operands.fetch(site))
+        tree = SiteTree.of(source, condition, operands.fetch(site))
         trees[first] << tree
       end
       trees

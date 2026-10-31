@@ -5,8 +5,10 @@ Gem::Specification.new do |s|
   s.version = ConditionCoverage::VERSION
   s.summary = 'Condition coverage for Ruby, ' \
               'alongside SimpleCov branch coverage'
-  s.description = 'Placeholder release outlining the idea; ' \
-                  'see the README.'
+  s.description = 'Records whether each operand of every &&, ||, ' \
+                  'and and or condition was seen both true and ' \
+                  'false, and reports the gaps in the terminal ' \
+                  'and as HTML.'
   s.authors = ['Jon Jagger']
   s.license = 'BSD-2-Clause'
   s.homepage = 'https://github.com/cyber-dojo/condition_coverage'

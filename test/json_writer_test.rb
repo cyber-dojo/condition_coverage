@@ -9,7 +9,7 @@ class JsonWriterTest < Id58TestBase
   | the result is written as raw JSON under "sites",
   | the base every other reporter reads
   ) do
-    sites = { 'k.rb:2:2' => [16...23, 27...35] }
+    sites = { 'k.rb:2:2' => condition('&&', 16...23, 27...35) }
     counts = { ['k.rb:2:2', 0] => { truthy: 1, falsy: 1 } }
     result = ConditionCoverage::Result.new(sites, counts)
     path = "#{Dir.mktmpdir('wdt910')}/condition_coverage.json"

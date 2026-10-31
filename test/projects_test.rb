@@ -17,6 +17,29 @@ class ProjectsTest < Id58TestBase
     assert status.success?
   end
 
+  test '4WXv20', %w(
+  | || sites, chains, nested and grouped conditions, a site
+  | inside a block, and an and whose operand is a command call
+  | all run unchanged when instrumented, and their gaps are
+  | listed in source order, each leaf indexed left to right
+  ) do
+    stdout, stderr, status = run_project('nested_conditions')
+    expected = [
+      'source/kata.rb:5:4 operand 1 never false',
+      'source/kata.rb:9:4 operand 1 never false',
+      'source/kata.rb:9:4 operand 2 never false',
+      'source/kata.rb:13:4 operand 1 never false',
+      'source/kata.rb:13:4 operand 2 never evaluated',
+      'source/kata.rb:17:4 operand 1 never false',
+      'source/kata.rb:17:20 operand 0 never false',
+      'source/kata.rb:17:20 operand 1 never false',
+      'source/kata.rb:21:4 operand 1 never false'
+    ].join("\n")
+    assert_equal "#{expected}\n", stdout
+    assert_equal '', stderr
+    assert status.success?
+  end
+
   private
 
   # Runs test/projects/name/run.rb in its own ruby process,
