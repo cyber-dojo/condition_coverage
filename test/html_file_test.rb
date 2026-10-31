@@ -151,6 +151,33 @@ class HtmlFileTest < Id58TestBase
     assert_equal ['├─ ', '└─ '], actual
   end
 
+  test 'gae536', %w(
+  | a button over two or more sites shows how many,
+  | and its tree keeps each site's rows in a group of their own,
+  | so they can be told apart; a one-site button shows no count
+  ) do
+    lines = [
+      { number: 1, text: '  [ok?(a) && new?(a), ok?(b) && new?(b)]',
+        status: :gaps, span: 1..1 },
+      { number: 2, text: '  ok?(c) && new?(c)', status: :covered,
+        span: 2..2 }
+    ]
+    site = { operator: '&&', operands: [
+      { text: 'ok?(a)', truthy: 1, falsy: 1, gap: nil },
+      { text: 'new?(a)', truthy: 1, falsy: 1, gap: nil }
+    ] }
+    trees = { 1 => [site, site], 2 => [site] }
+    listing = ConditionCoverage::HtmlFile.listing(lines, trees)
+    html = REXML::Document.new(listing)
+
+    counts = html.elements.to_a('//button/*[@data-site-count]')
+    actual = counts.map { |element| text_of(element) }
+    assert_equal ['2'], actual
+
+    groups = html.elements.to_a("//*[@id='tree-1']/*[@data-site]")
+    assert_equal 2, groups.size
+  end
+
   test 'gae540', %w(
   | a file's page is headed by its path, links back to the
   | index from as deep as the page sits, and holds its listing

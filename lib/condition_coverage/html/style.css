@@ -71,6 +71,21 @@ button.lnum::before {
   font-size: 11px; line-height: 24px; transition: transform 120ms;
 }
 button.lnum[aria-expanded="true"]::before { transform: rotate(90deg); }
+/* With a site count the count and the triangle share the
+   button's height, one 11px line each. */
+button.lnum:has(.site-count)::before { top: 12px; line-height: 11px; }
+/* On a button over two or more lines the triangle sits at the
+   very bottom. */
+button.lnum:has(.lineno + .lineno)::before { top: auto; bottom: 2px; line-height: 11px; }
+.site-count {
+  position: absolute; left: 7px; top: 1px;
+  font-size: 9px; line-height: 11px; font-weight: 700;
+}
+/* The rule between sites spans the tree's full width, through
+   its 16px side padding. */
+.site + .site {
+  border-top: 1px solid var(--rule); margin: 6px -16px 0; padding: 6px 16px 0;
+}
 button.lnum .lineno { width: 50px; padding-right: 19px; color: inherit; line-height: 32px; margin: -4px 0; }
 button.lnum[data-status="covered"] { background: var(--ok-tint); color: var(--ok); border-color: var(--ok); }
 button.lnum[data-status="gaps"] { background: var(--bad); color: var(--on-status); border-color: var(--bad); }

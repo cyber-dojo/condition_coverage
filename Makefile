@@ -1,4 +1,4 @@
-.PHONY: all image test test_check lint
+.PHONY: all image test test_check lint demo
 
 # Everything a change must pass before it is committed.
 all: lint test test_check
@@ -20,3 +20,10 @@ test_check:
 
 lint:
 	${PWD}/bin/lint.sh
+
+# Build the demo report into site/, the same site GitHub Pages
+# publishes, and open it in a browser where one can be found.
+demo:
+	${PWD}/bin/build_demo.sh
+	@if command -v open > /dev/null; then open ${PWD}/site/index.html; \
+	elif command -v xdg-open > /dev/null; then xdg-open ${PWD}/site/index.html; fi

@@ -39,26 +39,39 @@ module ConditionCoverage
       return plain_line(first) if first[:span].nil?
 
       number = first[:number]
-      span_block(lines) + tree(number, trees.fetch(number, []))
+      site_trees = trees.fetch(number, [])
+      span_block(lines, site_trees.size) + tree(number, site_trees)
     end
 
     # The lines of one span: one button over all their numbers,
+    # and how many sites it opens when that is two or more,
     # beside their code.
-    def self.span_block(lines)
+    def self.span_block(lines, sites)
       numbers = lines.map { |line| number(line[:number]) }.join
       codes = lines.map { |line| code(line) }.join
       srcs = %(<div class="srcs">#{codes}</div>)
-      %(<div class="block">#{button(lines[0], numbers)}#{srcs}</div>)
+      content = site_count(sites) + numbers
+      %(<div class="block">#{button(lines[0], content)}#{srcs}</div>)
+    end
+
+    # The count of a button's sites, shown only for two or more.
+    def self.site_count(sites)
+      return '' if sites < 2
+
+      %(<span class="site-count" data-site-count="">#{sites}</span>)
     end
 
     HEADINGS = %w[condition true false gap].freeze
 
-    # The hidden tree of a span: a heading row, then the rows of
-    # each of its sites.
+    # The hidden tree of a span: a heading row, then each site's
+    # rows in a group of their own.
     def self.tree(number, site_trees)
-      rows = site_trees.flat_map { |site| site_rows(site) }
+      groups = site_trees.map do |site|
+        rows = site_rows(site).join
+        %(<div class="site" data-site="">#{rows}</div>)
+      end
       id = "tree-#{number}"
-      body = [heading_row, *rows].join
+      body = [heading_row, *groups].join
       %(<div class="tree" id="#{id}" hidden="hidden">#{body}</div>)
     end
 

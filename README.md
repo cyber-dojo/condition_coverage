@@ -7,6 +7,10 @@ Status: 0.0.1 on rubygems.org is a placeholder. The code in this repo,
 heading for 0.0.2, covers a single `&&` (each of its two operands); `||`,
 chains and nesting come next.
 
+Demo: https://cyber-dojo.github.io/condition_coverage/ shows the HTML
+report for the mock source tree in `demo/`. `make demo` builds and opens
+the same report locally.
+
 ## The gap it fills
 
 Ruby's built-in `Coverage` (which SimpleCov reads) tracks branches, not the
@@ -119,3 +123,8 @@ the run never loaded are read and parsed then.
   (`make test tids='6D1K'` runs only matching tests, and skips the check)
 - `make test_check`: shunit2 tests showing that a breached bound fails the
   check with a non-zero exit
+
+`make demo` (not part of `make all`) runs `demo/run.rb` through
+`bin/build_demo.sh`, writing the report to `site/` and opening it. The
+Pages workflow (`.github/workflows/pages.yml`) runs the same script on
+each push to `main` and publishes `site/`.
