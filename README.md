@@ -58,6 +58,19 @@ This starts with `report :post`. With no `CONDITION_COVERAGE_COLLECTOR` it
 starts nothing and prints nothing, so an image can set `RUBYOPT` for every
 run and measure only those given a collector.
 
+The gem's `condition_coverage_collector` command is that collector. It
+saves each report POSTed to it as a numbered file, and once every run is
+done they render as one report:
+
+```sh
+condition_coverage_collector 4570 /tmp/condition/runs   # until stopped
+```
+
+```ruby
+runs = Dir['/tmp/condition/runs/*.json']
+ConditionCoverage::Render.from_json(config, runs)
+```
+
 ## What a run reports
 
 As the process exits:

@@ -13,7 +13,9 @@ Gem::Specification.new do |s|
   s.license = 'BSD-2-Clause'
   s.homepage = 'https://github.com/cyber-dojo/condition_coverage'
   s.files = Dir['lib/**/*'].select { |f| File.file?(f) } +
-            %w[README.md LICENSE.md]
+            %w[README.md LICENSE.md exe/condition_coverage_collector]
+  s.bindir = 'exe'
+  s.executables = ['condition_coverage_collector']
   # String#bytesplice arrived in Ruby 3.2.
   s.required_ruby_version = '>= 3.2'
   s.add_dependency 'prism', '~> 1.0'

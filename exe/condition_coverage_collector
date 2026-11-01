@@ -1,0 +1,26 @@
+#!/usr/bin/env ruby
+require 'fileutils'
+require 'socket'
+require 'condition_coverage/collector'
+
+if ARGV.first == '-h'
+  puts <<~HELP
+    Usage: condition_coverage_collector PORT DIR
+
+    Listens on PORT and saves each JSON report the :post reporter
+    sends as DIR/run-0001.json, DIR/run-0002.json, and so on,
+    creating DIR if need be. Runs until stopped.
+
+    Options:
+      -h    Show this help
+
+    Example:
+      condition_coverage_collector 4570 /tmp/condition/runs
+  HELP
+  exit 0
+end
+
+port, dir = ARGV
+FileUtils.mkdir_p(dir)
+server = TCPServer.new('0.0.0.0', Integer(port))
+ConditionCoverage::Collector.serve(server, dir)

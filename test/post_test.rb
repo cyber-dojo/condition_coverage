@@ -1,4 +1,5 @@
 require_relative 'test_helper'
+require 'condition_coverage/collector'
 require 'condition_coverage/configuration'
 require 'condition_coverage/render'
 require 'json'
@@ -120,16 +121,8 @@ class PostTest < Id58TestBase
   end
 
   # The body of the one HTTP request on client, after
-  # answering it 200.
+  # answering it 200, read as the collector reads it.
   def request_body(client)
-    length = 0
-    while (line = client.gets) && line != "\r\n"
-      name, value = line.split(':', 2)
-      length = value.to_i if name.casecmp?('content-length')
-    end
-    body = client.read(length)
-    client.write("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")
-    client.close
-    body
+    ConditionCoverage::Collector.request_body(client)
   end
 end
