@@ -6,7 +6,7 @@ class VersionTest < Id58TestBase
   test 'W3kU10', %w(
   | requiring the gem's entry point defines its version
   ) do
-    assert_equal '0.0.5', ConditionCoverage::VERSION
+    assert_equal '0.0.6', ConditionCoverage::VERSION
   end
 
   test 'W3kU20', %w(
