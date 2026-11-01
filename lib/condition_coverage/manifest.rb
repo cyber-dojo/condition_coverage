@@ -97,18 +97,33 @@ module ConditionCoverage
       ].freeze
       FALSY_TYPES = %i[nil_node false_node].freeze
 
+      # Ruby raises TypeError on assigning nil or false to these.
+      TRUTHY_GLOBALS = %i[$stdout $stderr].freeze
+
       # The one outcome a leaf can have, eg :truthy for `Clock.new`
       # or a literal, :falsy for `nil`; nil for a leaf that can
       # have either.
       def fixed_outcome(node)
         return :falsy if FALSY_TYPES.include?(node.type)
 
-        :truthy if TRUTHY_TYPES.include?(node.type) || new_call?(node)
+        :truthy if truthy_only?(node)
+      end
+
+      # True for a leaf that can never be falsy.
+      def truthy_only?(node)
+        TRUTHY_TYPES.include?(node.type) || new_call?(node) ||
+          truthy_global?(node)
       end
 
       # True for a call to new, eg `Clock.new`.
       def new_call?(node)
         node.type == :call_node && node.name == :new
+      end
+
+      # True for $stdout or $stderr, which can never be falsy.
+      def truthy_global?(node)
+        node.type == :global_variable_read_node &&
+          TRUTHY_GLOBALS.include?(node.name)
       end
 
       # True for a call to a named method with arguments and no

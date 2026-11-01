@@ -79,7 +79,9 @@ An operand whose form allows one outcome only needs only to be evaluated:
 its other outcome is impossible, not a gap. `Foo.new`, literals (`'s'`,
 `1`, `:k`, `[]`, `{}`, `true`), lambdas and constants (`LATEST`,
 `Config::DEFAULT`, since one holding nil or false is rare) can only be
-truthy; `nil` and `false` only falsy:
+truthy, as can `$stdout` and `$stderr`, which Ruby refuses to set to nil
+or false. Other globals, `$stdin` among them, can be either. `nil` and
+`false` can only be falsy:
 
 ```ruby
 @clock = options[:clock] || MonotonicClock.new  # operand 1: never evaluated, or no gap

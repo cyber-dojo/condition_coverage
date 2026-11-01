@@ -205,6 +205,26 @@ class ManifestTest < Id58TestBase
     assert_equal expected, actual
   end
 
+  test '6asy7b', %w(
+  | $stdout and $stderr are truthy only, as Ruby refuses nil
+  | or false for either; $stdin accepts both, so it is not
+  | fixed
+  ) do
+    source = <<~RUBY
+      def streams
+        out = Thread.current[:out] || $stdout
+        err = Thread.current[:err] || $stderr
+        inp = Thread.current[:inp] || $stdin
+        [out, err, inp]
+      end
+    RUBY
+    sites = ConditionCoverage::Manifest.sites(source, 'k.rb')
+    actual = sites.values.map(&:fixed).reduce({}, :merge)
+                  .transform_keys { |range| source.byteslice(range) }
+    expected = { '$stdout' => :truthy, '$stderr' => :truthy }
+    assert_equal expected, actual
+  end
+
   test '6asy80', %w(
   | a condition inside a leaf operand, eg in a block,
   | decides something else, so it is a site of its own
