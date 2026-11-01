@@ -5,8 +5,8 @@ module ConditionCoverage
   # The settings given in a ConditionCoverage.start block.
   class Configuration
     GLOB_FLAGS = File::FNM_PATHNAME | File::FNM_EXTGLOB
-    SETTINGS = %w[cover coverage_dir report root].freeze
-    REPORTERS = %w[gaps html].freeze
+    SETTINGS = %w[collector cover coverage_dir report root].freeze
+    REPORTERS = %w[gaps html post].freeze
 
     # Evaluates the settings block against a new configuration.
     def initialize(&)
@@ -21,6 +21,14 @@ module ConditionCoverage
     # The dir the reports are written to.
     def output_dir
       @coverage_dir
+    end
+
+    # The url the :post reporter sends the JSON report to.
+    attr_reader :collector_url
+
+    # Sets the url the :post reporter sends the JSON report to.
+    def collector(url)
+      @collector_url = url
     end
 
     # Sets the dir that cover globs and site names are

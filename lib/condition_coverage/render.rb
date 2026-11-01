@@ -3,6 +3,7 @@ require_relative 'gaps'
 require_relative 'html_report'
 require_relative 'manifest'
 require_relative 'merge'
+require_relative 'post'
 
 module ConditionCoverage
   # The reporters, run from operands alone: needing nothing the
@@ -16,9 +17,12 @@ module ConditionCoverage
       if reporters.include?(:gaps)
         Gaps.lines(operands).each { |line| puts line }
       end
-      return unless reporters.include?(:html)
+      if reporters.include?(:html)
+        HtmlReport.write(operands, files, config)
+      end
+      return unless reporters.include?(:post)
 
-      HtmlReport.write(operands, files, config)
+      Post.deliver(operands, config.collector_url)
     end
 
     # Runs the reporters chosen in config from the JSON reports

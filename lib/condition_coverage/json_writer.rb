@@ -7,8 +7,12 @@ module ConditionCoverage
     # Writes operands, as Result#operands gives them, to path as
     # {"sites": {site: [counts, ...]}}.
     def self.write(operands, path)
-      json = JSON.pretty_generate('sites' => operands)
-      File.write(path, json)
+      File.write(path, json(operands))
+    end
+
+    # operands as the JSON report's text.
+    def self.json(operands)
+      JSON.pretty_generate('sites' => operands)
     end
   end
 end

@@ -15,7 +15,7 @@ class ConfigurationTest < Id58TestBase
     end
     expected = [
       'unknown setting covr in ConditionCoverage.start',
-      'the settings are: cover, coverage_dir, report, root'
+      'the settings are: collector, cover, coverage_dir, report, root'
     ].join("\n")
     assert_equal expected, error.message
   end
@@ -32,7 +32,7 @@ class ConfigurationTest < Id58TestBase
     end
     expected = [
       'unknown reporter htm in ConditionCoverage.start',
-      'the reporters are: gaps, html'
+      'the reporters are: gaps, html, post'
     ].join("\n")
     assert_equal expected, error.message
   end

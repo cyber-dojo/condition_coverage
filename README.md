@@ -105,6 +105,12 @@ or false. Other globals, `$stdin` among them, can be either. `nil` and
   the top of the page lists every site as a link to its line, covered
   sites first, then those with gaps, and arrows beside each site with
   gaps jump to the previous and next one, wrapping round at either end.
+- `:post` sends the JSON report, as an HTTP POST, to the url set by
+  `collector 'http://...'`. It is for a run whose own files are thrown
+  away, such as a failing `docker build` step. It prints nothing, never
+  goes through an `http_proxy`, and gives up in silence on a collector
+  that cannot be reached or does not answer within a second, so the
+  run's output and exit status are unchanged.
 
 ## How it works
 
