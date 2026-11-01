@@ -19,14 +19,14 @@ class SummaryTest < Id58TestBase
       ['source/team.rb:2:20', 0] => { truthy: 2, falsy: 1 },
       ['source/team.rb:2:20', 1] => { truthy: 1, falsy: 1 }
     }
-    result = ConditionCoverage::Result.new(sites, counts)
+    operands = ConditionCoverage::Result.new(sites, counts).operands
     expected = [
       { path: 'source/kata.rb', sites: 2, seen: 3, outcomes: 8,
         percent: 38, missing: 5 },
       { path: 'source/team.rb', sites: 1, seen: 4, outcomes: 4,
         percent: 100, missing: 0 }
     ]
-    actual = ConditionCoverage::Summary.files(result)
+    actual = ConditionCoverage::Summary.files(operands)
     assert_equal expected, actual
   end
 
@@ -44,12 +44,12 @@ class SummaryTest < Id58TestBase
       ['source/clock.rb:2:11', 0] => { truthy: 1, falsy: 1 },
       ['source/clock.rb:2:11', 1] => { truthy: 1, falsy: 0 }
     }
-    result = ConditionCoverage::Result.new(sites, counts)
+    operands = ConditionCoverage::Result.new(sites, counts).operands
     expected = [
       { path: 'source/clock.rb', sites: 1, seen: 3, outcomes: 3,
         percent: 100, missing: 0 }
     ]
-    actual = ConditionCoverage::Summary.files(result)
+    actual = ConditionCoverage::Summary.files(operands)
     assert_equal expected, actual
   end
 end

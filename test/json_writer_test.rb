@@ -11,9 +11,9 @@ class JsonWriterTest < Id58TestBase
   ) do
     sites = { 'k.rb:2:2' => condition('&&', 16...23, 27...35) }
     counts = { ['k.rb:2:2', 0] => { truthy: 1, falsy: 1 } }
-    result = ConditionCoverage::Result.new(sites, counts)
+    operands = ConditionCoverage::Result.new(sites, counts).operands
     path = "#{Dir.mktmpdir('wdt910')}/condition_coverage.json"
-    ConditionCoverage::JsonWriter.write(result, path)
+    ConditionCoverage::JsonWriter.write(operands, path)
     expected = {
       'sites' => {
         'k.rb:2:2' => [

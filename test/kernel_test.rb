@@ -210,6 +210,51 @@ class KernelTest < Id58TestBase
     assert File.file?("#{out}/index.html")
   end
 
+  test '6rTS4a', %w(
+  | the pages rendered later from the JSON report alone,
+  | by a render that recorded nothing, are the very pages
+  | the recording run wrote, fixed leaves and gaps and all
+  ) do
+    dir = Dir.mktmpdir('6rTS4a')
+    File.write("#{dir}/gang.rb", <<~RUBY)
+      module Gang6rTS4a
+        LIMIT = 6
+        def self.ok?(id) = !id.empty?
+        def self.gang?(id) = ok?(id) && id.size == LIMIT
+        def self.limit(n) = n || LIMIT
+      end
+    RUBY
+    live = "#{dir}/live"
+    exit_report = nil
+    on_exit = ->(&block) { exit_report = block }
+    ConditionCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir live
+      report :html
+    end
+    require "#{dir}/gang.rb"
+    Gang6rTS4a.gang?('Kp9sA2')
+    Gang6rTS4a.limit(nil)
+    exit_report.call
+
+    later = "#{dir}/later"
+    FileUtils.mkdir_p(later)
+    FileUtils.cp("#{live}/condition_coverage.json", later)
+    config = ConditionCoverage::Configuration.new do
+      root dir
+      cover '*.rb'
+      coverage_dir later
+      report :html
+    end
+    ConditionCoverage::Render.from_json(config)
+
+    %w(index.html files/gang.rb.html).each do |page|
+      expected = File.read("#{live}/#{page}")
+      assert_equal expected, File.read("#{later}/#{page}"), page
+    end
+  end
+
   test '6rTS50', %w(
   | starting a second time swaps the configuration silently,
   | with no warning that the load hook was redefined

@@ -1,9 +1,10 @@
 module ConditionCoverage
   # The per-file numbers the HTML index page shows.
   module Summary
-    # One row per file that has sites in result, in path order.
-    def self.files(result)
-      by_path = result.operands.group_by { |site, _| path_of(site) }
+    # One row per file that has sites in operands, as
+    # Result#operands gives them, in path order.
+    def self.files(operands)
+      by_path = operands.group_by { |site, _| path_of(site) }
       by_path.sort.map { |path, sites| row(path, sites) }
     end
 

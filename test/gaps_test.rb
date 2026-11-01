@@ -21,14 +21,14 @@ class GapsTest < Id58TestBase
       ['k.rb:12:4', 0] => { truthy: 1, falsy: 1 },
       ['k.rb:12:4', 1] => { truthy: 1, falsy: 1 }
     }
-    result = ConditionCoverage::Result.new(sites, counts)
+    operands = ConditionCoverage::Result.new(sites, counts).operands
     expected = [
       'k.rb:2:2 operand 0 never false',
       'k.rb:2:2 operand 1 never evaluated',
       'k.rb:6:4 never reached',
       'k.rb:9:4 operand 1 never true'
     ]
-    actual = ConditionCoverage::Gaps.lines(result)
+    actual = ConditionCoverage::Gaps.lines(operands)
     assert_equal expected, actual
   end
 
@@ -44,7 +44,7 @@ class GapsTest < Id58TestBase
       ['k.rb:2:11', 0] => { truthy: 1, falsy: 1 },
       ['k.rb:2:11', 1] => { truthy: 1, falsy: 0 }
     }
-    result = ConditionCoverage::Result.new(sites, counts)
-    assert_equal [], ConditionCoverage::Gaps.lines(result)
+    operands = ConditionCoverage::Result.new(sites, counts).operands
+    assert_equal [], ConditionCoverage::Gaps.lines(operands)
   end
 end

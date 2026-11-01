@@ -1,10 +1,9 @@
 require 'fileutils'
 require_relative 'configuration'
-require_relative 'gaps'
-require_relative 'html_report'
 require_relative 'json_writer'
 require_relative 'manifest'
 require_relative 'recorder'
+require_relative 'render'
 require_relative 'result'
 require_relative 'rewriter'
 
@@ -62,15 +61,9 @@ module ConditionCoverage
   def self.instrumented(path, config)
     return unless config.covers?(path)
 
-    parsed = @parsed[path] = parse(path, config)
+    parsed = @parsed[path] = Manifest.parse(path, config)
     rewritten = Rewriter.rewrite(parsed[:source], parsed[:sites])
     RubyVM::InstructionSequence.compile(rewritten, path, path)
-  end
-
-  # The source and sites of the covered file at path.
-  def self.parse(path, config)
-    source = File.read(path)
-    { source:, sites: Manifest.sites(source, config.relative(path)) }
   end
 
   # Writes the JSON report, then runs the chosen reporters, for
@@ -78,21 +71,18 @@ module ConditionCoverage
   # coverage_dir, created first if need be.
   def self.report(config)
     files = parsed_files(config)
-    result = Result.new(merged_sites(files), @recorder.counts)
-    FileUtils.mkdir_p(config.output_dir)
-    JsonWriter.write(result, config.json_path)
-    run_reporters(result, files, config)
+    operands = collect(files, config)
+    Render.run(operands, files, config)
   end
 
-  # Runs each reporter chosen in the start block.
-  def self.run_reporters(result, files, config)
-    reporters = config.reporters
-    if reporters.include?(:gaps)
-      Gaps.lines(result).each { |line| puts line }
-    end
-    return unless reporters.include?(:html)
-
-    HtmlReport.write(result, files, config)
+  # The operands of every covered file, with the counts this
+  # run recorded, once written as the JSON report.
+  def self.collect(files, config)
+    sites = merged_sites(files)
+    operands = Result.new(sites, @recorder.counts).operands
+    FileUtils.mkdir_p(config.output_dir)
+    JsonWriter.write(operands, config.json_path)
+    operands
   end
 
   # { full path => {source:, sites:} } for every covered file:
@@ -100,7 +90,7 @@ module ConditionCoverage
   # never loaded.
   def self.parsed_files(config)
     config.files.to_h do |path|
-      [path, @parsed.fetch(path) { parse(path, config) }]
+      [path, @parsed.fetch(path) { Manifest.parse(path, config) }]
     end
   end
 

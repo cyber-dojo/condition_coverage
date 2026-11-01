@@ -49,7 +49,10 @@ As the process exits:
 
 - `condition_coverage.json` is always written to `coverage_dir`: every site
   of every covered file, with each operand's true and false counts. It is
-  the base the other reporters read.
+  the base the other reporters read, so they can also be run later, in
+  another process, from it alone:
+  `ConditionCoverage::Render.from_json(config)`, where `config` is a
+  `ConditionCoverage::Configuration` built from the same settings block.
 - `:gaps` prints one line per missing outcome, in manifest order:
 
 ```text

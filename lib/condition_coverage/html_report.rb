@@ -10,23 +10,25 @@ module ConditionCoverage
   # each covered file, written to the configuration's
   # output_dir.
   module HtmlReport
-    # Writes every page. files is { full path => {source:, sites:} }
-    # for each covered file, as the kernel parsed it.
-    def self.write(result, files, config)
+    # Writes every page. operands are as Result#operands gives
+    # them; files is { full path => {source:, sites:} } for each
+    # covered file, as the kernel parsed it.
+    def self.write(operands, files, config)
       dir = config.output_dir
-      index = HtmlIndex.page(Summary.files(result))
+      index = HtmlIndex.page(Summary.files(operands))
       File.write("#{dir}/index.html", index)
       files.each do |full_path, parsed|
         path = config.relative(full_path)
-        write_page("#{dir}/files/#{path}.html", path, parsed, result)
+        out = "#{dir}/files/#{path}.html"
+        write_page(out, path, parsed, operands)
       end
     end
 
     # Writes one file's page to out.
-    def self.write_page(out, path, parsed, result)
+    def self.write_page(out, path, parsed, operands)
       source = parsed[:source]
-      lines = SourceLines.of(source, parsed[:sites], result.operands)
-      trees = trees(source, parsed[:sites], lines, result.operands)
+      lines = SourceLines.of(source, parsed[:sites], operands)
+      trees = trees(source, parsed[:sites], lines, operands)
       FileUtils.mkdir_p(File.dirname(out))
       File.write(out, HtmlFile.page(path, lines, trees))
     end

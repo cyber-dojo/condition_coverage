@@ -1,13 +1,13 @@
 module ConditionCoverage
   # The terminal worklist: one line per missing outcome, and
   # nothing for a site seen both ways. Every count stays in
-  # the Result for reporters that show them all.
+  # the operands for reporters that show them all.
   module Gaps
-    # The gap lines of result, eg "k.rb:2:2 operand 0 never
-    # false", in manifest order.
-    def self.lines(result)
-      result.operands.flat_map do |site, operands|
-        site_gaps(site, operands)
+    # The gap lines of operands, as Result#operands gives them,
+    # eg "k.rb:2:2 operand 0 never false", in manifest order.
+    def self.lines(operands)
+      operands.flat_map do |site, counts|
+        site_gaps(site, counts)
       end
     end
 

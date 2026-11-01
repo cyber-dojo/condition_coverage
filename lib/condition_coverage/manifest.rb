@@ -13,6 +13,12 @@ module ConditionCoverage
       collector.sites
     end
 
+    # The source and sites of the covered file at full_path.
+    def self.parse(full_path, config)
+      source = File.read(full_path)
+      { source:, sites: sites(source, config.relative(full_path)) }
+    end
+
     # Collects each site and its Condition.
     class ConditionSites < Prism::Visitor
       # Starts with no sites found.
