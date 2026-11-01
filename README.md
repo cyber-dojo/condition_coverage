@@ -3,7 +3,10 @@
 Condition coverage for Ruby, to run alongside SimpleCov's line and branch
 coverage.
 
-Status: 0.0.5 covers `&&`, `||`, `and` and `or`: each leaf operand of a
+Gem: https://rubygems.org/gems/condition_coverage (which shows the latest
+version).
+
+Status: covers `&&`, `||`, `and` and `or`: each leaf operand of a
 condition, however its operators are chained, nested or grouped. Decisions
 hidden inside calls come next (see Roadmap).
 
