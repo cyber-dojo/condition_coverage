@@ -2,6 +2,7 @@ require 'json'
 require_relative 'gaps'
 require_relative 'html_report'
 require_relative 'manifest'
+require_relative 'merge'
 
 module ConditionCoverage
   # The reporters, run from operands alone: needing nothing the
@@ -20,17 +21,23 @@ module ConditionCoverage
       HtmlReport.write(operands, files, config)
     end
 
-    # Runs the reporters chosen in config from the JSON report
-    # at config.json_path, parsing each covered file afresh.
-    def self.from_json(config)
-      json = JSON.parse(File.read(config.json_path))
-      operands = json['sites'].transform_values do |leaves|
-        leaves.map { |leaf| counts(leaf) }
-      end
+    # Runs the reporters chosen in config from the JSON reports
+    # at paths, their counts merged, parsing each covered file
+    # afresh. paths is config.json_path alone by default.
+    def self.from_json(config, paths = [config.json_path])
+      operands = Merge.operands(paths.map { |path| read(path) })
       files = config.files.to_h do |path|
         [path, Manifest.parse(path, config)]
       end
       run(operands, files, config)
+    end
+
+    # The operands of the JSON report at path.
+    def self.read(path)
+      json = JSON.parse(File.read(path))
+      json['sites'].transform_values do |leaves|
+        leaves.map { |leaf| counts(leaf) }
+      end
     end
 
     # One operand's counts as JSON holds them, with the keys,

@@ -53,6 +53,9 @@ As the process exits:
   another process, from it alone:
   `ConditionCoverage::Render.from_json(config)`, where `config` is a
   `ConditionCoverage::Configuration` built from the same settings block.
+  Given several runs' reports, `Render.from_json(config, paths)` adds
+  their counts together first, so the report shows only the gaps that
+  every run left.
 - `:gaps` prints one line per missing outcome, in manifest order:
 
 ```text
