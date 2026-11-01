@@ -210,6 +210,37 @@ class KernelTest < Id58TestBase
     assert File.file?("#{out}/index.html")
   end
 
+  test '6rTS4b', %w(
+  | starting from the environment covers each of its
+  | comma-separated globs under its root, writing the JSON
+  | report to its dir and POSTing it to its collector
+  ) do
+    dir = Dir.mktmpdir('6rTS4b')
+    FileUtils.mkdir_p(%W[#{dir}/source #{dir}/lib])
+    File.write("#{dir}/source/kata.rb", "def kata?(id) = id\n")
+    File.write("#{dir}/lib/team.rb", "def team?(id) = id\n")
+    env = {
+      'CONDITION_COVERAGE_ROOT' => dir,
+      'CONDITION_COVERAGE_COVER' => 'source/*.rb,lib/*.rb',
+      'CONDITION_COVERAGE_DIR' => "#{dir}/condition",
+      'CONDITION_COVERAGE_COLLECTOR' => 'http://10.0.0.7:4570/runs'
+    }
+    on_exit = ->(&_report) {} # this test checks the settings only
+    ConditionCoverage.start_from_env(env, on_exit:)
+
+    config = ConditionCoverage.config
+    actual = [
+      config.files, config.json_path,
+      config.collector_url, config.reporters
+    ]
+    expected = [
+      ["#{dir}/lib/team.rb", "#{dir}/source/kata.rb"],
+      "#{dir}/condition/condition_coverage.json",
+      'http://10.0.0.7:4570/runs', [:post]
+    ]
+    assert_equal expected, actual
+  end
+
   test '6rTS4a', %w(
   | the pages rendered later from the JSON report alone,
   | by a render that recorded nothing, are the very pages

@@ -46,6 +46,27 @@ module ConditionCoverage
     on_exit.call { report(config) }
   end
 
+  # Starts from settings in env alone, for a run whose code
+  # cannot be changed, eg one started by RUBYOPT=-r: covers
+  # the comma-separated CONDITION_COVERAGE_COVER globs under
+  # CONDITION_COVERAGE_ROOT, writing the JSON report into
+  # CONDITION_COVERAGE_DIR and POSTing it to
+  # CONDITION_COVERAGE_COLLECTOR. Without a collector it
+  # starts nothing, so RUBYOPT can be set for every run.
+  def self.start_from_env(env, on_exit: method(:at_exit))
+    return unless env.key?('CONDITION_COVERAGE_COLLECTOR')
+
+    start(on_exit:) do
+      root env.fetch('CONDITION_COVERAGE_ROOT')
+      env.fetch('CONDITION_COVERAGE_COVER').split(',').each do |glob|
+        cover glob
+      end
+      coverage_dir env.fetch('CONDITION_COVERAGE_DIR')
+      collector env.fetch('CONDITION_COVERAGE_COLLECTOR')
+      report :post
+    end
+  end
+
   # Routes every later load through instrumented, under
   # whichever configuration is current. Installed once: a
   # second definition would warn that it was redefined.

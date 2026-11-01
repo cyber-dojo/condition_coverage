@@ -43,6 +43,21 @@ end
 A misspelt setting or an unknown reporter is refused by name, with the list
 of the ones there are. Calling `start` again replaces the configuration.
 
+A run whose code cannot be changed, such as a script in a `docker build`
+step, can be covered from its environment alone:
+
+```sh
+RUBYOPT=-rcondition_coverage/auto
+CONDITION_COVERAGE_ROOT=/app                  # root
+CONDITION_COVERAGE_COVER=src/**/*.rb,lib/*.rb  # cover, comma-separated
+CONDITION_COVERAGE_DIR=/tmp/condition         # coverage_dir
+CONDITION_COVERAGE_COLLECTOR=http://host.docker.internal:4570/runs
+```
+
+This starts with `report :post`. With no `CONDITION_COVERAGE_COLLECTOR` it
+starts nothing and prints nothing, so an image can set `RUBYOPT` for every
+run and measure only those given a collector.
+
 ## What a run reports
 
 As the process exits:
