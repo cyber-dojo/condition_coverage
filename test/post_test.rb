@@ -39,6 +39,31 @@ class PostTest < Id58TestBase
     assert_equal expected, JSON.parse(received.join(5).value)
   end
 
+  test 'Pq3s11', %w(
+  | the site outcomes are POSTed in the JSON report too, so
+  | a collector's render shows which arms each ternary ran
+  ) do
+    server = TCPServer.new('127.0.0.1', 0)
+    port = server.addr[1]
+    received = Thread.new { request_body(server.accept) }
+    operands = {
+      'source/fee.rb:2:23' => [{ truthy: 1, falsy: 1 }]
+    }
+    outcomes = {
+      'source/fee.rb:2:23' => { truthy: 1, falsy: 1, ternary: true }
+    }
+    config = post_config('Pq3s11', "http://127.0.0.1:#{port}/runs")
+    assert_output('', '') do
+      ConditionCoverage::Render.run(operands, {}, config, outcomes:)
+    end
+    expected = {
+      'source/fee.rb:2:23' =>
+        { 'truthy' => 1, 'falsy' => 1, 'ternary' => true }
+    }
+    json = JSON.parse(received.join(5).value)
+    assert_equal expected, json['outcomes']
+  end
+
   test 'Pq3s20', %w(
   | a collector that cannot be reached is passed over in
   | silence, so a run without one still exits as it would

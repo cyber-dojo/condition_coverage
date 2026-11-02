@@ -4,10 +4,18 @@ module ConditionCoverage
   # Condition. A site's commands are the byte ranges of its
   # leaves that are command calls, eg `ok? id`; its fixed are
   # { byte range => :truthy } for leaves that can have that one
-  # outcome only, eg `Clock.new`.
-  Condition = Data.define(:operator, :operands, :commands, :fixed) do
-    # A condition with no command-call or fixed leaves by default.
-    def initialize(operator:, operands:, commands: [], fixed: {})
+  # outcome only, eg `Clock.new`. Its extent is the byte range
+  # of the whole condition as written, eg a ternary's from its
+  # predicate to its else arm, which its leaves alone cannot
+  # give.
+  Condition = Data.define(
+    :operator, :operands, :commands, :fixed, :extent
+  ) do
+    # A condition with no command-call or fixed leaves, and no
+    # extent, by default.
+    def initialize(
+      operator:, operands:, commands: [], fixed: {}, extent: nil
+    )
       super
     end
 

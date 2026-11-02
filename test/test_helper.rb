@@ -152,11 +152,14 @@ class Id58TestBase < Minitest::Test
 
   # A site's condition as the manifest finds it, eg
   # condition('&&', 16...23, 27...35), with commands naming
-  # the leaves that are command calls, and fixed the leaves
-  # that can have one outcome only.
-  def condition(operator, *operands, commands: [], fixed: {})
+  # the leaves that are command calls, fixed the leaves that
+  # can have one outcome only, and extent the byte range of the
+  # whole condition.
+  def condition(
+    operator, *operands, commands: [], fixed: {}, extent: nil
+  )
     ConditionCoverage::Condition.new(
-      operator:, operands:, commands:, fixed:
+      operator:, operands:, commands:, fixed:, extent:
     )
   end
 

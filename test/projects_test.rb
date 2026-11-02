@@ -44,11 +44,32 @@ class ProjectsTest < Id58TestBase
   | an instrumented file has the same relevant lines for
   | line coverage as it has uninstrumented, so SimpleCov's
   | line totals do not change when condition coverage runs,
-  | even for a condition written over several lines
+  | even for a condition written over several lines, or a
+  | method whose paths are measured, a modifier if among
+  | its decisions
   ) do
     off, = run_project('multiline_condition', 'CONDITIONS' => 'off')
     on, = run_project('multiline_condition', 'CONDITIONS' => 'on')
     assert_equal off, on
+  end
+
+  test '4WXv40', %w(
+  | a project run measuring paths too prints, after its
+  | condition gaps, a line for each path a method with two
+  | or more decisions never took, the method running
+  | unchanged when instrumented
+  ) do
+    stdout, stderr, status = run_project('two_decisions')
+    expected = [
+      'source/shop.rb:5:19 operand 1 never false',
+      'source/shop.rb:2:2 fee path never taken: ' \
+      'line 4 true, line 5 true',
+      'source/shop.rb:2:2 fee path never taken: ' \
+      'line 4 false, line 5 false'
+    ].join("\n")
+    assert_equal "#{expected}\n", stdout
+    assert_equal '', stderr
+    assert status.success?
   end
 
   private

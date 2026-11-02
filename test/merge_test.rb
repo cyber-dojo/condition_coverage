@@ -40,4 +40,25 @@ class MergeTest < Id58TestBase
     actual = ConditionCoverage::Merge.operands([first, second])
     assert_equal expected, actual
   end
+
+  test 'Mg8q20', %w(
+  | the site outcomes of several runs merge by adding their
+  | true and false counts, keeping a ternary's mark, so an
+  | arm one run never took another can
+  ) do
+    first = {
+      'source/fee.rb:2:23' => { truthy: 2, falsy: 0, ternary: true },
+      'source/kata.rb:3:23' => { truthy: 1, falsy: 0 }
+    }
+    second = {
+      'source/fee.rb:2:23' => { truthy: 0, falsy: 1, ternary: true },
+      'source/kata.rb:3:23' => { truthy: 0, falsy: 0 }
+    }
+    expected = {
+      'source/fee.rb:2:23' => { truthy: 2, falsy: 1, ternary: true },
+      'source/kata.rb:3:23' => { truthy: 1, falsy: 0 }
+    }
+    actual = ConditionCoverage::Merge.outcomes([first, second])
+    assert_equal expected, actual
+  end
 end

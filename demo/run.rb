@@ -7,11 +7,13 @@ ConditionCoverage.start do
   cover 'source/**/*.rb'
   coverage_dir ENV.fetch('COVERAGE_DIR')
   report :gaps, :html
+  measure :conditions, :paths
 end
 
 require_relative 'source/kata'
 require_relative 'source/group'
 require_relative 'source/team'
+require_relative 'source/shop'
 
 KataState = Data.define(:started, :finished)
 GroupState = Data.define(:size, :open)
@@ -50,3 +52,31 @@ Team.can_edit?(editor)
 # A site inside a block, inside an || site of its own.
 Team.led?([owner])
 Team.led?([])
+
+# The shop: some choices made every way, some never.
+alice = { member: true, banned: false, spend: 2000, invited: false }
+bob = { member: false, banned: false, spend: 0, coupon: true }
+Shop.member?(alice)
+Shop.member?(bob)
+# A banned member: member? is now covered.
+Shop.member?({ member: true, banned: true })
+gift = { items: [{ price: 80 }], gift: true, wrap: false }
+pickup = { items: [{ price: 20 }], pickup: true, express: true }
+Shop.price(alice, gift)
+Shop.price(bob, pickup)
+begin
+  Shop.price(bob, { items: [] })
+rescue ArgumentError
+  # An empty order fails, as it should.
+end
+Shop.install_discounts([])
+Shop.install_discounts([0.1, 0.2])
+Shop.discount(100, 0.1)
+# A zero rate, and a zero total: discount's && is covered.
+Shop.discount(100, 0)
+Shop.discount(0, 0.1)
+Shop.labels([{ sale: true, price: 5 }, { sale: false, price: 20 }])
+Shop.greeting({ name: 'Ann' })
+# No name, and an empty one: greeting is covered.
+Shop.greeting({})
+Shop.greeting({ name: '' })

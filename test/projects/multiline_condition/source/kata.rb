@@ -8,4 +8,14 @@ module Kata
     name.start_with?('ghcr.io/') ||
       name.start_with?('docker.io/')
   end
+
+  def self.size(id, max)
+    size = id.size
+    size -= 1 if id.start_with?('N')
+    if size > max &&
+       max.positive?
+      size = max
+    end
+    size
+  end
 end

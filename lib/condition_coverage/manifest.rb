@@ -19,6 +19,15 @@ module ConditionCoverage
       { source:, sites: sites(source, config.relative(full_path)) }
     end
 
+    # True for a call to a named method with arguments and no
+    # parentheses, eg `id.include? 'N'`, but not `id.size == 6`;
+    # such a call is no bare argument, so a rewrite wrapping it
+    # in another call must parenthesise it.
+    def self.command?(node)
+      node.type == :call_node && node.arguments &&
+        node.opening_loc.nil? && node.name.match?(/\A[a-z_]/i)
+    end
+
     # Collects each site and its Condition.
     class ConditionSites < Prism::Visitor
       # Starts with no sites found.
@@ -44,6 +53,17 @@ module ConditionCoverage
         add_site(node)
       end
 
+      # Notes a ternary site, then any site in its then and else
+      # arms, which decide something else; any other if is no
+      # site itself.
+      def visit_if_node(node)
+        return super unless node.if_keyword_loc.nil?
+
+        add_site(node)
+        node.statements.accept(self)
+        node.subsequent.accept(self)
+      end
+
       # Notes node as a site. It claims its place first, so a
       # site found inside one of its leaves follows it, keeping
       # the sites in source order.
@@ -58,10 +78,16 @@ module ConditionCoverage
       end
 
       # node as a Condition, operands and all, named by its
-      # operator as written.
+      # operator as written; a ternary is named ?: and its one
+      # operand is its predicate.
       def condition_of(node)
-        operator = node.operator
-        Condition.new(operator:, operands: operands_of(node))
+        ternary = node.type == :if_node
+        Condition.new(
+          operator: ternary ? '?:' : node.operator,
+          operands:
+            ternary ? [predicate_of(node)] : operands_of(node),
+          extent: extent_of(node)
+        )
       end
 
       # node's operands: a chain of the same operator flattened
@@ -75,6 +101,21 @@ module ConditionCoverage
 
           [leaf(operand)]
         end
+      end
+
+      # The byte range of node as written.
+      def extent_of(node)
+        loc = node.location
+        loc.start_offset...loc.end_offset
+      end
+
+      # A ternary's predicate as its operand: an && or || nested
+      # as a Condition, anything else a leaf.
+      def predicate_of(node)
+        predicate = node.predicate
+        return condition_of(predicate) if operator?(predicate)
+
+        leaf(predicate)
       end
 
       # True for an &&, ||, and or or node.
@@ -95,11 +136,11 @@ module ConditionCoverage
         range
       end
 
-      # A constant is taken to be truthy, as one holding nil or
-      # false is rare.
+      # Literals and lambdas, whose value is truthy by their form;
+      # a constant is not among them, as it can hold nil or false.
       TRUTHY_TYPES = %i[
         string_node integer_node symbol_node array_node hash_node
-        true_node lambda_node constant_read_node constant_path_node
+        true_node lambda_node
       ].freeze
       FALSY_TYPES = %i[nil_node false_node].freeze
 
@@ -132,11 +173,9 @@ module ConditionCoverage
           TRUTHY_GLOBALS.include?(node.name)
       end
 
-      # True for a call to a named method with arguments and no
-      # parentheses, eg `id.include? 'N'`, but not `id.size == 6`.
+      # True for a command call, as Manifest.command? says.
       def command?(node)
-        node.type == :call_node && node.arguments &&
-          node.opening_loc.nil? && node.name.match?(/\A[a-z_]/i)
+        Manifest.command?(node)
       end
 
       # The one statement inside a parenthesised operand, or the

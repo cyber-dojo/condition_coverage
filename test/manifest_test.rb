@@ -18,7 +18,8 @@ class ManifestTest < Id58TestBase
       end
     RUBY
     # ok?(id) is bytes 16...23, new?(id) is bytes 27...35
-    expected = { 'k.rb:2:2' => condition('&&', 16...23, 27...35) }
+    both = condition('&&', 16...23, 27...35, extent: 16...35)
+    expected = { 'k.rb:2:2' => both }
     actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end
@@ -32,7 +33,8 @@ class ManifestTest < Id58TestBase
         ok?(id) || new?(id)
       end
     RUBY
-    expected = { 'k.rb:2:2' => condition('||', 16...23, 27...35) }
+    either = condition('||', 16...23, 27...35, extent: 16...35)
+    expected = { 'k.rb:2:2' => either }
     actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end
@@ -47,7 +49,8 @@ class ManifestTest < Id58TestBase
       end
     RUBY
     operands = [16...23, 27...35, 39...51]
-    expected = { 'k.rb:2:2' => condition('&&', *operands) }
+    chain = condition('&&', *operands, extent: 16...51)
+    expected = { 'k.rb:2:2' => chain }
     actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end
@@ -62,8 +65,9 @@ class ManifestTest < Id58TestBase
         ok?(id) && new?(id) || id.size == 6
       end
     RUBY
-    both = condition('&&', 16...23, 27...35)
-    expected = { 'k.rb:2:2' => condition('||', both, 39...51) }
+    both = condition('&&', 16...23, 27...35, extent: 16...35)
+    either = condition('||', both, 39...51, extent: 16...51)
+    expected = { 'k.rb:2:2' => either }
     actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end
@@ -78,8 +82,10 @@ class ManifestTest < Id58TestBase
         ok?(id) && (new?(id) || id.size == 6)
       end
     RUBY
-    either = condition('||', 28...36, 40...52)
-    expected = { 'k.rb:2:2' => condition('&&', 16...23, either) }
+    # the site's extent takes in the closing parenthesis
+    either = condition('||', 28...36, 40...52, extent: 28...52)
+    both = condition('&&', 16...23, either, extent: 16...53)
+    expected = { 'k.rb:2:2' => both }
     actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end
@@ -93,7 +99,8 @@ class ManifestTest < Id58TestBase
         ok?(id) && (log(id); new?(id))
       end
     RUBY
-    expected = { 'k.rb:2:2' => condition('&&', 16...23, 27...46) }
+    both = condition('&&', 16...23, 27...46, extent: 16...46)
+    expected = { 'k.rb:2:2' => both }
     actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end
@@ -106,7 +113,8 @@ class ManifestTest < Id58TestBase
         ok?(id) && ()
       end
     RUBY
-    expected = { 'k.rb:2:2' => condition('&&', 16...23, 27...29) }
+    both = condition('&&', 16...23, 27...29, extent: 16...29)
+    expected = { 'k.rb:2:2' => both }
     actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end
@@ -120,8 +128,9 @@ class ManifestTest < Id58TestBase
         ok?(id) and new?(id) or id.size == 6
       end
     RUBY
-    both = condition('and', 16...23, 28...36)
-    expected = { 'k.rb:2:2' => condition('or', both, 40...52) }
+    both = condition('and', 16...23, 28...36, extent: 16...36)
+    either = condition('or', both, 40...52, extent: 16...52)
+    expected = { 'k.rb:2:2' => either }
     actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end
@@ -136,7 +145,9 @@ class ManifestTest < Id58TestBase
         ok?(id) and id.include? 'N'
       end
     RUBY
-    site = condition('and', 16...23, 28...43, commands: [28...43])
+    site = condition(
+      'and', 16...23, 28...43, commands: [28...43], extent: 16...43
+    )
     expected = { 'k.rb:2:2' => site }
     actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
@@ -153,7 +164,7 @@ class ManifestTest < Id58TestBase
       end
     RUBY
     fixed = { 54...72 => :truthy }
-    site = condition('||', 35...50, 54...72, fixed:)
+    site = condition('||', 35...50, 54...72, fixed:, extent: 35...72)
     expected = { 'k.rb:2:11' => site }
     actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
@@ -188,8 +199,8 @@ class ManifestTest < Id58TestBase
   end
 
   test '6asy7a', %w(
-  | a constant, eg LATEST or Config::DEFAULT, is taken to be
-  | truthy only, as a constant holding nil or false is rare
+  | a constant, eg LATEST or Config::DEFAULT, is no fixed
+  | leaf, since it can hold nil or false, eg VERBOSE = false
   ) do
     source = <<~RUBY
       def tagged(match)
@@ -199,10 +210,7 @@ class ManifestTest < Id58TestBase
       end
     RUBY
     sites = ConditionCoverage::Manifest.sites(source, 'k.rb')
-    actual = sites.values.map(&:fixed).reduce({}, :merge)
-                  .transform_keys { |range| source.byteslice(range) }
-    expected = { 'LATEST' => :truthy, 'Config::DEFAULT' => :truthy }
-    assert_equal expected, actual
+    assert_equal [{}, {}], sites.values.map(&:fixed)
   end
 
   test '6asy7b', %w(
@@ -234,10 +242,74 @@ class ManifestTest < Id58TestBase
         ok?(id) && ids.any? { |k| k && k.ok? }
       end
     RUBY
-    expected = {
-      'k.rb:2:2' => condition('&&', 16...23, 27...54),
-      'k.rb:2:28' => condition('&&', 42...43, 47...52)
-    }
+    outer = condition('&&', 16...23, 27...54, extent: 16...54)
+    inner = condition('&&', 42...43, 47...52, extent: 42...52)
+    expected = { 'k.rb:2:2' => outer, 'k.rb:2:28' => inner }
+    actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
+    assert_equal expected, actual
+  end
+
+  test '6asy90', %w(
+  | a ternary is a choice too, so it is a site, named ?:,
+  | whose one operand is its predicate, and whose extent is
+  | the whole ternary, its arms included
+  ) do
+    source = <<~RUBY
+      def kata?(id)
+        ok?(id) ? :ok : :no
+      end
+    RUBY
+    ternary = condition('?:', 16...23, extent: 16...35)
+    expected = { 'k.rb:2:2' => ternary }
+    actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
+    assert_equal expected, actual
+  end
+
+  test '6asy91', %w(
+  | a ternary whose predicate is an && nests the &&
+  | inside its site, as an operand of the other operator
+  | nests, rather than the && being a site of its own
+  ) do
+    source = <<~RUBY
+      def kata?(id)
+        ok?(id) && new?(id) ? :ok : :no
+      end
+    RUBY
+    both = condition('&&', 16...23, 27...35, extent: 16...35)
+    ternary = condition('?:', both, extent: 16...47)
+    expected = { 'k.rb:2:2' => ternary }
+    actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
+    assert_equal expected, actual
+  end
+
+  test '6asy92', %w(
+  | a condition in a ternary's arm decides something else,
+  | so it is a site of its own, after the ternary's
+  ) do
+    source = <<~RUBY
+      def kata?(id)
+        ok?(id) ? new?(id) && id.size == 6 : :no
+      end
+    RUBY
+    ternary = condition('?:', 16...23, extent: 16...56)
+    both = condition('&&', 26...34, 38...50, extent: 26...50)
+    expected = { 'k.rb:2:2' => ternary, 'k.rb:2:12' => both }
+    actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
+    assert_equal expected, actual
+  end
+
+  test '6asy93', %w(
+  | a condition in a ternary's else arm is a site of its own
+  | too, after the ternary's
+  ) do
+    source = <<~RUBY
+      def kata?(id)
+        ok?(id) ? :ok : new?(id) && id.size == 6
+      end
+    RUBY
+    ternary = condition('?:', 16...23, extent: 16...56)
+    both = condition('&&', 32...40, 44...56, extent: 32...56)
+    expected = { 'k.rb:2:2' => ternary, 'k.rb:2:18' => both }
     actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end

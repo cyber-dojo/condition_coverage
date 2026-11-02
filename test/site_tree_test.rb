@@ -81,4 +81,57 @@ class SiteTreeTest < Id58TestBase
     actual = ConditionCoverage::SiteTree.of(source, site, counts)
     assert_equal expected, actual
   end
+
+  test 'EuNs40', %w(
+  | given its site's own outcome, a tree's root has that
+  | outcome's true and false counts and its gap, so a
+  | ternary shows which of its arms ran
+  ) do
+    source = <<~RUBY
+      module Fee
+        def self.fee(u) = u[:a] || u[:b] ? 5 : 7
+      end
+    RUBY
+    either = condition('||', 31...36, 40...45)
+    site = condition('?:', either)
+    counts = [
+      { truthy: 1, falsy: 1 },
+      { truthy: 1, falsy: 0 }
+    ]
+    outcome = { truthy: 2, falsy: 0, ternary: true }
+    expected = {
+      operator: '?:', truthy: 2, falsy: 0, gap: 'never false',
+      operands: [
+        {
+          operator: '||',
+          operands: [
+            { text: 'u[:a]', truthy: 1, falsy: 1, gap: nil },
+            { text: 'u[:b]', truthy: 1, falsy: 0,
+              gap: 'never false' }
+          ]
+        }
+      ]
+    }
+    tree = ConditionCoverage::SiteTree
+    assert_equal expected, tree.of(source, site, counts, outcome)
+  end
+
+  test 'EuNs50', %w(
+  | any site's root shows its own outcome's gap, eg an && never
+  | true, though only a ternary's is listed among the gaps
+  ) do
+    source = <<~RUBY
+      module Shop
+        def self.loud? = VERBOSE && $stdout.tty?
+      end
+    RUBY
+    site = condition('&&', 30...37, 41...53)
+    counts = [
+      { truthy: 0, falsy: 1 },
+      { truthy: 0, falsy: 0 }
+    ]
+    outcome = { truthy: 0, falsy: 1 }
+    tree = ConditionCoverage::SiteTree.of(source, site, counts, outcome)
+    assert_equal 'never true', tree[:gap]
+  end
 end

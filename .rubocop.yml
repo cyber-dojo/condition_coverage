@@ -1,8 +1,11 @@
 AllCops:
   NewCops: enable
   TargetRubyVersion: 3.2
+  # shop.rb is the demo's mock of every shape of choice the
+  # report draws, written to be awkward rather than tidy.
   Exclude:
     - reports/**/*
+    - demo/source/shop.rb
 
 Layout/LineLength:
   Max: 70

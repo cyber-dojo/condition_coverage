@@ -11,13 +11,15 @@ module ConditionCoverage
     # The whole page for the file at path (relative to root),
     # written at files/<path>.html, so it links back to the
     # index one folder up for each folder in that.
-    def self.page(path, lines, trees)
+    def self.page(path, lines, trees, grids = '')
       HtmlTemplate.fill(
         HtmlTemplate.asset('file.html'),
         'path' => CGI.escapeHTML(path),
         'index' => "#{'../' * (path.count('/') + 1)}index.html",
         'style' => HtmlTemplate.asset('style.css'),
-        'script' => HtmlTemplate.asset('toggle.js'),
+        'script' => HtmlTemplate.asset('toggle.js') +
+                    HtmlTemplate.asset('side.js'),
+        'grids' => grids,
         'jumps' => HtmlNav.jumps(lines),
         'listing' => listing(lines, trees)
       )

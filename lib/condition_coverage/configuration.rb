@@ -5,18 +5,33 @@ module ConditionCoverage
   # The settings given in a ConditionCoverage.start block.
   class Configuration
     GLOB_FLAGS = File::FNM_PATHNAME | File::FNM_EXTGLOB
-    SETTINGS = %w[collector cover coverage_dir report root].freeze
+    SETTINGS = %w[
+      collector cover coverage_dir measure report root
+    ].freeze
     REPORTERS = %w[gaps html post].freeze
+    MEASURES = %w[conditions paths].freeze
 
     # Evaluates the settings block against a new configuration.
     def initialize(&)
       @globs = []
       @reporters = [:gaps]
+      @measures = [:conditions]
       instance_eval(&)
     end
 
     # The reporters chosen with report, :gaps when none were.
     attr_reader :reporters
+
+    # What is measured, chosen with measure, :conditions when
+    # nothing was.
+    attr_reader :measures
+
+    # Chooses what is measured, eg measure :conditions, :paths;
+    # refuses a name there is no measure for.
+    def measure(*names)
+      check('measure', names, MEASURES)
+      @measures = names.map(&:to_sym)
+    end
 
     # The dir the reports are written to.
     def output_dir
@@ -45,15 +60,21 @@ module ConditionCoverage
     # Chooses the reporters run at exit, eg report :gaps;
     # refuses a name there is no reporter for.
     def report(*names)
+      check('reporter', names, REPORTERS)
+      @reporters = names.map(&:to_sym)
+    end
+
+    # Refuses the first of names that is not in known, naming
+    # it as a kind and listing the known ones.
+    def check(kind, names, known)
       names.each do |name|
-        next if REPORTERS.include?(name.to_s)
+        next if known.include?(name.to_s)
 
         raise ConfigurationError, [
-          "unknown reporter #{name} in ConditionCoverage.start",
-          "the reporters are: #{REPORTERS.join(', ')}"
+          "unknown #{kind} #{name} in ConditionCoverage.start",
+          "the #{kind}s are: #{known.join(', ')}"
         ].join("\n")
       end
-      @reporters = names.map(&:to_sym)
     end
 
     # Sets the dir the condition_coverage.json report is

@@ -102,6 +102,65 @@ class KernelTest < Id58TestBase
     assert_equal expected, json['sites']
   end
 
+  test '6rTS42', %w(
+  | a ternary's predicate is recorded as it runs, so one
+  | only ever taken one way is reported as a gap
+  ) do
+    dir = Dir.mktmpdir('6rTS42')
+    File.write("#{dir}/fee.rb", <<~RUBY)
+      module Fee6rTS42
+        def self.fee(member) = member ? 5 : 7
+      end
+    RUBY
+    report = nil
+    on_exit = ->(&block) { report = block }
+    ConditionCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+    end
+    require "#{dir}/fee.rb"
+    Fee6rTS42.fee(true)
+    expected = "fee.rb:2:25 operand 0 never false\n"
+    assert_output(expected) { report.call }
+  end
+
+  test '6rTS43', %w(
+  | a ternary's own outcome is recorded as it runs, so one
+  | whose predicate of several leaves only ever picked one
+  | arm is reported as a gap of its own, and written to the
+  | JSON report beside the operands
+  ) do
+    dir = Dir.mktmpdir('6rTS43')
+    File.write("#{dir}/fee.rb", <<~RUBY)
+      module Fee6rTS43
+        def self.fee(user) = user[:member] || user[:vip] ? 5 : 7
+      end
+    RUBY
+    report = nil
+    on_exit = ->(&block) { report = block }
+    ConditionCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+    end
+    require "#{dir}/fee.rb"
+    Fee6rTS43.fee({ member: true })
+    expected = [
+      'fee.rb:2:23 outcome never false',
+      'fee.rb:2:23 operand 0 never false',
+      'fee.rb:2:23 operand 1 never evaluated'
+    ].join("\n")
+    assert_output("#{expected}\n") { report.call }
+
+    json = JSON.parse(File.read("#{dir}/condition_coverage.json"))
+    expected = {
+      'fee.rb:2:23' =>
+        { 'truthy' => 1, 'falsy' => 0, 'ternary' => true }
+    }
+    assert_equal expected, json['outcomes']
+  end
+
   test '6rTS45', %w(
   | a file loaded during the run is not read again for the
   | exit report: the sites parsed as it loaded are reused,
@@ -252,7 +311,7 @@ class KernelTest < Id58TestBase
         LIMIT = 6
         def self.ok?(id) = !id.empty?
         def self.gang?(id) = ok?(id) && id.size == LIMIT
-        def self.limit(n) = n || LIMIT
+        def self.limit(n) = n || 6
       end
     RUBY
     live = "#{dir}/live"
@@ -284,6 +343,44 @@ class KernelTest < Id58TestBase
       expected = File.read("#{live}/#{page}")
       assert_equal expected, File.read("#{later}/#{page}"), page
     end
+  end
+
+  test '6rTS41', %w(
+  | measuring paths too, a covered file's methods with two
+  | or more decisions record each call's path, and the
+  | exit report prints each path never taken
+  ) do
+    dir = Dir.mktmpdir('6rTS41')
+    File.write("#{dir}/fee.rb", <<~RUBY)
+      module Fee6rTS41
+        def self.fee(member, big)
+          total = 100
+          if member
+            total -= 5
+          end
+          if big
+            total -= 10
+          end
+          total
+        end
+      end
+    RUBY
+    report = nil
+    on_exit = ->(&block) { report = block }
+    ConditionCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+      measure :conditions, :paths
+    end
+    require "#{dir}/fee.rb"
+    assert_equal 95, Fee6rTS41.fee(true, false)
+    expected = [
+      'fee.rb:2:2 fee path never taken: line 4 true, line 7 true',
+      'fee.rb:2:2 fee path never taken: line 4 false, line 7 true',
+      'fee.rb:2:2 fee path never taken: line 4 false, line 7 false'
+    ].join("\n")
+    assert_output("#{expected}\n") { report.call }
   end
 
   test '6rTS50', %w(

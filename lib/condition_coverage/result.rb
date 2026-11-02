@@ -6,10 +6,23 @@ module ConditionCoverage
     NEVER_RAN = { truthy: 0, falsy: 0 }.freeze
 
     # sites is { site => Condition }, from the manifest;
-    # counts is { [site, index] => counts }, from the recorder.
-    def initialize(sites, counts)
+    # counts is { [site, index] => counts } and outcomes is
+    # { site => counts }, both from the recorder.
+    def initialize(sites, counts, outcomes = {})
       @sites = sites
       @counts = counts
+      @outcomes = outcomes
+    end
+
+    # { site => counts of its own outcome }, with zero counts
+    # for a site that never ran, and ternary: true for a
+    # ternary, whose outcome picks an arm.
+    def outcomes
+      @sites.to_h do |site, condition|
+        counts = @outcomes.fetch(site, NEVER_RAN)
+        ternary = condition.operator == '?:'
+        [site, ternary ? counts.merge(ternary: true) : counts]
+      end
     end
 
     # { site => [counts of operand 0, counts of operand 1, ...] },

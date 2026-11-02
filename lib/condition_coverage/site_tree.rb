@@ -9,9 +9,17 @@ module ConditionCoverage
     # same { operator:, operands: } shape. Each leaf has its
     # text cut from source at its manifest byte range, its
     # counts, and its gap label in the same words as the
-    # terminal gaps list (nil for none).
-    def self.of(source, condition, counts)
-      node(source, condition, counts.each)
+    # terminal gaps list (nil for none). Given the site's own
+    # outcome, as Result#outcomes gives it, the root has its
+    # truthy and falsy counts and its gap too, worded as a
+    # leaf's, whatever its operator.
+    def self.of(source, condition, counts, outcome = nil)
+      tree = node(source, condition, counts.each)
+      return tree if outcome.nil?
+
+      gap = Gaps.operand_gap(outcome).first
+      truthy, falsy = outcome.values_at(:truthy, :falsy)
+      tree.merge(truthy:, falsy:, gap:)
     end
 
     # The tree of condition, each leaf taking the next of

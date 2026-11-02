@@ -6,9 +6,9 @@ coverage.
 Gem: https://rubygems.org/gems/condition_coverage (which shows the latest
 version).
 
-Status: covers `&&`, `||`, `and` and `or`: each leaf operand of a
-condition, however its operators are chained, nested or grouped. Decisions
-hidden inside calls come next (see Roadmap).
+Status: covers `&&`, `||`, `and`, `or` and the ternary `?:`: each leaf
+operand of a condition, however its operators are chained, nested or
+grouped. Decisions hidden inside calls come next (see Roadmap).
 
 Demo: https://cyber-dojo.github.io/condition_coverage/ shows the HTML
 report for the mock source tree in `demo/`. `make demo` builds and opens
@@ -79,7 +79,8 @@ ConditionCoverage::Render.from_json(config, runs)
 As the process exits:
 
 - `condition_coverage.json` is always written to `coverage_dir`: every site
-  of every covered file, with each operand's true and false counts. It is
+  of every covered file, with each operand's true and false counts under
+  `sites`, and each site's own true and false counts under `outcomes`. It is
   the base the other reporters read, so they can also be run later, in
   another process, from it alone:
   `ConditionCoverage::Render.from_json(config)`, where `config` is a
@@ -106,7 +107,25 @@ ok?(id) && new?(id) && id.size == 6     # one && site, operands 0 1 2
 ok?(id) && (new?(id) || id.size == 6)   # an || nested in an && site, 0 1 2
 ok?(id) && new?(id) || id.size == 6     # an && nested in an || site, 0 1 2
 ids.any? { |k| k && k.ok? } && ok?(id)  # two sites: the block's is its own
+ok?(id) ? :ok : :no                     # a ?: site, its predicate operand 0
+ok?(id) && new?(id) ? :ok : :no         # an && nested in a ?: site, 0 1
+ok?(id) ? new?(id) && id.size == 6 : :no  # two sites: an arm's is its own
 ```
+
+A ternary is a site even when its predicate is a single operand: its one
+operand is its predicate, and its arms, like a block, decide something
+else.
+
+Each site's own outcome is counted too: a ternary's predicate as a whole,
+which picks its arm, and any other site's value. A ternary whose predicate
+has several operands has a gap of its own when only one arm ever ran:
+
+```text
+source/shop.rb:34:15 outcome never false
+```
+
+Any other site's outcome is shown but is never a gap, as its operands'
+gaps say more.
 
 A chain of one operator is flat; a change of operator, by precedence or by
 parentheses, nests. Parentheses are not part of the tree, since they decide
@@ -114,11 +133,11 @@ nothing.
 
 An operand whose form allows one outcome only needs only to be evaluated:
 its other outcome is impossible, not a gap. `Foo.new`, literals (`'s'`,
-`1`, `:k`, `[]`, `{}`, `true`), lambdas and constants (`LATEST`,
-`Config::DEFAULT`, since one holding nil or false is rare) can only be
-truthy, as can `$stdout` and `$stderr`, which Ruby refuses to set to nil
-or false. Other globals, `$stdin` among them, can be either. `nil` and
-`false` can only be falsy:
+`1`, `:k`, `[]`, `{}`, `true`) and lambdas can only be truthy, as can
+`$stdout` and `$stderr`, which Ruby refuses to set to nil or false. Other
+globals, `$stdin` among them, can be either, as can constants, since one
+can hold nil or false (`VERBOSE = false`). `nil` and `false` can only be
+falsy:
 
 ```ruby
 @clock = options[:clock] || MonotonicClock.new  # operand 1: never evaluated, or no gap
@@ -130,8 +149,9 @@ or false. Other globals, `$stdin` among them, can be either. `nil` and
   source. On a line holding a condition the line number is a button (blue
   and outlined when every outcome was seen, solid orange when any is
   missing) that opens a tree of the condition: its operators, nested as
-  Ruby groups them, and each leaf operand's true and false counts and its
-  gap. A condition written over several lines has one button over all of
+  Ruby groups them, the site's own true and false counts on its top row,
+  and each leaf operand's true and false counts and its gap. A condition
+  written over several lines has one button over all of
   its line numbers. Trees with gaps start open. A header that stays at
   the top of the page lists every site as a link to its line, covered
   sites first, then those with gaps, and arrows beside each site with
@@ -148,28 +168,29 @@ or false. Other globals, `$stdin` among them, can be either. `nil` and
 At load time each covered file is read and parsed once, with Prism. The
 parse gives the manifest: each site's condition tree and the byte range of
 each of its leaf operands. The rewriter then inserts a record call around
-each leaf, without parsing again, and the result is compiled in place of
-the file:
+each leaf, and an outcome call around what decides the site's own outcome,
+without parsing again, and the result is compiled in place of the file:
 
 ```ruby
 ok?(id) && new?(id)
 # compiles as
-ConditionCoverage.record("k.rb:2:2", 0, ok?(id)) && ConditionCoverage.record("k.rb:2:2", 1, new?(id))
+ConditionCoverage.outcome("k.rb:2:2", ConditionCoverage.record("k.rb:2:2", 0, ok?(id)) && ConditionCoverage.record("k.rb:2:2", 1, new?(id)))
 ```
 
 A command call such as `ok? id` (after `and`) is not valid as a bare
-argument, so that operand alone gets parentheses of its own. No other operand
-does: parentheses make a statement, and a statement on a continuation line
-gives that line a line-coverage count of its own, which would change
-SimpleCov's line totals. With that one exception, an instrumented file has
-the same relevant lines as an uninstrumented one.
+argument, so that operand alone gets parentheses of its own, and so does a
+whole `and` or `or` inside its outcome call. Nothing else does:
+parentheses make a statement, and a statement on a continuation line gives
+that line a line-coverage count of its own, which changes SimpleCov's line
+totals. So a command call, or an `and` or `or`, written over several lines
+can add to SimpleCov's relevant lines; nothing else does.
 
-`record` counts whether the operand was truthy or falsy and returns it
-unchanged, so short-circuiting and the value of the expression are
-preserved. Only text is inserted, never a newline, so backtrace line numbers
+`record` and `outcome` count whether their value was truthy or falsy and
+return it unchanged, so short-circuiting and the value of the expression
+are preserved. Only text is inserted, never a newline, so backtrace line numbers
 still match the file. The rewrite happens in memory; no file on disk
-changes. A condition with a single operand is left alone, since branch
-coverage already sees both its outcomes.
+changes. An `if` or `unless` whose condition is a single operand is left
+alone, since branch coverage already sees both its outcomes.
 
 At exit the manifests parsed during the run are reused; only covered files
 the run never loaded are read and parsed then.
@@ -182,7 +203,7 @@ the run never loaded are read and parsed then.
   - `find` / `detect`: found vs nil
   - `fetch(k, default)`, `dig`, `Hash#[]` with a default: present vs default
   - `x || default` in value context, `&.` safe navigation: nil vs not nil
-  - ternaries, `unless`, modifier `if`, `case`/`when` and `in` patterns
+  - `unless`, modifier `if`, `case`/`when` and `in` patterns
   - regex matches: nil vs MatchData
 
 ## Constraints

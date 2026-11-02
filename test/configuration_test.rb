@@ -15,7 +15,8 @@ class ConfigurationTest < Id58TestBase
     end
     expected = [
       'unknown setting covr in ConditionCoverage.start',
-      'the settings are: collector, cover, coverage_dir, report, root'
+      'the settings are: ' \
+      'collector, cover, coverage_dir, measure, report, root'
     ].join("\n")
     assert_equal expected, error.message
   end
@@ -43,5 +44,36 @@ class ConfigurationTest < Id58TestBase
   ) do
     config = ConditionCoverage::Configuration.new { root '/app' }
     refute config.respond_to?(:covr)
+  end
+
+  test 'A9MJ30', %w(
+  | conditions alone are measured unless measure says
+  | otherwise, so a start block written before paths
+  | were measured is unchanged by them
+  ) do
+    config = ConditionCoverage::Configuration.new { root '/app' }
+    assert_equal [:conditions], config.measures
+    config = ConditionCoverage::Configuration.new do
+      root '/app'
+      measure :conditions, :paths
+    end
+    assert_equal %i[conditions paths], config.measures
+  end
+
+  test 'A9MJ31', %w(
+  | an unknown measure in the start block is refused,
+  | naming it and listing the measures there are
+  ) do
+    error = assert_raises(ConditionCoverage::ConfigurationError) do
+      ConditionCoverage::Configuration.new do
+        root '/app'
+        measure :conditions, :path
+      end
+    end
+    expected = [
+      'unknown measure path in ConditionCoverage.start',
+      'the measures are: conditions, paths'
+    ].join("\n")
+    assert_equal expected, error.message
   end
 end

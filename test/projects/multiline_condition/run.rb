@@ -8,11 +8,13 @@ if ENV.fetch('CONDITIONS') == 'on'
     root __dir__
     cover 'source/**/*.rb'
     coverage_dir ENV.fetch('COVERAGE_DIR')
+    measure :conditions, :paths
   end
 end
 
 require_relative 'source/kata'
 Kata.ok?('N1')
 Kata.image?('docker.io/ruby')
+Kata.size('N123456', 4)
 kata = File.expand_path('source/kata.rb', __dir__)
 puts JSON.generate(Coverage.result.fetch(kata)[:lines])

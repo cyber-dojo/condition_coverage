@@ -50,4 +50,22 @@ class ResultTest < Id58TestBase
     actual = ConditionCoverage::Result.new(sites, counts).operands
     assert_equal expected, actual
   end
+
+  test 'DYTY30', %w(
+  | the result lists every site's own outcome counts, zero
+  | for a site that never ran, a ternary's marked as such,
+  | since its outcome picks an arm
+  ) do
+    sites = {
+      'k.rb:2:2' => condition('&&', 16...23, 27...35),
+      'k.rb:6:4' => condition('?:', 57...64)
+    }
+    outcomes = { 'k.rb:2:2' => { truthy: 2, falsy: 1 } }
+    expected = {
+      'k.rb:2:2' => { truthy: 2, falsy: 1 },
+      'k.rb:6:4' => { truthy: 0, falsy: 0, ternary: true }
+    }
+    result = ConditionCoverage::Result.new(sites, {}, outcomes)
+    assert_equal expected, result.outcomes
+  end
 end

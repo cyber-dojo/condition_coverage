@@ -25,10 +25,36 @@ module ConditionCoverage
       %(<div class="row headings" data-heading="">#{cells}</div>)
     end
 
-    # A site's operator row, then the rows of its operands.
+    # A site's operator row, with its own outcome's counts and
+    # gap when it has them, then the rows of its operands.
     def self.site_rows(site)
-      row = %(<div class="row">#{operator(site)}</div>)
+      cells = operator(site)
+      cells += count_cells(site) if site.key?(:truthy)
+      row = %(<div class="row"#{at(site)}>#{cells}</div>)
       [row, *operand_rows(site, '')]
+    end
+
+    # The true and false count and gap cells of a node; a node
+    # with no gap says so, as none.
+    def self.count_cells(node)
+      counts = %i[truthy falsy].map do |name|
+        value = CGI.escapeHTML(node[name].to_s)
+        %(<span class="#{name}" data-#{name}="">#{value}</span>)
+      end
+      counts.join + gap_cell(node[:gap])
+    end
+
+    # The cell naming a node's gap, or none.
+    def self.gap_cell(gap)
+      return %(<span class="gap none" data-gap="">none</span>) if gap.nil?
+
+      %(<span class="gap" data-gap="">#{CGI.escapeHTML(gap)}</span>)
+    end
+
+    # SPIKE: the data-at attribute of a node located in its
+    # source, '' for one that is not.
+    def self.at(node)
+      node[:at] ? %( data-at="#{node[:at].join(',')}") : ''
     end
 
     # The rows of a condition's operands, each branching from
@@ -49,7 +75,7 @@ module ConditionCoverage
     # A nested condition's row: its branch and its operator.
     def self.subtree_row(condition, branch)
       cells = branch_cell(branch) + operator(condition)
-      %(<div class="row" data-subtree="">#{cells}</div>)
+      %(<div class="row" data-subtree=""#{at(condition)}>#{cells}</div>)
     end
 
     # The cell naming a condition's operator.
@@ -61,12 +87,11 @@ module ConditionCoverage
     # One operand's row: its branch, text, true and false
     # counts, and gap.
     def self.operand_row(operand, branch)
-      cells = %i[text truthy falsy gap].map do |name|
-        value = CGI.escapeHTML(operand[name].to_s)
-        %(<span class="#{name}" data-#{name}="">#{value}</span>)
-      end
+      text = CGI.escapeHTML(operand[:text].to_s)
+      cells = %(<span class="text" data-text="">#{text}</span>) +
+              count_cells(operand)
       lead = branch_cell(branch)
-      %(<div class="row" data-operand="">#{lead}#{cells.join}</div>)
+      %(<div class="row" data-operand=""#{at(operand)}>#{lead}#{cells}</div>)
     end
 
     # The cell drawing a row's branch from its operator.

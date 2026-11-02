@@ -2,6 +2,8 @@ require 'fileutils'
 require_relative 'configuration'
 require_relative 'json_writer'
 require_relative 'manifest'
+require_relative 'path_gaps'
+require_relative 'path_manifest'
 require_relative 'recorder'
 require_relative 'render'
 require_relative 'result'
@@ -33,6 +35,25 @@ module ConditionCoverage
   # value unchanged.
   def self.record(site, index, value)
     @recorder.record(site, index, value)
+  end
+
+  # The call rewritten code makes around what decides each
+  # site's own outcome; returns value unchanged.
+  def self.outcome(site, value)
+    @recorder.outcome(site, value)
+  end
+
+  # The call rewritten code makes as a call reaches its
+  # method's first decision; returns the call's new path.
+  def self.path(site, size)
+    @recorder.path(site, size)
+  end
+
+  # The call rewritten code makes around each decision's
+  # predicate, with exits for one whose arm leaves the method;
+  # returns value unchanged.
+  def self.decide(path, index, value, exits = nil)
+    @recorder.decide(path, index, value, exits)
   end
 
   # Instruments every file later required that the settings
@@ -83,27 +104,56 @@ module ConditionCoverage
     return unless config.covers?(path)
 
     parsed = @parsed[path] = Manifest.parse(path, config)
-    rewritten = Rewriter.rewrite(parsed[:source], parsed[:sites])
+    methods = path_methods(path, parsed[:source], config)
+    sites = parsed[:sites]
+    rewritten = Rewriter.rewrite(parsed[:source], sites, methods)
     RubyVM::InstructionSequence.compile(rewritten, path, path)
+  end
+
+  # The methods of the covered file at path whose paths are
+  # counted, none unless config measures paths.
+  def self.path_methods(path, source, config)
+    return {} unless config.measures.include?(:paths)
+
+    PathManifest.methods(source, config.relative(path))
   end
 
   # Writes the JSON report, then runs the chosen reporters, for
   # every covered file whether or not the run loaded it, into
-  # coverage_dir, created first if need be.
+  # coverage_dir, created first if need be. The paths never
+  # taken follow the condition gaps.
   def self.report(config)
     files = parsed_files(config)
-    operands = collect(files, config)
-    Render.run(operands, files, config)
+    result = collect(files, config)
+    paths = config.measures.include?(:paths) ? @recorder.paths : nil
+    Render.run(
+      result.operands, files, config, paths, outcomes: result.outcomes
+    )
+    return unless config.reporters.include?(:gaps)
+
+    methods = path_methods_of(files, config)
+    PathGaps.lines(methods, @recorder.paths).each { |line| puts line }
   end
 
-  # The operands of every covered file, with the counts this
-  # run recorded, once written as the JSON report.
+  # The methods whose paths are counted of every covered file,
+  # in one manifest.
+  def self.path_methods_of(files, config)
+    all = files.map do |path, parsed|
+      path_methods(path, parsed[:source], config)
+    end
+    all.reduce({}, :merge)
+  end
+
+  # The Result of every covered file, with the counts this run
+  # recorded, once its operands and outcomes are written as the
+  # JSON report.
   def self.collect(files, config)
     sites = merged_sites(files)
-    operands = Result.new(sites, @recorder.counts).operands
+    result = Result.new(sites, @recorder.counts, @recorder.outcomes)
     FileUtils.mkdir_p(config.output_dir)
-    JsonWriter.write(operands, config.json_path)
-    operands
+    path = config.json_path
+    JsonWriter.write(result.operands, path, result.outcomes)
+    result
   end
 
   # { full path => {source:, sites:} } for every covered file:

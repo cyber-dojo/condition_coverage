@@ -112,9 +112,10 @@ class HtmlFileTest < Id58TestBase
         text_of(row.elements["*[@data-#{cell}]"])
       end
     end
+    # an operand with no gap says so, as none
     expected = [
-      ['ok?(id)', '1', '1', ''],
-      ["id.start_with?('N')", '1', '1', '']
+      ['ok?(id)', '1', '1', 'none'],
+      ["id.start_with?('N')", '1', '1', 'none']
     ]
     assert_equal expected, actual
   end
