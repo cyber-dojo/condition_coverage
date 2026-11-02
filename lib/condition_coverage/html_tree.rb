@@ -46,9 +46,9 @@ module ConditionCoverage
 
     # The cell naming a node's gap, or none.
     def self.gap_cell(gap)
-      return %(<span class="gap none" data-gap="">none</span>) if gap.nil?
-
-      %(<span class="gap" data-gap="">#{CGI.escapeHTML(gap)}</span>)
+      css, text = gap.nil? ? ['gap none', 'none'] : ['gap', gap]
+      text = CGI.escapeHTML(text)
+      %(<span class="#{css}" data-gap="">#{text}</span>)
     end
 
     # SPIKE: the data-at attribute of a node located in its
@@ -75,7 +75,8 @@ module ConditionCoverage
     # A nested condition's row: its branch and its operator.
     def self.subtree_row(condition, branch)
       cells = branch_cell(branch) + operator(condition)
-      %(<div class="row" data-subtree=""#{at(condition)}>#{cells}</div>)
+      attrs = %(data-subtree=""#{at(condition)})
+      %(<div class="row" #{attrs}>#{cells}</div>)
     end
 
     # The cell naming a condition's operator.
@@ -91,7 +92,8 @@ module ConditionCoverage
       cells = %(<span class="text" data-text="">#{text}</span>) +
               count_cells(operand)
       lead = branch_cell(branch)
-      %(<div class="row" data-operand=""#{at(operand)}>#{lead}#{cells}</div>)
+      attrs = %(data-operand=""#{at(operand)})
+      %(<div class="row" #{attrs}>#{lead}#{cells}</div>)
     end
 
     # The cell drawing a row's branch from its operator.

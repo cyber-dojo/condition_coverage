@@ -17,12 +17,16 @@ module ConditionCoverage
         'path' => CGI.escapeHTML(path),
         'index' => "#{'../' * (path.count('/') + 1)}index.html",
         'style' => HtmlTemplate.asset('style.css'),
-        'script' => HtmlTemplate.asset('toggle.js') +
-                    HtmlTemplate.asset('side.js'),
+        'script' => script,
         'grids' => grids,
         'jumps' => HtmlNav.jumps(lines),
         'listing' => listing(lines, trees)
       )
+    end
+
+    # The page's script: its tree toggles, then its side rails.
+    def self.script
+      HtmlTemplate.asset('toggle.js') + HtmlTemplate.asset('side.js')
     end
 
     # The source listing of lines, as SourceLines.of gives them:

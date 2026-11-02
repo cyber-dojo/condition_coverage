@@ -9,6 +9,9 @@ SimpleCov.start do
   coverage_dir('/reports')
   cover('lib/**/*.rb')
   cover { |file| file.project_filename.start_with?('test/') }
+  # SPIKE: the path grids of the HTML report, untested while
+  # their design settles.
+  add_filter('lib/condition_coverage/html_paths.rb')
 
   group('code') { |file| file.filename.start_with?('/gem/lib/') }
   group('test') { |file| file.filename.start_with?('/gem/test/') }

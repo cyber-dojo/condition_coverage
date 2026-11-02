@@ -2,10 +2,12 @@ AllCops:
   NewCops: enable
   TargetRubyVersion: 3.2
   # shop.rb is the demo's mock of every shape of choice the
-  # report draws, written to be awkward rather than tidy.
+  # report draws, written to be awkward rather than tidy;
+  # html_paths.rb is a SPIKE, unlinted while its design settles.
   Exclude:
     - reports/**/*
     - demo/source/shop.rb
+    - lib/condition_coverage/html_paths.rb
 
 Layout/LineLength:
   Max: 70

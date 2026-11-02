@@ -131,7 +131,8 @@ class SiteTreeTest < Id58TestBase
       { truthy: 0, falsy: 0 }
     ]
     outcome = { truthy: 0, falsy: 1 }
-    tree = ConditionCoverage::SiteTree.of(source, site, counts, outcome)
-    assert_equal 'never true', tree[:gap]
+    tree = ConditionCoverage::SiteTree
+    root = tree.of(source, site, counts, outcome)
+    assert_equal 'never true', root[:gap]
   end
 end
