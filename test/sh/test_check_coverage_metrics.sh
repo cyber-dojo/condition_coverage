@@ -46,7 +46,7 @@ run_check()
   docker run --rm \
     --volume "${repo_dir}:/gem:ro" \
     --volume "${fixtures_dir}:/fixtures:ro" \
-    condition_coverage-test \
+    path_coverage-test \
     ruby bin/check_coverage_metrics.rb "$@" \
     > "${stdoutF}" 2> "${stderrF}"
   echo $? > "${statusF}"

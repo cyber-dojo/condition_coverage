@@ -1,5 +1,5 @@
 require_relative 'test_helper'
-require 'condition_coverage/html_file'
+require 'path_coverage/html_file'
 require 'rexml/document'
 
 class HtmlFileTest < Id58TestBase
@@ -18,7 +18,7 @@ class HtmlFileTest < Id58TestBase
         status: :covered, span: 3..3 },
       { number: 4, text: 'end', status: nil, span: nil }
     ]
-    listing = ConditionCoverage::HtmlFile.listing(lines)
+    listing = PathCoverage::HtmlFile.listing(lines)
     html = REXML::Document.new(listing)
 
     codes = html.elements.to_a('//*[@data-src]')
@@ -60,7 +60,7 @@ class HtmlFileTest < Id58TestBase
         span: 3..4 },
       { number: 5, text: '  end', status: nil, span: nil }
     ]
-    listing = ConditionCoverage::HtmlFile.listing(lines)
+    listing = PathCoverage::HtmlFile.listing(lines)
     html = REXML::Document.new(listing)
 
     buttons = html.elements.to_a('//button')
@@ -101,7 +101,7 @@ class HtmlFileTest < Id58TestBase
         }
       ]
     }
-    listing = ConditionCoverage::HtmlFile.listing(lines, trees)
+    listing = PathCoverage::HtmlFile.listing(lines, trees)
     html = REXML::Document.new(listing)
 
     tree = html.elements["//*[@id='tree-2']"]
@@ -143,7 +143,7 @@ class HtmlFileTest < Id58TestBase
         }
       ]
     }
-    listing = ConditionCoverage::HtmlFile.listing(lines, trees)
+    listing = PathCoverage::HtmlFile.listing(lines, trees)
     html = REXML::Document.new(listing)
     tree = html.elements["//*[@id='tree-1']"]
 
@@ -187,7 +187,7 @@ class HtmlFileTest < Id58TestBase
         }
       ]
     }
-    listing = ConditionCoverage::HtmlFile.listing(lines, trees)
+    listing = PathCoverage::HtmlFile.listing(lines, trees)
     html = REXML::Document.new(listing)
     tree = html.elements["//*[@id='tree-1']"]
 
@@ -231,7 +231,7 @@ class HtmlFileTest < Id58TestBase
         }
       ]
     }
-    listing = ConditionCoverage::HtmlFile.listing(lines, trees)
+    listing = PathCoverage::HtmlFile.listing(lines, trees)
     html = REXML::Document.new(listing)
     tree = html.elements["//*[@id='tree-1']"]
 
@@ -278,7 +278,7 @@ class HtmlFileTest < Id58TestBase
         }
       ]
     }
-    listing = ConditionCoverage::HtmlFile.listing(lines, trees)
+    listing = PathCoverage::HtmlFile.listing(lines, trees)
     html = REXML::Document.new(listing)
     tree = html.elements["//*[@id='tree-1']"]
 
@@ -294,6 +294,57 @@ class HtmlFileTest < Id58TestBase
     branches = tree.elements.to_a('.//*[@data-branch]')
     actual = branches.map { |element| text_of(element) }
     expected = ['├─ ', '├─ ', '│  ├─ ', '│  └─ ', '└─ ']
+    assert_equal expected, actual
+  end
+
+  test 'gae533', %w(
+  | an if's arms are named then and else, as their text is
+  | statements, and each marks the paths that took it
+  ) do
+    lines = [
+      { number: 1, text: '  if x == a && y == b', status: :gaps,
+        span: 1..1 }
+    ]
+    both = {
+      operator: '&&', cells: [false, true, false],
+      operands: [
+        { text: 'x == a', cells: [true, true, false] },
+        { text: 'y == b', cells: [false, true, nil] }
+      ]
+    }
+    trees = {
+      1 => [
+        {
+          operator: 'if', counts: [0, 1, 2],
+          cells: [nil, nil, nil],
+          operands: [
+            both,
+            {
+              arm: :then, text: 'alpha',
+              cells: [false, true, false], body: nil
+            },
+            {
+              arm: :else, text: 'beta',
+              cells: [true, false, true], body: nil
+            }
+          ]
+        }
+      ]
+    }
+    listing = PathCoverage::HtmlFile.listing(lines, trees)
+    html = REXML::Document.new(listing)
+    tree = html.elements["//*[@id='tree-1']"]
+
+    rows = tree.elements.to_a('.//*[@data-arm]')
+    actual = rows.map do |row|
+      cells = row.elements.to_a('*[@data-cell]').map { text_of(_1) }
+      [text_of(row.elements['*[@data-label]']), *cells]
+    end
+    bullet = [0x2022].pack('U')
+    expected = [
+      ['then', '', bullet, ''],
+      ['else', bullet, '', bullet]
+    ]
     assert_equal expected, actual
   end
 
@@ -316,7 +367,7 @@ class HtmlFileTest < Id58TestBase
       ]
     }
     trees = { 1 => [site, site], 2 => [site] }
-    listing = ConditionCoverage::HtmlFile.listing(lines, trees)
+    listing = PathCoverage::HtmlFile.listing(lines, trees)
     html = REXML::Document.new(listing)
 
     counts = html.elements.to_a('//button/*[@data-site-count]')
@@ -338,7 +389,7 @@ class HtmlFileTest < Id58TestBase
       { number: 2, text: '  ok?(b) && new?(b)', status: :covered,
         span: 2..2 }
     ]
-    listing = ConditionCoverage::HtmlFile.listing(lines)
+    listing = PathCoverage::HtmlFile.listing(lines)
     html = REXML::Document.new(listing)
 
     buttons = html.elements.to_a('//button')
@@ -366,7 +417,7 @@ class HtmlFileTest < Id58TestBase
       { number: 5, text: '  ok?(d) && new?(d)', status: :gaps,
         span: 5..5 }
     ]
-    listing = ConditionCoverage::HtmlFile.listing(lines)
+    listing = PathCoverage::HtmlFile.listing(lines)
     html = REXML::Document.new(listing)
 
     cells = html.elements.to_a('//*[@data-nav]')
@@ -393,7 +444,7 @@ class HtmlFileTest < Id58TestBase
         span: 2..2 },
       { number: 3, text: 'end', status: nil, span: nil }
     ]
-    listing = ConditionCoverage::HtmlFile.listing(lines)
+    listing = PathCoverage::HtmlFile.listing(lines)
     html = REXML::Document.new(listing)
 
     numbers = html.elements.to_a('//*[@data-line]')
@@ -416,7 +467,7 @@ class HtmlFileTest < Id58TestBase
       { number: 4, text: '  ok?(c) && new?(c)', status: :gaps,
         span: 4..4 }
     ]
-    html_file = ConditionCoverage::HtmlFile
+    html_file = PathCoverage::HtmlFile
     page = html_file.page('source/kata.rb', lines, {})
     html = REXML::Document.new(page)
     head = html.elements['//*[@data-head]']
@@ -440,7 +491,7 @@ class HtmlFileTest < Id58TestBase
       { number: 1, text: 'module Kata', status: nil, span: nil },
       { number: 2, text: 'end', status: nil, span: nil }
     ]
-    html_file = ConditionCoverage::HtmlFile
+    html_file = PathCoverage::HtmlFile
     page = html_file.page('source/kata.rb', lines, {})
     html = REXML::Document.new(page)
 

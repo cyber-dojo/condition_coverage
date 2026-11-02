@@ -1,8 +1,8 @@
 require_relative 'test_helper'
-require 'condition_coverage/configuration'
-require 'condition_coverage/json_writer'
-require 'condition_coverage/manifest'
-require 'condition_coverage/render'
+require 'path_coverage/configuration'
+require 'path_coverage/json_writer'
+require 'path_coverage/manifest'
+require 'path_coverage/render'
 require 'tmpdir'
 
 class RenderTest < Id58TestBase
@@ -14,7 +14,7 @@ class RenderTest < Id58TestBase
     dir = Dir.mktmpdir('Rn5d10')
     source = "def kata?(id) = ok?(id) && id.size == 6\n"
     File.write("#{dir}/kata.rb", source)
-    sites = ConditionCoverage::Manifest.sites(source, 'kata.rb')
+    sites = PathCoverage::Manifest.sites(source, 'kata.rb')
     site = sites.keys.first
     leaves = [%w(1:16 1:23), %w(1:27 1:39)]
     runs = [
@@ -26,11 +26,11 @@ class RenderTest < Id58TestBase
               .zip(counts).map { |path, count| { path:, count: } }
       file = "#{dir}/run#{n}.json"
       report = { site => { leaves:, taken: } }
-      writer = ConditionCoverage::JsonWriter
+      writer = PathCoverage::JsonWriter
       writer.write({ site => operands }, file, report)
       file
     end
-    config = ConditionCoverage::Configuration.new do
+    config = PathCoverage::Configuration.new do
       root dir
       cover '*.rb'
       coverage_dir dir
@@ -39,7 +39,7 @@ class RenderTest < Id58TestBase
     gap = "#{site} path never taken: " \
           '`ok?(id)` true, `id.size == 6` true'
     assert_output("#{gap}\n", '') do
-      ConditionCoverage::Render.from_json(config, paths)
+      PathCoverage::Render.from_json(config, paths)
     end
   end
 
@@ -52,12 +52,12 @@ class RenderTest < Id58TestBase
     dir = Dir.mktmpdir('Rn5d20')
     source = "def kata?(id) = ok?(id) && id.size == 6\n"
     File.write("#{dir}/kata.rb", source)
-    sites = ConditionCoverage::Manifest.sites(source, 'kata.rb')
+    sites = PathCoverage::Manifest.sites(source, 'kata.rb')
     site = sites.keys.first
     operands = [{ truthy: 1, falsy: 1 }, { truthy: 1, falsy: 0 }]
     file = "#{dir}/run.json"
-    ConditionCoverage::JsonWriter.write({ site => operands }, file)
-    config = ConditionCoverage::Configuration.new do
+    PathCoverage::JsonWriter.write({ site => operands }, file)
+    config = PathCoverage::Configuration.new do
       root dir
       cover '*.rb'
       coverage_dir dir
@@ -70,7 +70,7 @@ class RenderTest < Id58TestBase
       "#{never} false"
     ].join("\n")
     assert_output("#{expected}\n", '') do
-      ConditionCoverage::Render.from_json(config, [file])
+      PathCoverage::Render.from_json(config, [file])
     end
   end
 end

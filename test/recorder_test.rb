@@ -1,5 +1,5 @@
 require_relative 'test_helper'
-require 'condition_coverage/recorder'
+require 'path_coverage/recorder'
 
 class RecorderTest < Id58TestBase
   test '8TuB10', %w(
@@ -7,7 +7,7 @@ class RecorderTest < Id58TestBase
   | so the && it sits in still short-circuits
   | and still yields the same result
   ) do
-    recorder = ConditionCoverage::Recorder.new
+    recorder = PathCoverage::Recorder.new
     kata = { 'id' => 'Kp9sA2' }
     assert_same kata, recorder.record('k.rb:2:2', 0, kata)
     assert_nil recorder.record('k.rb:2:2', 1, nil)
@@ -17,7 +17,7 @@ class RecorderTest < Id58TestBase
   | each operand's truthy and falsy outcomes are counted,
   | keyed by its site and index
   ) do
-    recorder = ConditionCoverage::Recorder.new
+    recorder = PathCoverage::Recorder.new
     site = 'k.rb:2:2'
     # ok?(id) && new?(id), called three times
     recorder.record(site, 0, true)
@@ -38,7 +38,7 @@ class RecorderTest < Id58TestBase
   | keyed by the method's site; deciding returns the
   | predicate's value unchanged
   ) do
-    recorder = ConditionCoverage::Recorder.new
+    recorder = PathCoverage::Recorder.new
     site = 'k.rb:1:0'
     # fee(user, order), called three times
     calls = [[:gold, false], [false, :big], [:gold, false]]
@@ -56,7 +56,7 @@ class RecorderTest < Id58TestBase
   | or raise, counts no path, so no path is ever claimed
   | as seen that was not taken all the way through
   ) do
-    recorder = ConditionCoverage::Recorder.new
+    recorder = PathCoverage::Recorder.new
     path = recorder.path('k.rb:1:0', 2)
     recorder.decide(path, 0, true)
     assert_equal({}, recorder.paths)
@@ -67,7 +67,7 @@ class RecorderTest < Id58TestBase
   | the method counts its path there, cut short, as the
   | call makes no more decisions
   ) do
-    recorder = ConditionCoverage::Recorder.new
+    recorder = PathCoverage::Recorder.new
     site = 'k.rb:1:0'
     # fork(id), whose first decision fails when id has no group
     path = recorder.path(site, 2)
@@ -85,7 +85,7 @@ class RecorderTest < Id58TestBase
   | each leaf it reached, nil for one it never did; leaving
   | returns the site's value unchanged
   ) do
-    recorder = ConditionCoverage::Recorder.new
+    recorder = PathCoverage::Recorder.new
     site = 'k.rb:2:2'
     # ok?(id) && new?(id), called twice
     trail = recorder.enter(site, 2)
@@ -104,7 +104,7 @@ class RecorderTest < Id58TestBase
   | under way, fills in a trail of its own, so neither
   | thread's path takes the other's outcomes
   ) do
-    recorder = ConditionCoverage::Recorder.new
+    recorder = PathCoverage::Recorder.new
     site = 'k.rb:2:2'
     # ok?(id) && new?(id), in two threads at once
     entered = Queue.new
@@ -134,7 +134,7 @@ class RecorderTest < Id58TestBase
   | path is ever claimed as seen that was not, and the stack
   | is cleared down to it
   ) do
-    recorder = ConditionCoverage::Recorder.new
+    recorder = PathCoverage::Recorder.new
     site = 'k.rb:2:2'
     # ok?(id) || retry?(id), whose retry? recursed and raised
     outer = recorder.enter(site, 2)
@@ -156,7 +156,7 @@ class RecorderTest < Id58TestBase
   | entered it is not on that fiber's stack, so it counts
   | no path, and leaving it still returns
   ) do
-    recorder = ConditionCoverage::Recorder.new
+    recorder = PathCoverage::Recorder.new
     site = 'k.rb:2:2'
     trail = Fiber.new do
       recorder.enter(site, 2).tap { recorder.record(site, 0, true) }

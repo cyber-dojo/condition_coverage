@@ -1,6 +1,6 @@
 require_relative 'test_helper'
-require 'condition_coverage/collector'
-require 'condition_coverage/post'
+require 'path_coverage/collector'
+require 'path_coverage/post'
 require 'json'
 require 'open3'
 require 'socket'
@@ -19,11 +19,11 @@ class CollectorTest < Id58TestBase
     dir = Dir.mktmpdir('Cl4k10')
     server = TCPServer.new('127.0.0.1', 0)
     url = "http://127.0.0.1:#{server.addr[1]}/runs"
-    collector = ConditionCoverage::Collector
+    collector = PathCoverage::Collector
     serving = Thread.new { collector.serve(server, dir) }
     [[2, 0], [0, 1]].each do |truthy, falsy|
       operands = { 'source/kata.rb:3:23' => [{ truthy:, falsy: }] }
-      ConditionCoverage::Post.deliver(operands, url)
+      PathCoverage::Post.deliver(operands, url)
     end
     serving.kill
     server.close
@@ -45,11 +45,11 @@ class CollectorTest < Id58TestBase
     dir = Dir.mktmpdir('Cl4k15')
     server = TCPServer.new('127.0.0.1', 0)
     port = server.addr[1]
-    collector = ConditionCoverage::Collector
+    collector = PathCoverage::Collector
     serving = Thread.new { collector.serve(server, dir) }
     TCPSocket.new('127.0.0.1', port).close
     operands = { 'source/kata.rb:3:23' => [{ truthy: 2, falsy: 0 }] }
-    ConditionCoverage::Post.deliver(operands, "http://127.0.0.1:#{port}/")
+    PathCoverage::Post.deliver(operands, "http://127.0.0.1:#{port}/")
     serving.kill
     server.close
     actual = Dir.children(dir).to_h do |name|
@@ -64,7 +64,7 @@ class CollectorTest < Id58TestBase
   ) do
     stdout, stderr, status = Open3.capture3(*command('-h'))
     assert_equal ['', 0], [stderr, status.exitstatus]
-    name = 'condition_coverage_collector'
+    name = 'path_coverage_collector'
     assert_includes stdout, "Usage: #{name} PORT DIR"
     assert_includes stdout, "#{name} 4570 "
   end
@@ -80,7 +80,7 @@ class CollectorTest < Id58TestBase
     pid = Process.spawn(*command(port.to_s, dir))
     wait_until_listening(port)
     operands = { 'source/kata.rb:3:23' => [{ truthy: 1, falsy: 1 }] }
-    ConditionCoverage::Post.deliver(operands, "http://127.0.0.1:#{port}/")
+    PathCoverage::Post.deliver(operands, "http://127.0.0.1:#{port}/")
     Process.kill('TERM', pid)
     Process.wait(pid)
     counts = { 'truthy' => 1, 'falsy' => 1 }
@@ -92,7 +92,7 @@ class CollectorTest < Id58TestBase
   # The collector command, with args, run from this checkout.
   def command(*args)
     root = File.expand_path('..', __dir__)
-    exe = "#{root}/exe/condition_coverage_collector"
+    exe = "#{root}/exe/path_coverage_collector"
     ['ruby', "-I#{root}/lib", exe, *args]
   end
 

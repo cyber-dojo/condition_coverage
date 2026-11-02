@@ -1,5 +1,5 @@
 require_relative 'test_helper'
-require 'condition_coverage/path_manifest'
+require 'path_coverage/path_manifest'
 
 class PathManifestTest < Id58TestBase
   test 'Pm7c01', %w(
@@ -175,16 +175,16 @@ class PathManifestTest < Id58TestBase
 
   # The path manifest of source, as if it were k.rb.
   def methods(source)
-    ConditionCoverage::PathManifest.methods(source, 'k.rb')
+    PathCoverage::PathManifest.methods(source, 'k.rb')
   end
 
   # The PathMethod named name, with entry and decisions.
   def path_method(name, entry, *decisions)
-    ConditionCoverage::PathMethod.new(name:, entry:, decisions:)
+    PathCoverage::PathMethod.new(name:, entry:, decisions:)
   end
 
   # The Decision at line whose predicate is at range.
   def decision(line, range, command: false)
-    ConditionCoverage::Decision.new(line:, range:, command:)
+    PathCoverage::Decision.new(line:, range:, command:)
   end
 end

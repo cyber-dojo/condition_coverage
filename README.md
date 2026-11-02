@@ -1,23 +1,29 @@
-# condition_coverage
+# path_coverage
 
-Condition coverage for Ruby, to run alongside SimpleCov's line and branch
-coverage.
+Path coverage for Ruby, to run alongside SimpleCov's line and branch
+coverage, at two scopes:
 
-Gem: https://rubygems.org/gems/condition_coverage (which shows the latest
+- within each expression (a site): which combinations of its leaf
+  outcomes ran, eg `ok?(id)` true then `new?(id)` false
+- across each method: which combinations of its decisions ran, eg the
+  `if` on line 4 true then the `if` on line 7 false
+
+Gem: https://rubygems.org/gems/path_coverage (which shows the latest
 version).
 
-Status: covers `&&`, `||`, `and`, `or` and the ternary `?:`: each leaf
-operand of a condition, however its operators are chained, nested or
-grouped. Decisions hidden inside calls come next (see Roadmap).
+Status: sites cover `&&`, `||`, `and`, `or`, the ternary `?:`, and
+`if`/`elsif`/`else`: each leaf operand of a condition, however its
+operators are chained, nested or grouped. Method paths cover `if`
+decisions. Decisions hidden inside calls come next (see Roadmap).
 
-Demo: https://cyber-dojo.github.io/condition_coverage/ shows the HTML
-report for the mock source tree in `demo/`. `make demo` builds and opens
-the same report locally.
+Demo: https://cyber-dojo.github.io/path_coverage/ shows the HTML report
+for the mock source tree in `demo/`. `make demo` builds and opens the
+same report locally.
 
 ## The gap it fills
 
 Ruby's built-in `Coverage` (which SimpleCov reads) tracks branches, not the
-conditions inside them:
+conditions inside them, nor the combinations of branches taken:
 
 ```ruby
 return :ok if ok?(id) && id.start_with?('N')
@@ -31,14 +37,15 @@ never false, or never evaluated, and branch coverage reports 100%.
 ```ruby
 # test coverage config, before any application code is required
 require 'simplecov'
-require 'condition_coverage'
+require 'path_coverage'
 SimpleCov.start do
   # ...
 end
-ConditionCoverage.start do
+PathCoverage.start do
   root APP_DIR                 # cover globs and site names are relative to it
   cover 'source/**/*.rb'       # each matching file is instrumented as it loads
-  coverage_dir '/tmp/coverage' # where condition_coverage.json is written
+  coverage_dir '/tmp/coverage' # where path_coverage.json is written
+  measure :conditions, :paths  # sites alone unless :paths is named too
   report :gaps, :html          # the reporters run at exit (default :gaps)
 end
 ```
@@ -50,54 +57,57 @@ A run whose code cannot be changed, such as a script in a `docker build`
 step, can be covered from its environment alone:
 
 ```sh
-RUBYOPT=-rcondition_coverage/auto
-CONDITION_COVERAGE_ROOT=/app                  # root
-CONDITION_COVERAGE_COVER=src/**/*.rb,lib/*.rb  # cover, comma-separated
-CONDITION_COVERAGE_DIR=/tmp/condition         # coverage_dir
-CONDITION_COVERAGE_COLLECTOR=http://host.docker.internal:4570/runs
+RUBYOPT=-rpath_coverage/auto
+PATH_COVERAGE_ROOT=/app                  # root
+PATH_COVERAGE_COVER=src/**/*.rb,lib/*.rb  # cover, comma-separated
+PATH_COVERAGE_DIR=/tmp/paths             # coverage_dir
+PATH_COVERAGE_COLLECTOR=http://host.docker.internal:4570/runs
 ```
 
-This starts with `report :post`. With no `CONDITION_COVERAGE_COLLECTOR` it
+This starts with `report :post`. With no `PATH_COVERAGE_COLLECTOR` it
 starts nothing and prints nothing, so an image can set `RUBYOPT` for every
 run and measure only those given a collector.
 
-The gem's `condition_coverage_collector` command is that collector. It
-saves each report POSTed to it as a numbered file, and once every run is
-done they render as one report:
+The gem's `path_coverage_collector` command is that collector. It saves
+each report POSTed to it as a numbered file, and once every run is done
+they render as one report:
 
 ```sh
-condition_coverage_collector 4570 /tmp/condition/runs   # until stopped
+path_coverage_collector 4570 /tmp/paths/runs   # until stopped
 ```
 
 ```ruby
-runs = Dir['/tmp/condition/runs/*.json']
-ConditionCoverage::Render.from_json(config, runs)
+runs = Dir['/tmp/paths/runs/*.json']
+PathCoverage::Render.from_json(config, runs)
 ```
 
 ## What a run reports
 
 As the process exits:
 
-- `condition_coverage.json` is always written to `coverage_dir`: every site
+- `path_coverage.json` is always written to `coverage_dir`: every site
   of every covered file, with each operand's true and false counts under
-  `sites`, and each site's paths under `paths`. It is
-  the base the other reporters read, so they can also be run later, in
-  another process, from it alone:
-  `ConditionCoverage::Render.from_json(config)`, where `config` is a
-  `ConditionCoverage::Configuration` built from the same settings block.
+  `sites`, and each site's paths under `paths`. It is the base the other
+  reporters read, so they can also be run later, in another process, from
+  it alone: `PathCoverage::Render.from_json(config)`, where `config` is a
+  `PathCoverage::Configuration` built from the same settings block.
   Given several runs' reports, `Render.from_json(config, paths)` adds
   their counts together first, so the report shows only the gaps that
   every run left.
-- `:gaps` prints one line per path a site never took, in manifest order,
-  naming the outcome of each leaf on that path:
+- `:gaps` prints one line per path never taken, in manifest order: a
+  site's naming the outcome of each leaf on it, a method's the outcome
+  of each decision on it, by line:
 
 ```text
 source/kata.rb:3:23 path never taken: `ok?(id)` true, `new?(id)` false
 source/kata.rb:4:24 never reached
+source/fee.rb:2:2 fee path never taken: line 4 true, line 7 false
 ```
 
-A site is named by the `path:line:column` where its condition starts, the
-path relative to `root`. A site in a covered file the run never loaded is
+### Sites
+
+A site is named by the `path:line:column` where it starts, the path
+relative to `root`. A site in a covered file the run never loaded is
 still reported, as `never reached`.
 
 A path is the outcome of each leaf one evaluation of the site reached, in
@@ -120,59 +130,80 @@ should read the JSON, whose `paths` give each site's leaves as
 }
 ```
 
-A site is an outermost condition. Its operands are numbered left to right
+A site is an outermost condition. Its leaves are numbered left to right
 across the whole of it, nested conditions included:
 
 ```ruby
-ok?(id) && new?(id) && id.size == 6     # one && site, operands 0 1 2
+ok?(id) && new?(id) && id.size == 6     # one && site, leaves 0 1 2
 ok?(id) && (new?(id) || id.size == 6)   # an || nested in an && site, 0 1 2
 ok?(id) && new?(id) || id.size == 6     # an && nested in an || site, 0 1 2
 ids.any? { |k| k && k.ok? } && ok?(id)  # two sites: the block's is its own
-ok?(id) ? :ok : :no                     # a ?: site, its predicate operand 0
+ok?(id) ? :ok : :no                     # a ?: site, its predicate leaf 0
 ok?(id) && new?(id) ? :ok : :no         # an && nested in a ?: site, 0 1
 ok?(id) ? new?(id) && id.size == 6 : :no  # one ?: site, its then arm 1 2
 ```
 
-A ternary is a site even when its predicate is a single operand. An arm
+A ternary is a site even when its predicate is a single leaf. An arm
 holding a condition of `&&`, `||`, `and`, `or` or `?:` is part of the
 ternary's site, its leaves numbered after the predicate's, so the site's
 paths run through whichever arm the predicate picks. Any other arm, like a
 block, is not part of it, though a condition inside it is a site of its
 own.
 
+An `if` (with its `end`, not a modifier) is a site too, even when its
+predicate is a single leaf: its predicate nests in it, an `&&` there
+being no site of its own, and its `then` and `else` arms are plain, as
+they are statements. Its extent is the `if` keyword to the end of its
+predicate, so a site inside an arm keeps its own button. An `elsif` is a
+site of its own.
+
 A chain of one operator is flat; a change of operator, by precedence or by
 parentheses, nests. Parentheses are not part of the tree, since they decide
 nothing.
 
-An operand whose form allows one outcome only needs only to be evaluated:
-its other outcome is impossible, not a gap. `Foo.new`, literals (`'s'`,
-`1`, `:k`, `[]`, `{}`, `true`) and lambdas can only be truthy, as can
-`$stdout` and `$stderr`, which Ruby refuses to set to nil or false. Other
-globals, `$stdin` among them, can be either, as can constants, since one
-can hold nil or false (`VERBOSE = false`). `nil` and `false` can only be
-falsy:
+A leaf whose form allows one outcome only needs only to be evaluated: a
+path needing its other outcome is impossible, not a gap. `Foo.new`,
+literals (`'s'`, `1`, `:k`, `[]`, `{}`, `true`) and lambdas can only be
+truthy, as can `$stdout` and `$stderr`, which Ruby refuses to set to nil
+or false. Other globals, `$stdin` among them, can be either, as can
+constants, since one can hold nil or false (`VERBOSE = false`). `nil` and
+`false` can only be falsy:
 
 ```ruby
-@clock = options[:clock] || MonotonicClock.new  # operand 1: never evaluated, or no gap
+@clock = options[:clock] || MonotonicClock.new  # leaf 1: never evaluated, or no gap
 ```
+
+### Methods
+
+With `measure :conditions, :paths`, each method with two or more
+decisions also counts each call's path through them: the outcome of each
+decision it reached, in order. A method is named by the `path:line:column`
+of its `def`, then its name. Each decision is one outcome on the path,
+however many leaves its predicate has; those are its site's to show. So a
+site's columns stay its own leaves' combinations, and a method's its own
+decisions', rather than multiplying together. A decision whose arm always
+leaves the method ends the path there.
+
+### Reporters
 
 - `:html` writes `index.html` to `coverage_dir`: the covered files with
   their sites, outcomes seen (with a percent) and outcomes missing, each
   column sortable. Each file name opens `files/<path>.html`, the file's
-  source. On a line holding a condition the line number is a button (blue
+  source. On a line holding a site the line number is a button (blue
   and outlined when every outcome was seen, solid orange when any is
-  missing) that opens a grid of the condition's paths. Its rows are the
-  condition's tree: its operators, nested as Ruby groups them, a
-  ternary's arms marked `?` and `:`, and its leaves. Its columns are the
-  site's paths, never taken first, each headed by its count, orange when
-  zero; a leaf shows its outcome on each path, T or F, blank where the
-  path never reached it, and a plain arm a dot on each path that took
-  it. A condition
-  written over several lines has one button over all of
-  its line numbers. Trees with gaps start open. A header that stays at
-  the top of the page lists every site as a link to its line, covered
-  sites first, then those with gaps, and arrows beside each site with
-  gaps jump to the previous and next one, wrapping round at either end.
+  missing) that opens a grid of the site's paths, on the left. Its rows
+  are the site's tree: its operators, nested as Ruby groups them, a
+  ternary's arms marked `?` and `:`, an `if`'s named `then` and `else`,
+  and its leaves. Its columns are the site's paths, never taken first,
+  each headed by its count, orange when zero; a leaf shows its outcome on
+  each path, T or F, blank where the path never reached it, and a plain
+  arm a dot on each path that took it. A site written over several lines
+  has one button over all of its line numbers. Grids with gaps start
+  open. A header that stays at the top of the page lists every site as a
+  link to its line, covered sites first, then those with gaps, and arrows
+  beside each site with gaps jump to the previous and next one, wrapping
+  round at either end. Measuring paths, each method's grid of its
+  decisions' paths opens on the right.
 - `:post` sends the JSON report, as an HTTP POST, to the url set by
   `collector 'http://...'`. It is for a run whose own files are thrown
   away, such as a failing `docker build` step. It prints nothing, never
@@ -184,19 +215,25 @@ falsy:
 
 At load time each covered file is read and parsed once, with Prism. The
 parse gives the manifest: each site's condition tree and the byte range of
-each of its leaf operands. The rewriter then inserts a record call around
-each leaf, and a leave call around the whole site, whose first argument
-enters it, without parsing again, and the result is compiled in place of
-the file:
+each of its leaves. The rewriter then inserts a record call around each
+leaf, and a leave call around the whole site, whose first argument enters
+it, without parsing again, and the result is compiled in place of the
+file:
 
 ```ruby
 ok?(id) && new?(id)
 # compiles as
-ConditionCoverage.leave(ConditionCoverage.enter("k.rb:2:2", 2), ConditionCoverage.record("k.rb:2:2", 0, ok?(id)) && ConditionCoverage.record("k.rb:2:2", 1, new?(id)))
+PathCoverage.leave(PathCoverage.enter("k.rb:2:2", 2), PathCoverage.record("k.rb:2:2", 0, ok?(id)) && PathCoverage.record("k.rb:2:2", 1, new?(id)))
 ```
 
+An `if` site's leave call wraps its predicate alone, as its path is
+decided there, so an arm that returns or raises still counts it.
+Measuring paths, each method starts a path at its entry, and each
+decision's predicate is wrapped in a decide call too, outside its site's
+calls.
+
 A command call such as `ok? id` (after `and`) is not valid as a bare
-argument, so that operand alone gets parentheses of its own, and so does a
+argument, so that leaf alone gets parentheses of its own, and so does a
 whole `and` or `or` inside its leave call. Nothing else does:
 parentheses make a statement, and a statement on a continuation line gives
 that line a line-coverage count of its own, which changes SimpleCov's line
@@ -208,10 +245,9 @@ site's current path; `enter` starts that path, and `leave` counts it.
 Each returns its value unchanged, so short-circuiting and the value of
 the expression are preserved. Paths are kept per fiber, so threads never
 mix their outcomes; an evaluation cut short by a raise counts no path,
-so no path is ever claimed that was not taken. Only text is inserted, never a newline, so backtrace line numbers
-still match the file. The rewrite happens in memory; no file on disk
-changes. An `if` or `unless` whose condition is a single operand is left
-alone, since branch coverage already sees both its outcomes.
+so no path is ever claimed that was not taken. Only text is inserted,
+never a newline, so backtrace line numbers still match the file. The
+rewrite happens in memory; no file on disk changes.
 
 At exit the manifests parsed during the run are reused; only covered files
 the run never loaded are read and parsed then.

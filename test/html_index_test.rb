@@ -1,5 +1,5 @@
 require_relative 'test_helper'
-require 'condition_coverage/html_index'
+require 'path_coverage/html_index'
 require 'rexml/document'
 
 class HtmlIndexTest < Id58TestBase
@@ -12,7 +12,7 @@ class HtmlIndexTest < Id58TestBase
       path: 'source/kata.rb', sites: 2, seen: 3, outcomes: 8,
       percent: 38, missing: 5
     }
-    html = REXML::Document.new(ConditionCoverage::HtmlIndex.row(row))
+    html = REXML::Document.new(PathCoverage::HtmlIndex.row(row))
     cells = html.elements.to_a('//td')
 
     sorts = cells.map { |cell| cell.attributes['data-sort'] }
@@ -33,7 +33,7 @@ class HtmlIndexTest < Id58TestBase
       path: 'source/q&a.rb', sites: 1, seen: 4, outcomes: 4,
       percent: 100, missing: 0
     }
-    html = REXML::Document.new(ConditionCoverage::HtmlIndex.row(row))
+    html = REXML::Document.new(PathCoverage::HtmlIndex.row(row))
 
     first = html.elements['//td']
     assert_equal 'source/q&a.rb', first.attributes['data-sort']
@@ -53,7 +53,7 @@ class HtmlIndexTest < Id58TestBase
       { path: 'source/team.rb', sites: 1, seen: 4, outcomes: 4,
         percent: 100, missing: 0 }
     ]
-    html = REXML::Document.new(ConditionCoverage::HtmlIndex.page(rows))
+    html = REXML::Document.new(PathCoverage::HtmlIndex.page(rows))
 
     buttons = html.elements.to_a('//thead//th/button')
     expected = ['File', 'Sites', 'Outcomes seen', 'Missing']

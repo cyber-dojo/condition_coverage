@@ -1,5 +1,5 @@
 require_relative 'test_helper'
-require 'condition_coverage/merge'
+require 'path_coverage/merge'
 
 class MergeTest < Id58TestBase
   test 'Mg8q10', %w(
@@ -37,7 +37,7 @@ class MergeTest < Id58TestBase
         { truthy: 1, falsy: 0, only: :truthy }
       ]
     }
-    actual = ConditionCoverage::Merge.operands([first, second])
+    actual = PathCoverage::Merge.operands([first, second])
     assert_equal expected, actual
   end
 
@@ -66,7 +66,7 @@ class MergeTest < Id58TestBase
         { path: [false, nil], count: 0 }
       ]
     }
-    actual = ConditionCoverage::Merge.paths([first, second])
+    actual = PathCoverage::Merge.paths([first, second])
     assert_equal expected, actual
   end
 end

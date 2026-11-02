@@ -4,7 +4,7 @@
 all: lint test test_check
 
 image:
-	docker build --tag condition_coverage-test ${PWD}
+	docker build --tag path_coverage-test ${PWD}
 
 # A full run also gates the coverage report against
 # test/coverage_metrics_params.json. tids runs only the tests

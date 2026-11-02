@@ -1,8 +1,8 @@
-# Runs the demo source tree under condition coverage, as a
+# Runs the demo source tree under path coverage, as a
 # test suite would, writing the report to COVERAGE_DIR.
-require 'condition_coverage'
+require 'path_coverage'
 
-ConditionCoverage.start do
+PathCoverage.start do
   root __dir__
   cover 'source/**/*.rb'
   coverage_dir ENV.fetch('COVERAGE_DIR')

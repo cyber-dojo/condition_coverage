@@ -1,5 +1,5 @@
 require_relative 'test_helper'
-require 'condition_coverage/site_tree'
+require 'path_coverage/site_tree'
 
 class SiteTreeTest < Id58TestBase
   test 'EuNs10', %w(
@@ -29,7 +29,7 @@ class SiteTreeTest < Id58TestBase
         { text: "id.start_with?('N')", cells: [false, true, nil] }
       ]
     }
-    actual = ConditionCoverage::SiteTree.of(source, site, paths)
+    actual = PathCoverage::SiteTree.of(source, site, paths)
     assert_equal expected, actual
   end
 
@@ -65,7 +65,7 @@ class SiteTreeTest < Id58TestBase
         }
       ]
     }
-    actual = ConditionCoverage::SiteTree.of(source, site, paths)
+    actual = PathCoverage::SiteTree.of(source, site, paths)
     assert_equal expected, actual
   end
 
@@ -113,7 +113,80 @@ class SiteTreeTest < Id58TestBase
         }
       ]
     }
-    actual = ConditionCoverage::SiteTree.of(source, site, paths)
+    actual = PathCoverage::SiteTree.of(source, site, paths)
+    assert_equal expected, actual
+  end
+
+  test 'EuNs80', %w(
+  | an if's tree is a ternary's: its predicate decides which
+  | arm each path took, and its value is its taken arm's, nil
+  | for its plain arms
+  ) do
+    source = <<~RUBY
+      def fee(order)
+        if order.big? && order.new?
+          5
+        else
+          7
+        end
+      end
+    RUBY
+    both = condition('&&', 20...30, 34...44)
+    site = condition(
+      'if', both, arm(:then, 49...50), arm(:else, 62...63)
+    )
+    paths = [
+      { path: [true, true], count: 1 },
+      { path: [true, false], count: 0 },
+      { path: [false, nil], count: 2 }
+    ]
+    expected = {
+      operator: 'if', counts: [0, 1, 2],
+      cells: [nil, nil, nil],
+      operands: [
+        {
+          operator: '&&', cells: [false, true, false],
+          operands: [
+            { text: 'order.big?', cells: [true, true, false] },
+            { text: 'order.new?', cells: [false, true, nil] }
+          ]
+        },
+        {
+          arm: :then, text: '5',
+          cells: [false, true, false], body: nil
+        },
+        {
+          arm: :else, text: '7',
+          cells: [true, false, true], body: nil
+        }
+      ]
+    }
+    actual = PathCoverage::SiteTree.of(source, site, paths)
+    assert_equal expected, actual
+  end
+
+  test 'EuNs81', %w(
+  | an if's arm with no statements has no text
+  ) do
+    source = <<~RUBY
+      def k(x)
+        if x
+        end
+      end
+    RUBY
+    site = condition('if', 14...15, arm(:then, nil))
+    paths = [
+      { path: [true], count: 1 },
+      { path: [false], count: 0 }
+    ]
+    expected = {
+      operator: 'if', counts: [0, 1], cells: [nil, nil],
+      operands: [
+        { text: 'x', cells: [false, true] },
+        { arm: :then, text: nil, cells: [false, true], body: nil }
+      ]
+    }
+    actual = PathCoverage::SiteTree.of(source, site, paths)
     assert_equal expected, actual
   end
 end

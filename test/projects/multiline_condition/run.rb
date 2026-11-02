@@ -3,8 +3,8 @@ require 'json'
 
 Coverage.start(lines: true)
 if ENV.fetch('CONDITIONS') == 'on'
-  require 'condition_coverage'
-  ConditionCoverage.start(on_exit: proc {}) do
+  require 'path_coverage'
+  PathCoverage.start(on_exit: proc {}) do
     root __dir__
     cover 'source/**/*.rb'
     coverage_dir ENV.fetch('COVERAGE_DIR')

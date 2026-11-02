@@ -1,5 +1,5 @@
 require_relative 'test_helper'
-require 'condition_coverage/site_paths'
+require 'path_coverage/site_paths'
 
 class SitePathsTest < Id58TestBase
   test 'Sp3x10', %w(
@@ -10,7 +10,7 @@ class SitePathsTest < Id58TestBase
     # ok?(id) && new?(id)
     site = condition('&&', 16...23, 27...35)
     expected = [[true, true], [true, false], [false, nil]]
-    assert_equal expected, ConditionCoverage::SitePaths.possible(site)
+    assert_equal expected, PathCoverage::SitePaths.possible(site)
   end
 
   test 'Sp3x20', %w(
@@ -20,7 +20,7 @@ class SitePathsTest < Id58TestBase
     # ok?(id) || new?(id)
     site = condition('||', 16...23, 27...35)
     expected = [[true, nil], [false, true], [false, false]]
-    assert_equal expected, ConditionCoverage::SitePaths.possible(site)
+    assert_equal expected, PathCoverage::SitePaths.possible(site)
   end
 
   test 'Sp3x30', %w(
@@ -37,7 +37,7 @@ class SitePathsTest < Id58TestBase
       [true, true, true], [true, true, false],
       [true, false, nil], [false, nil, nil]
     ]
-    assert_equal expected, ConditionCoverage::SitePaths.possible(site)
+    assert_equal expected, PathCoverage::SitePaths.possible(site)
   end
 
   test 'Sp3x40', %w(
@@ -51,7 +51,7 @@ class SitePathsTest < Id58TestBase
       fixed: { 28...33 => :falsy }
     )
     expected = [[true, nil], [false, false]]
-    assert_equal expected, ConditionCoverage::SitePaths.possible(site)
+    assert_equal expected, PathCoverage::SitePaths.possible(site)
   end
 
   test 'Sp3x50', %w(
@@ -65,6 +65,17 @@ class SitePathsTest < Id58TestBase
       [true, true, nil], [true, false, true], [true, false, false],
       [false, nil, true], [false, nil, false]
     ]
-    assert_equal expected, ConditionCoverage::SitePaths.possible(site)
+    assert_equal expected, PathCoverage::SitePaths.possible(site)
+  end
+
+  test 'Sp3x60', %w(
+  | an if's paths are its predicate's, its arms being plain,
+  | and an if with no else arm has a false path all the same
+  ) do
+    # if order.big? && order.new?
+    both = condition('&&', 20...30, 34...44)
+    site = condition('if', both, arm(:then, 49...50))
+    expected = [[true, true], [true, false], [false, nil]]
+    assert_equal expected, PathCoverage::SitePaths.possible(site)
   end
 end

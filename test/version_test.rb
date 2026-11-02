@@ -1,12 +1,12 @@
 require_relative 'test_helper'
-require 'condition_coverage'
+require 'path_coverage'
 require 'open3'
 
 class VersionTest < Id58TestBase
   test 'W3kU10', %w(
   | requiring the gem's entry point defines its version
   ) do
-    assert_equal '0.0.6', ConditionCoverage::VERSION
+    assert_equal '0.0.2', PathCoverage::VERSION
   end
 
   test 'W3kU20', %w(
@@ -15,8 +15,8 @@ class VersionTest < Id58TestBase
   ) do
     # A fresh process: in this one, other tests have
     # already required the kernel directly.
-    script = "require 'condition_coverage'; " \
-             'p ConditionCoverage.respond_to?(:start)'
+    script = "require 'path_coverage'; " \
+             'p PathCoverage.respond_to?(:start)'
     lib = File.expand_path('../lib', __dir__)
     output, status = Open3.capture2e('ruby', '-I', lib, '-e', script)
     assert_equal "true\n", output

@@ -1,7 +1,7 @@
 require_relative 'test_helper'
-require 'condition_coverage/collector'
-require 'condition_coverage/kernel'
-require 'condition_coverage/manifest'
+require 'path_coverage/collector'
+require 'path_coverage/kernel'
+require 'path_coverage/manifest'
 require 'json'
 require 'open3'
 require 'socket'
@@ -17,15 +17,15 @@ class AutoTest < Id58TestBase
   | starts nothing and prints nothing, so an image can set
   | RUBYOPT for every run while only some are measured
   ) do
-    assert_nil ENV.fetch('CONDITION_COVERAGE_COLLECTOR', nil)
-    before = ConditionCoverage.config
-    assert_output('', '') { require 'condition_coverage/auto' }
+    assert_nil ENV.fetch('PATH_COVERAGE_COLLECTOR', nil)
+    before = PathCoverage.config
+    assert_output('', '') { require 'path_coverage/auto' }
     # equal? as before is nil when no test has started yet.
-    assert before.equal?(ConditionCoverage.config), 'config changed'
+    assert before.equal?(PathCoverage.config), 'config changed'
   end
 
   test 'Au7x10', %w(
-  | requiring condition_coverage/auto, as RUBYOPT=-r does,
+  | requiring path_coverage/auto, as RUBYOPT=-r does,
   | with the settings in the environment, covers a script
   | that exits 42 and POSTs its counts to the collector,
   | leaving its stdout, stderr and exit status unchanged
@@ -47,19 +47,19 @@ class AutoTest < Id58TestBase
     port = server.addr[1]
     received = Thread.new { request_body(server.accept) }
     env = {
-      'CONDITION_COVERAGE_ROOT' => dir,
-      'CONDITION_COVERAGE_COVER' => 'source/**/*.rb',
-      'CONDITION_COVERAGE_DIR' => "#{dir}/condition",
-      'CONDITION_COVERAGE_COLLECTOR' => "http://127.0.0.1:#{port}/runs"
+      'PATH_COVERAGE_ROOT' => dir,
+      'PATH_COVERAGE_COVER' => 'source/**/*.rb',
+      'PATH_COVERAGE_DIR' => "#{dir}/condition",
+      'PATH_COVERAGE_COLLECTOR' => "http://127.0.0.1:#{port}/runs"
     }
     lib = File.expand_path('../lib', __dir__)
-    auto = '-rcondition_coverage/auto'
+    auto = '-rpath_coverage/auto'
     command = ['ruby', "-I#{lib}", auto, "#{dir}/run.rb"]
     stdout, stderr, status = Open3.capture3(env, *command)
     assert_equal ['', '', 42], [stdout, stderr, status.exitstatus]
 
     path = 'source/kata.rb'
-    sites = ConditionCoverage::Manifest.sites(source, path)
+    sites = PathCoverage::Manifest.sites(source, path)
     expected = {
       sites.keys.first => [
         { 'truthy' => 1, 'falsy' => 0 },
@@ -72,6 +72,6 @@ class AutoTest < Id58TestBase
   # The body of the one HTTP request on client, after
   # answering it 200, read as the collector reads it.
   def request_body(client)
-    ConditionCoverage::Collector.request_body(client)
+    PathCoverage::Collector.request_body(client)
   end
 end

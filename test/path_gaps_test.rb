@@ -1,6 +1,6 @@
 require_relative 'test_helper'
-require 'condition_coverage/path_gaps'
-require 'condition_coverage/path_manifest'
+require 'path_coverage/path_gaps'
+require 'path_coverage/path_manifest'
 
 class PathGapsTest < Id58TestBase
   test 'Pg4w01', %w(
@@ -10,14 +10,14 @@ class PathGapsTest < Id58TestBase
   | here deliver, has no line
   ) do
     decisions = [
-      ConditionCoverage::Decision.new(
+      PathCoverage::Decision.new(
         line: 3, range: 48...60, command: false
       ),
-      ConditionCoverage::Decision.new(
+      PathCoverage::Decision.new(
         line: 6, range: 87...97, command: false
       )
     ]
-    path_method = ConditionCoverage::PathMethod
+    path_method = PathCoverage::PathMethod
     methods = {
       'k.rb:1:0' => path_method.new(
         name: :fee, entry: 45, decisions:
@@ -37,7 +37,7 @@ class PathGapsTest < Id58TestBase
       'k.rb:1:0 fee path never taken: line 3 true, line 6 true',
       'k.rb:1:0 fee path never taken: line 3 false, line 6 true'
     ]
-    gaps = ConditionCoverage::PathGaps.lines(methods, paths)
+    gaps = PathCoverage::PathGaps.lines(methods, paths)
     assert_equal expected, gaps
   end
 
@@ -47,15 +47,15 @@ class PathGapsTest < Id58TestBase
   | after it, and is the only path with that outcome there
   ) do
     decisions = [
-      ConditionCoverage::Decision.new(
+      PathCoverage::Decision.new(
         line: 2, range: 34...47, command: false, exits: true
       ),
-      ConditionCoverage::Decision.new(
+      PathCoverage::Decision.new(
         line: 3, range: 53...60, command: false
       )
     ]
     methods = {
-      'k.rb:1:0' => ConditionCoverage::PathMethod.new(
+      'k.rb:1:0' => PathCoverage::PathMethod.new(
         name: :fork, entry: 15, decisions:
       )
     }
@@ -64,7 +64,7 @@ class PathGapsTest < Id58TestBase
       'k.rb:1:0 fork path never taken: line 2 true',
       'k.rb:1:0 fork path never taken: line 2 false, line 3 false'
     ]
-    gaps = ConditionCoverage::PathGaps.lines(methods, paths)
+    gaps = PathCoverage::PathGaps.lines(methods, paths)
     assert_equal expected, gaps
   end
 end

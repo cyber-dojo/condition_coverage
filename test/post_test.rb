@@ -1,7 +1,7 @@
 require_relative 'test_helper'
-require 'condition_coverage/collector'
-require 'condition_coverage/configuration'
-require 'condition_coverage/render'
+require 'path_coverage/collector'
+require 'path_coverage/configuration'
+require 'path_coverage/render'
 require 'json'
 require 'socket'
 require 'tmpdir'
@@ -26,7 +26,7 @@ class PostTest < Id58TestBase
     }
     config = post_config('Pq3s10', "http://127.0.0.1:#{port}/runs")
     assert_output('', '') do
-      ConditionCoverage::Render.run(operands, {}, config)
+      PathCoverage::Render.run(operands, {}, config)
     end
     expected = {
       'sites' => {
@@ -60,7 +60,7 @@ class PostTest < Id58TestBase
       ]
     }
     config = post_config('Pq3s11', "http://127.0.0.1:#{port}/runs")
-    render = ConditionCoverage::Render
+    render = PathCoverage::Render
     assert_output('', '') do
       render.run(operands, files, config, site_paths:)
     end
@@ -87,7 +87,7 @@ class PostTest < Id58TestBase
     config = post_config('Pq3s20', "http://127.0.0.1:#{port}/runs")
     operands = { 'source/kata.rb:3:23' => [{ truthy: 1, falsy: 0 }] }
     assert_output('', '') do
-      ConditionCoverage::Render.run(operands, {}, config)
+      PathCoverage::Render.run(operands, {}, config)
     end
   end
 
@@ -102,7 +102,7 @@ class PostTest < Id58TestBase
     operands = { 'source/kata.rb:3:23' => [{ truthy: 1, falsy: 0 }] }
     started = now
     assert_output('', '') do
-      ConditionCoverage::Render.run(operands, {}, config)
+      PathCoverage::Render.run(operands, {}, config)
     end
     elapsed = now - started
     server.close
@@ -125,7 +125,7 @@ class PostTest < Id58TestBase
     config = post_config('Pq3s40', "http://#{host}:#{port}/runs")
     operands = { 'source/kata.rb:3:23' => [{ truthy: 1, falsy: 0 }] }
     with_env('http_proxy', "http://127.0.0.1:#{dead_port}") do
-      ConditionCoverage::Render.run(operands, {}, config)
+      PathCoverage::Render.run(operands, {}, config)
     end
     sites = JSON.parse(received.join(3).value)['sites']
     assert_equal ['source/kata.rb:3:23'], sites.keys
@@ -149,7 +149,7 @@ class PostTest < Id58TestBase
   # A configuration choosing only :post, to url.
   def post_config(id, url)
     dir = Dir.mktmpdir(id)
-    ConditionCoverage::Configuration.new do
+    PathCoverage::Configuration.new do
       root dir
       cover '*.rb'
       coverage_dir dir
@@ -161,6 +161,6 @@ class PostTest < Id58TestBase
   # The body of the one HTTP request on client, after
   # answering it 200, read as the collector reads it.
   def request_body(client)
-    ConditionCoverage::Collector.request_body(client)
+    PathCoverage::Collector.request_body(client)
   end
 end

@@ -1,5 +1,5 @@
 require_relative 'test_helper'
-require 'condition_coverage/paths_report'
+require 'path_coverage/paths_report'
 
 class PathsReportTest < Id58TestBase
   test 'Pr7q10', %w(
@@ -25,7 +25,7 @@ class PathsReportTest < Id58TestBase
         leaves: [%w(2:2 2:9), %w(2:13 2:21)], taken:
       }
     }
-    report = ConditionCoverage::PathsReport
+    report = PathCoverage::PathsReport
     assert_equal expected, report.of({ 'k.rb:2:2' => taken }, files)
   end
 
@@ -42,6 +42,6 @@ class PathsReportTest < Id58TestBase
     sites = { 'k.rb:2:2' => site }
     files = { '/app/k.rb' => { source:, sites: } }
     expected = { 'k.rb:2:2' => ['ok?(id)', 'new?(id)'] }
-    assert_equal expected, ConditionCoverage::PathsReport.texts(files)
+    assert_equal expected, PathCoverage::PathsReport.texts(files)
   end
 end

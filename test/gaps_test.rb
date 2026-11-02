@@ -1,6 +1,6 @@
 require_relative 'test_helper'
-require 'condition_coverage/gaps'
-require 'condition_coverage/result'
+require 'path_coverage/gaps'
+require 'path_coverage/result'
 
 class GapsTest < Id58TestBase
   test 'ngWa20', %w(
@@ -19,11 +19,11 @@ class GapsTest < Id58TestBase
     site_paths = {
       'k.rb:2:11' => { [true, nil] => 1, [false, true] => 1 }
     }
-    result = ConditionCoverage::Result.new(sites, counts, site_paths)
+    result = PathCoverage::Result.new(sites, counts, site_paths)
     texts = {
       'k.rb:2:11' => ['options[:clock]', 'MonotonicClock.new']
     }
-    actual = ConditionCoverage::Gaps.lines(
+    actual = PathCoverage::Gaps.lines(
       result.operands, paths: result.paths, texts:
     )
     assert_equal [], actual
@@ -45,7 +45,7 @@ class GapsTest < Id58TestBase
       "#{never} true, `fetch(:a, 1)` false",
       "#{never} false"
     ]
-    gaps = ConditionCoverage::Gaps
+    gaps = PathCoverage::Gaps
     actual = gaps.path_gaps('k.rb:2:2', paths, texts)
     assert_equal expected, actual
   end
@@ -56,7 +56,7 @@ class GapsTest < Id58TestBase
   | longest, with a space inside when it starts or ends
   | with one, so the quoting is never ambiguous
   ) do
-    code = ConditionCoverage::Gaps.method(:code)
+    code = PathCoverage::Gaps.method(:code)
     assert_equal '``a`b``', code.call('a`b')
     assert_equal '`` `ls` ``', code.call('`ls`')
     assert_equal '``` x == ``y`` ```', code.call('x == ``y``')
@@ -68,7 +68,7 @@ class GapsTest < Id58TestBase
   | line; the site's path:line:column still pins it
   ) do
     text = "user.member?(\n  order.id)"
-    actual = ConditionCoverage::Gaps.code(text)
+    actual = PathCoverage::Gaps.code(text)
     assert_equal '`user.member?( order.id)`', actual
   end
 
@@ -87,7 +87,7 @@ class GapsTest < Id58TestBase
     site_paths = {
       'k.rb:2:2' => { [true, false] => 2, [false, nil] => 1 }
     }
-    result = ConditionCoverage::Result.new(sites, counts, site_paths)
+    result = PathCoverage::Result.new(sites, counts, site_paths)
     texts = {
       'k.rb:2:2' => ['ok?(id)', 'new?(id)'],
       'k.rb:6:4' => ['ok?(id)', 'old?(id)']
@@ -96,7 +96,7 @@ class GapsTest < Id58TestBase
       'k.rb:2:2 path never taken: `ok?(id)` true, `new?(id)` true',
       'k.rb:6:4 never reached'
     ]
-    actual = ConditionCoverage::Gaps.lines(
+    actual = PathCoverage::Gaps.lines(
       result.operands, paths: result.paths, texts:
     )
     assert_equal expected, actual

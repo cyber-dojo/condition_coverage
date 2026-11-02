@@ -4,7 +4,7 @@ require 'tmpdir'
 
 class ProjectsTest < Id58TestBase
   test '4WXv10', %w(
-  | a project run with condition coverage started prints,
+  | a project run with path coverage started prints,
   | as it exits, a line for each path through an && its run
   | never took
   ) do
@@ -55,7 +55,7 @@ class ProjectsTest < Id58TestBase
   test '4WXv30', %w(
   | an instrumented file has the same relevant lines for
   | line coverage as it has uninstrumented, so SimpleCov's
-  | line totals do not change when condition coverage runs,
+  | line totals do not change when path coverage runs,
   | even for a condition written over several lines, or a
   | method whose paths are measured, a modifier if among
   | its decisions

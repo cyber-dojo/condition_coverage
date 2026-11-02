@@ -1,5 +1,5 @@
 require 'English'
-require 'condition_coverage/condition'
+require 'path_coverage/condition'
 require 'etc'
 require 'minitest/autorun'
 require 'minitest/reporters'
@@ -158,7 +158,7 @@ class Id58TestBase < Minitest::Test
   def condition(
     operator, *operands, commands: [], fixed: {}, extent: nil
   )
-    ConditionCoverage::Condition.new(
+    PathCoverage::Condition.new(
       operator:, operands:, commands:, fixed:, extent:
     )
   end
@@ -168,7 +168,7 @@ class Id58TestBase < Minitest::Test
   # its byte range, and body the condition it holds, nil for a
   # plain value.
   def arm(kind, extent, body = nil)
-    ConditionCoverage::Arm.new(kind:, extent:, body:)
+    PathCoverage::Arm.new(kind:, extent:, body:)
   end
 
   # All the text inside a parsed REXML element, its children's

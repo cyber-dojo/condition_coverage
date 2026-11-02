@@ -1,5 +1,5 @@
 require_relative 'test_helper'
-require 'condition_coverage/configuration'
+require 'path_coverage/configuration'
 
 class ConfigurationTest < Id58TestBase
   test 'A9MJ10', %w(
@@ -7,14 +7,14 @@ class ConfigurationTest < Id58TestBase
   | naming it and listing the settings there are,
   | rather than failing with a NoMethodError
   ) do
-    error = assert_raises(ConditionCoverage::ConfigurationError) do
-      ConditionCoverage::Configuration.new do
+    error = assert_raises(PathCoverage::ConfigurationError) do
+      PathCoverage::Configuration.new do
         root '/app'
         covr 'source/**/*.rb'
       end
     end
     expected = [
-      'unknown setting covr in ConditionCoverage.start',
+      'unknown setting covr in PathCoverage.start',
       'the settings are: ' \
       'collector, cover, coverage_dir, measure, report, root'
     ].join("\n")
@@ -25,14 +25,14 @@ class ConfigurationTest < Id58TestBase
   | an unknown reporter in the start block is refused,
   | naming it and listing the reporters there are
   ) do
-    error = assert_raises(ConditionCoverage::ConfigurationError) do
-      ConditionCoverage::Configuration.new do
+    error = assert_raises(PathCoverage::ConfigurationError) do
+      PathCoverage::Configuration.new do
         root '/app'
         report :gaps, :htm
       end
     end
     expected = [
-      'unknown reporter htm in ConditionCoverage.start',
+      'unknown reporter htm in PathCoverage.start',
       'the reporters are: gaps, html, post'
     ].join("\n")
     assert_equal expected, error.message
@@ -42,7 +42,7 @@ class ConfigurationTest < Id58TestBase
   | a configuration does not claim to respond to a setting
   | that does not exist
   ) do
-    config = ConditionCoverage::Configuration.new { root '/app' }
+    config = PathCoverage::Configuration.new { root '/app' }
     refute config.respond_to?(:covr)
   end
 
@@ -51,9 +51,9 @@ class ConfigurationTest < Id58TestBase
   | otherwise, so a start block written before paths
   | were measured is unchanged by them
   ) do
-    config = ConditionCoverage::Configuration.new { root '/app' }
+    config = PathCoverage::Configuration.new { root '/app' }
     assert_equal [:conditions], config.measures
-    config = ConditionCoverage::Configuration.new do
+    config = PathCoverage::Configuration.new do
       root '/app'
       measure :conditions, :paths
     end
@@ -64,14 +64,14 @@ class ConfigurationTest < Id58TestBase
   | an unknown measure in the start block is refused,
   | naming it and listing the measures there are
   ) do
-    error = assert_raises(ConditionCoverage::ConfigurationError) do
-      ConditionCoverage::Configuration.new do
+    error = assert_raises(PathCoverage::ConfigurationError) do
+      PathCoverage::Configuration.new do
         root '/app'
         measure :conditions, :path
       end
     end
     expected = [
-      'unknown measure path in ConditionCoverage.start',
+      'unknown measure path in PathCoverage.start',
       'the measures are: conditions, paths'
     ].join("\n")
     assert_equal expected, error.message

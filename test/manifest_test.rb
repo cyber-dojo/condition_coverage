@@ -1,5 +1,5 @@
 require_relative 'test_helper'
-require 'condition_coverage/manifest'
+require 'path_coverage/manifest'
 
 class ManifestTest < Id58TestBase
   test '6asy10', %w(
@@ -20,7 +20,7 @@ class ManifestTest < Id58TestBase
     # ok?(id) is bytes 16...23, new?(id) is bytes 27...35
     both = condition('&&', 16...23, 27...35, extent: 16...35)
     expected = { 'k.rb:2:2' => both }
-    actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
+    actual = PathCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end
 
@@ -35,7 +35,7 @@ class ManifestTest < Id58TestBase
     RUBY
     either = condition('||', 16...23, 27...35, extent: 16...35)
     expected = { 'k.rb:2:2' => either }
-    actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
+    actual = PathCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end
 
@@ -51,7 +51,7 @@ class ManifestTest < Id58TestBase
     operands = [16...23, 27...35, 39...51]
     chain = condition('&&', *operands, extent: 16...51)
     expected = { 'k.rb:2:2' => chain }
-    actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
+    actual = PathCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end
 
@@ -68,7 +68,7 @@ class ManifestTest < Id58TestBase
     both = condition('&&', 16...23, 27...35, extent: 16...35)
     either = condition('||', both, 39...51, extent: 16...51)
     expected = { 'k.rb:2:2' => either }
-    actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
+    actual = PathCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end
 
@@ -86,7 +86,7 @@ class ManifestTest < Id58TestBase
     either = condition('||', 28...36, 40...52, extent: 28...52)
     both = condition('&&', 16...23, either, extent: 16...53)
     expected = { 'k.rb:2:2' => both }
-    actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
+    actual = PathCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end
 
@@ -101,7 +101,7 @@ class ManifestTest < Id58TestBase
     RUBY
     both = condition('&&', 16...23, 27...46, extent: 16...46)
     expected = { 'k.rb:2:2' => both }
-    actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
+    actual = PathCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end
 
@@ -115,7 +115,7 @@ class ManifestTest < Id58TestBase
     RUBY
     both = condition('&&', 16...23, 27...29, extent: 16...29)
     expected = { 'k.rb:2:2' => both }
-    actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
+    actual = PathCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end
 
@@ -131,7 +131,7 @@ class ManifestTest < Id58TestBase
     both = condition('and', 16...23, 28...36, extent: 16...36)
     either = condition('or', both, 40...52, extent: 16...52)
     expected = { 'k.rb:2:2' => either }
-    actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
+    actual = PathCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end
 
@@ -149,7 +149,7 @@ class ManifestTest < Id58TestBase
       'and', 16...23, 28...43, commands: [28...43], extent: 16...43
     )
     expected = { 'k.rb:2:2' => site }
-    actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
+    actual = PathCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end
 
@@ -166,7 +166,7 @@ class ManifestTest < Id58TestBase
     fixed = { 54...72 => :truthy }
     site = condition('||', 35...50, 54...72, fixed:, extent: 35...72)
     expected = { 'k.rb:2:11' => site }
-    actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
+    actual = PathCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end
 
@@ -187,7 +187,7 @@ class ManifestTest < Id58TestBase
         @i = o[:i] || false
       end
     RUBY
-    sites = ConditionCoverage::Manifest.sites(source, 'k.rb')
+    sites = PathCoverage::Manifest.sites(source, 'k.rb')
     actual = sites.values.map(&:fixed).reduce({}, :merge)
                   .transform_keys { |range| source.byteslice(range) }
     expected = {
@@ -209,7 +209,7 @@ class ManifestTest < Id58TestBase
         "\#{host}:\#{tag}"
       end
     RUBY
-    sites = ConditionCoverage::Manifest.sites(source, 'k.rb')
+    sites = PathCoverage::Manifest.sites(source, 'k.rb')
     assert_equal [{}, {}], sites.values.map(&:fixed)
   end
 
@@ -226,7 +226,7 @@ class ManifestTest < Id58TestBase
         [out, err, inp]
       end
     RUBY
-    sites = ConditionCoverage::Manifest.sites(source, 'k.rb')
+    sites = PathCoverage::Manifest.sites(source, 'k.rb')
     actual = sites.values.map(&:fixed).reduce({}, :merge)
                   .transform_keys { |range| source.byteslice(range) }
     expected = { '$stdout' => :truthy, '$stderr' => :truthy }
@@ -245,7 +245,7 @@ class ManifestTest < Id58TestBase
     outer = condition('&&', 16...23, 27...54, extent: 16...54)
     inner = condition('&&', 42...43, 47...52, extent: 42...52)
     expected = { 'k.rb:2:2' => outer, 'k.rb:2:28' => inner }
-    actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
+    actual = PathCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end
 
@@ -262,7 +262,7 @@ class ManifestTest < Id58TestBase
     arms = [arm(:then, 26...29), arm(:else, 32...35)]
     ternary = condition('?:', 16...23, *arms, extent: 16...35)
     expected = { 'k.rb:2:2' => ternary }
-    actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
+    actual = PathCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end
 
@@ -280,7 +280,7 @@ class ManifestTest < Id58TestBase
     arms = [arm(:then, 38...41), arm(:else, 44...47)]
     ternary = condition('?:', both, *arms, extent: 16...47)
     expected = { 'k.rb:2:2' => ternary }
-    actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
+    actual = PathCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end
 
@@ -300,7 +300,7 @@ class ManifestTest < Id58TestBase
       extent: 16...56
     )
     expected = { 'k.rb:2:2' => ternary }
-    actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
+    actual = PathCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end
 
@@ -319,7 +319,7 @@ class ManifestTest < Id58TestBase
       extent: 16...56
     )
     expected = { 'k.rb:2:2' => ternary }
-    actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
+    actual = PathCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end
 
@@ -339,7 +339,7 @@ class ManifestTest < Id58TestBase
     )
     inner = condition('&&', 41...42, 46...51, extent: 41...51)
     expected = { 'k.rb:2:2' => ternary, 'k.rb:2:27' => inner }
-    actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
+    actual = PathCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end
 
@@ -362,7 +362,96 @@ class ManifestTest < Id58TestBase
       extent: 14...33
     )
     expected = { 'k.rb:2:2' => outer }
-    actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
+    actual = PathCoverage::Manifest.sites(source, 'k.rb')
+    assert_equal expected, actual
+  end
+
+  test '6asya0', %w(
+  | an if is a choice, so it is a site, named if, whose
+  | operands are its predicate, an && nesting inside it, and
+  | its then and else arms; its extent is the if keyword to
+  | the end of its predicate, its arms being statements
+  ) do
+    source = <<~RUBY
+      def fee(order)
+        if order.big? && order.new?
+          5
+        else
+          7
+        end
+      end
+    RUBY
+    both = condition('&&', 20...30, 34...44, extent: 20...44)
+    choice = condition(
+      'if', both, arm(:then, 49...50), arm(:else, 62...63),
+      extent: 17...44
+    )
+    expected = { 'k.rb:2:2' => choice }
+    actual = PathCoverage::Manifest.sites(source, 'k.rb')
+    assert_equal expected, actual
+  end
+
+  test '6asya1', %w(
+  | an if with a single operand predicate is a site too, and
+  | an if with no else has its then arm only
+  ) do
+    source = <<~RUBY
+      def fee(order)
+        if order.big?
+          5
+        end
+      end
+    RUBY
+    choice = condition(
+      'if', 20...30, arm(:then, 35...36), extent: 17...30
+    )
+    expected = { 'k.rb:2:2' => choice }
+    actual = PathCoverage::Manifest.sites(source, 'k.rb')
+    assert_equal expected, actual
+  end
+
+  test '6asya2', %w(
+  | an elsif is a site of its own, after its if's, as its
+  | statements are no expression of the if's; it is the
+  | if's else arm, which has no body
+  ) do
+    source = <<~RUBY
+      def fee(order)
+        if order.big?
+          5
+        elsif order.new?
+          6
+        end
+      end
+    RUBY
+    outer = condition(
+      'if', 20...30, arm(:then, 35...36), arm(:else, 39...67),
+      extent: 17...30
+    )
+    inner = condition(
+      'if', 45...55, arm(:then, 60...61), extent: 39...55
+    )
+    expected = { 'k.rb:2:2' => outer, 'k.rb:4:2' => inner }
+    actual = PathCoverage::Manifest.sites(source, 'k.rb')
+    assert_equal expected, actual
+  end
+
+  test '6asya3', %w(
+  | an if's arm with no statements is still an arm, as the
+  | path that takes it is still a path, with no extent
+  ) do
+    source = <<~RUBY
+      def k(x)
+        if x
+        else
+        end
+      end
+    RUBY
+    choice = condition(
+      'if', 14...15, arm(:then, nil), arm(:else, nil), extent: 11...15
+    )
+    expected = { 'k.rb:2:2' => choice }
+    actual = PathCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end
 end

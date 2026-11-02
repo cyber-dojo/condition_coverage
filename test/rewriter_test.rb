@@ -1,6 +1,6 @@
 require_relative 'test_helper'
-require 'condition_coverage/path_manifest'
-require 'condition_coverage/rewriter'
+require 'path_coverage/path_manifest'
+require 'path_coverage/rewriter'
 
 class RewriterTest < Id58TestBase
   test '6D1Ka2', %w(
@@ -21,14 +21,14 @@ class RewriterTest < Id58TestBase
     sites = { 'k.rb:2:2' => both }
     expected = [
       'def kata?(id)',
-      '  ConditionCoverage.leave(' \
-      'ConditionCoverage.enter("k.rb:2:2", 2), ' \
-      'ConditionCoverage.record("k.rb:2:2", 0, ok?(id)) && ' \
-      'ConditionCoverage.record("k.rb:2:2", 1, new?(id)))',
+      '  PathCoverage.leave(' \
+      'PathCoverage.enter("k.rb:2:2", 2), ' \
+      'PathCoverage.record("k.rb:2:2", 0, ok?(id)) && ' \
+      'PathCoverage.record("k.rb:2:2", 1, new?(id)))',
       'end',
       ''
     ].join("\n")
-    rewriter = ConditionCoverage::Rewriter
+    rewriter = PathCoverage::Rewriter
     assert_equal expected, rewriter.rewrite(source, sites)
   end
 
@@ -47,15 +47,15 @@ class RewriterTest < Id58TestBase
     sites = { 'k.rb:2:2' => both }
     expected = [
       'def kata?(id)',
-      '  ConditionCoverage.leave(' \
-      'ConditionCoverage.enter("k.rb:2:2", 3), ' \
-      'ConditionCoverage.record("k.rb:2:2", 0, ok?(id)) && ' \
-      '(ConditionCoverage.record("k.rb:2:2", 1, new?(id)) || ' \
-      'ConditionCoverage.record("k.rb:2:2", 2, id.size == 6)))',
+      '  PathCoverage.leave(' \
+      'PathCoverage.enter("k.rb:2:2", 3), ' \
+      'PathCoverage.record("k.rb:2:2", 0, ok?(id)) && ' \
+      '(PathCoverage.record("k.rb:2:2", 1, new?(id)) || ' \
+      'PathCoverage.record("k.rb:2:2", 2, id.size == 6)))',
       'end',
       ''
     ].join("\n")
-    rewriter = ConditionCoverage::Rewriter
+    rewriter = PathCoverage::Rewriter
     assert_equal expected, rewriter.rewrite(source, sites)
   end
 
@@ -78,15 +78,15 @@ class RewriterTest < Id58TestBase
     sites = { 'k.rb:2:2' => site }
     expected = [
       'def kata?(id)',
-      '  ConditionCoverage.leave(' \
-      'ConditionCoverage.enter("k.rb:2:2", 2), (' \
-      'ConditionCoverage.record("k.rb:2:2", 0, ok?(id)) and ' \
-      "ConditionCoverage.record(\"k.rb:2:2\", 1, (id.include? 'N'))" \
+      '  PathCoverage.leave(' \
+      'PathCoverage.enter("k.rb:2:2", 2), (' \
+      'PathCoverage.record("k.rb:2:2", 0, ok?(id)) and ' \
+      "PathCoverage.record(\"k.rb:2:2\", 1, (id.include? 'N'))" \
       '))',
       'end',
       ''
     ].join("\n")
-    rewriter = ConditionCoverage::Rewriter
+    rewriter = PathCoverage::Rewriter
     assert_equal expected, rewriter.rewrite(source, sites)
   end
 
@@ -98,8 +98,118 @@ class RewriterTest < Id58TestBase
         return :ok if ok?(id)
       end
     RUBY
-    rewriter = ConditionCoverage::Rewriter
+    rewriter = PathCoverage::Rewriter
     assert_equal source, rewriter.rewrite(source, {})
+  end
+
+  test '6D1Ke1', %w(
+  | an if site's leave call wraps its predicate alone, as its
+  | path is decided there, so an arm that returns or raises
+  | still leaves the site with its path counted
+  ) do
+    source = <<~RUBY
+      def fee(order)
+        if order.big?
+          return 5
+        end
+        7
+      end
+    RUBY
+    choice = condition(
+      'if', 20...30, arm(:then, 35...43), extent: 17...30
+    )
+    sites = { 'k.rb:2:2' => choice }
+    expected = [
+      'def fee(order)',
+      '  if PathCoverage.leave(' \
+      'PathCoverage.enter("k.rb:2:2", 1), ' \
+      'PathCoverage.record("k.rb:2:2", 0, order.big?))',
+      '    return 5',
+      '  end',
+      '  7',
+      'end',
+      ''
+    ].join("\n")
+    rewriter = PathCoverage::Rewriter
+    assert_equal expected, rewriter.rewrite(source, sites)
+  end
+
+  test '6D1Ke2', %w(
+  | an if site whose predicate is an and or an or holds it
+  | in parentheses inside the leave call, as it is no bare
+  | argument
+  ) do
+    source = <<~RUBY
+      def k(a, b)
+        if a and b
+          1
+        end
+      end
+    RUBY
+    both = condition('and', 17...18, 23...24, extent: 17...24)
+    choice = condition(
+      'if', both, arm(:then, 29...30), extent: 14...24
+    )
+    sites = { 'k.rb:2:2' => choice }
+    expected = [
+      'def k(a, b)',
+      '  if PathCoverage.leave(' \
+      'PathCoverage.enter("k.rb:2:2", 2), ' \
+      '(PathCoverage.record("k.rb:2:2", 0, a) and ' \
+      'PathCoverage.record("k.rb:2:2", 1, b)))',
+      '    1',
+      '  end',
+      'end',
+      ''
+    ].join("\n")
+    rewriter = PathCoverage::Rewriter
+    assert_equal expected, rewriter.rewrite(source, sites)
+  end
+
+  test '6D1Ke3', %w(
+  | calls that close at the same offset close innermost
+  | first, so a decide call's further argument stays its own
+  | when its decision is an if site's predicate
+  ) do
+    source = <<~RUBY
+      def fee(rates)
+        if rates.empty?
+          return
+        end
+        1
+      end
+    RUBY
+    choice = condition(
+      'if', 20...32, arm(:then, 37...43), extent: 17...32
+    )
+    sites = { 'k.rb:2:2' => choice }
+    methods = {
+      'k.rb:1:0' => PathCoverage::PathMethod.new(
+        name: :fee,
+        entry: 17,
+        decisions: [
+          PathCoverage::Decision.new(
+            line: 2, range: 20...32, command: false, exits: true
+          )
+        ]
+      )
+    }
+    expected = [
+      'def fee(rates)',
+      '  __path_coverage_path = ' \
+      'PathCoverage.path("k.rb:1:0", 1); ' \
+      'if PathCoverage.decide(__path_coverage_path, 0, ' \
+      'PathCoverage.leave(' \
+      'PathCoverage.enter("k.rb:2:2", 1), ' \
+      'PathCoverage.record("k.rb:2:2", 0, rates.empty?)), true)',
+      '    return',
+      '  end',
+      '  1',
+      'end',
+      ''
+    ].join("\n")
+    rewriter = PathCoverage::Rewriter
+    assert_equal expected, rewriter.rewrite(source, sites, methods)
   end
 
   test '6D1Kc1', %w(
@@ -122,14 +232,14 @@ class RewriterTest < Id58TestBase
     both = condition('&&', 26...38, 42...53, extent: 26...53)
     sites = { 'k.rb:2:5' => both }
     methods = {
-      'k.rb:1:0' => ConditionCoverage::PathMethod.new(
+      'k.rb:1:0' => PathCoverage::PathMethod.new(
         name: :fee,
         entry: 23,
         decisions: [
-          ConditionCoverage::Decision.new(
+          PathCoverage::Decision.new(
             line: 2, range: 26...53, command: false
           ),
-          ConditionCoverage::Decision.new(
+          PathCoverage::Decision.new(
             line: 5, range: 71...87, command: true
           )
         ]
@@ -137,23 +247,23 @@ class RewriterTest < Id58TestBase
     }
     expected = [
       'def fee(user, order)',
-      '  __condition_coverage_path = ' \
-      'ConditionCoverage.path("k.rb:1:0", 2); ' \
-      'if ConditionCoverage.decide(__condition_coverage_path, 0, ' \
-      'ConditionCoverage.leave(' \
-      'ConditionCoverage.enter("k.rb:2:5", 2), ' \
-      'ConditionCoverage.record("k.rb:2:5", 0, user.member?) && ' \
-      'ConditionCoverage.record("k.rb:2:5", 1, order.paid?)))',
+      '  __path_coverage_path = ' \
+      'PathCoverage.path("k.rb:1:0", 2); ' \
+      'if PathCoverage.decide(__path_coverage_path, 0, ' \
+      'PathCoverage.leave(' \
+      'PathCoverage.enter("k.rb:2:5", 2), ' \
+      'PathCoverage.record("k.rb:2:5", 0, user.member?) && ' \
+      'PathCoverage.record("k.rb:2:5", 1, order.paid?)))',
       '    5',
       '  end',
-      '  if ConditionCoverage.decide(__condition_coverage_path, 1, ' \
+      '  if PathCoverage.decide(__path_coverage_path, 1, ' \
       '(order.tier? :big))',
       '    10',
       '  end',
       'end',
       ''
     ].join("\n")
-    rewriter = ConditionCoverage::Rewriter
+    rewriter = PathCoverage::Rewriter
     assert_equal expected, rewriter.rewrite(source, sites, methods)
   end
 
@@ -171,14 +281,14 @@ class RewriterTest < Id58TestBase
       end
     RUBY
     methods = {
-      'k.rb:1:0' => ConditionCoverage::PathMethod.new(
+      'k.rb:1:0' => PathCoverage::PathMethod.new(
         name: :fork,
         entry: 15,
         decisions: [
-          ConditionCoverage::Decision.new(
+          PathCoverage::Decision.new(
             line: 2, range: 34...47, command: false, exits: true
           ),
-          ConditionCoverage::Decision.new(
+          PathCoverage::Decision.new(
             line: 3, range: 53...60, command: false
           )
         ]
@@ -186,18 +296,18 @@ class RewriterTest < Id58TestBase
     }
     expected = [
       'def fork(id)',
-      '  __condition_coverage_path = ' \
-      'ConditionCoverage.path("k.rb:1:0", 2); ' \
-      "fail 'no group' if ConditionCoverage.decide(" \
-      '__condition_coverage_path, 0, id.group.nil?, true)',
-      '  if ConditionCoverage.decide(' \
-      '__condition_coverage_path, 1, id.odd?)',
+      '  __path_coverage_path = ' \
+      'PathCoverage.path("k.rb:1:0", 2); ' \
+      "fail 'no group' if PathCoverage.decide(" \
+      '__path_coverage_path, 0, id.group.nil?, true)',
+      '  if PathCoverage.decide(' \
+      '__path_coverage_path, 1, id.odd?)',
       '    1',
       '  end',
       'end',
       ''
     ].join("\n")
-    rewriter = ConditionCoverage::Rewriter
+    rewriter = PathCoverage::Rewriter
     assert_equal expected, rewriter.rewrite(source, {}, methods)
   end
 
@@ -217,13 +327,13 @@ class RewriterTest < Id58TestBase
     }
     expected = [
       'def kata?(id)',
-      '  ConditionCoverage.leave(' \
-      'ConditionCoverage.enter("k.rb:2:2", 1), ' \
-      'ConditionCoverage.record("k.rb:2:2", 0, ok?(id)) ? :ok : :no)',
+      '  PathCoverage.leave(' \
+      'PathCoverage.enter("k.rb:2:2", 1), ' \
+      'PathCoverage.record("k.rb:2:2", 0, ok?(id)) ? :ok : :no)',
       'end',
       ''
     ].join("\n")
-    rewriter = ConditionCoverage::Rewriter
+    rewriter = PathCoverage::Rewriter
     assert_equal expected, rewriter.rewrite(source, sites)
   end
 
@@ -242,15 +352,15 @@ class RewriterTest < Id58TestBase
     sites = { 'k.rb:2:2' => ternary }
     expected = [
       'def kata?(id)',
-      '  ConditionCoverage.leave(' \
-      'ConditionCoverage.enter("k.rb:2:2", 2), ' \
-      'ConditionCoverage.record("k.rb:2:2", 0, ok?(id)) && ' \
-      'ConditionCoverage.record("k.rb:2:2", 1, new?(id)) ' \
+      '  PathCoverage.leave(' \
+      'PathCoverage.enter("k.rb:2:2", 2), ' \
+      'PathCoverage.record("k.rb:2:2", 0, ok?(id)) && ' \
+      'PathCoverage.record("k.rb:2:2", 1, new?(id)) ' \
       '? :ok : :no)',
       'end',
       ''
     ].join("\n")
-    rewriter = ConditionCoverage::Rewriter
+    rewriter = PathCoverage::Rewriter
     assert_equal expected, rewriter.rewrite(source, sites)
   end
 
@@ -272,15 +382,15 @@ class RewriterTest < Id58TestBase
     sites = { 'k.rb:2:2' => ternary }
     expected = [
       'def kata?(id)',
-      '  ConditionCoverage.leave(' \
-      'ConditionCoverage.enter("k.rb:2:2", 3), ' \
-      'ConditionCoverage.record("k.rb:2:2", 0, ok?(id)) ? ' \
-      'ConditionCoverage.record("k.rb:2:2", 1, new?(id)) && ' \
-      'ConditionCoverage.record("k.rb:2:2", 2, id.size == 6) : :no)',
+      '  PathCoverage.leave(' \
+      'PathCoverage.enter("k.rb:2:2", 3), ' \
+      'PathCoverage.record("k.rb:2:2", 0, ok?(id)) ? ' \
+      'PathCoverage.record("k.rb:2:2", 1, new?(id)) && ' \
+      'PathCoverage.record("k.rb:2:2", 2, id.size == 6) : :no)',
       'end',
       ''
     ].join("\n")
-    rewriter = ConditionCoverage::Rewriter
+    rewriter = PathCoverage::Rewriter
     assert_equal expected, rewriter.rewrite(source, sites)
   end
 end

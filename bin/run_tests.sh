@@ -2,7 +2,7 @@
 set -Eeu
 
 readonly ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-readonly IMAGE=condition_coverage-test
+readonly IMAGE=path_coverage-test
 
 show_help()
 {

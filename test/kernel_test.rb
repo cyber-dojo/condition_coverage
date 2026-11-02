@@ -1,5 +1,5 @@
 require_relative 'test_helper'
-require 'condition_coverage/kernel'
+require 'path_coverage/kernel'
 require 'json'
 require 'rexml/document'
 require 'tmpdir'
@@ -10,16 +10,16 @@ class KernelTest < Id58TestBase
   serial!
 
   test '6rTS10', %w(
-  | ConditionCoverage.record, the call rewritten code makes,
+  | PathCoverage.record, the call rewritten code makes,
   | returns the operand's value and counts it
   | in the one shared recorder
   ) do
     site = 'kernel_test.rb:6rTS10:0' # used by no other test
     kata = { 'id' => 'Kp9sA2' }
-    assert_same kata, ConditionCoverage.record(site, 0, kata)
+    assert_same kata, PathCoverage.record(site, 0, kata)
 
     expected = { truthy: 1, falsy: 0 }
-    actual = ConditionCoverage.recorder.counts[[site, 0]]
+    actual = PathCoverage.recorder.counts[[site, 0]]
     assert_equal expected, actual
   end
 
@@ -36,7 +36,7 @@ class KernelTest < Id58TestBase
       end
     RUBY
     on_exit = ->(&_report) {} # this test checks the recording only
-    ConditionCoverage.start(on_exit:) do
+    PathCoverage.start(on_exit:) do
       root dir
       cover '*.rb'
     end
@@ -47,7 +47,7 @@ class KernelTest < Id58TestBase
       [site, 0] => { truthy: 1, falsy: 0 },
       [site, 1] => { truthy: 1, falsy: 0 }
     }
-    counts = ConditionCoverage.recorder.counts
+    counts = PathCoverage.recorder.counts
     actual = counts.select { |(s, _), _| s == site }
     assert_equal expected, actual
   end
@@ -60,11 +60,11 @@ class KernelTest < Id58TestBase
     other = Dir.mktmpdir('6rTS30-other')
     path = "#{other}/kata.rb"
     File.write(path, "def kata?(id) = ok?(id) && new?(id)\n")
-    config = ConditionCoverage::Configuration.new do
+    config = PathCoverage::Configuration.new do
       root covered
       cover '*.rb'
     end
-    assert_nil ConditionCoverage.instrumented(path, config)
+    assert_nil PathCoverage.instrumented(path, config)
   end
 
   test '6rTS40', %w(
@@ -80,7 +80,7 @@ class KernelTest < Id58TestBase
     RUBY
     report = nil
     on_exit = ->(&block) { report = block }
-    ConditionCoverage.start(on_exit:) do
+    PathCoverage.start(on_exit:) do
       root dir
       cover '*.rb'
       coverage_dir dir
@@ -94,7 +94,7 @@ class KernelTest < Id58TestBase
     ].join("\n")
     assert_output("#{expected}\n") { report.call }
 
-    json = JSON.parse(File.read("#{dir}/condition_coverage.json"))
+    json = JSON.parse(File.read("#{dir}/path_coverage.json"))
     expected = {
       'group.rb:3:24' => [
         { 'truthy' => 1, 'falsy' => 0 },
@@ -116,7 +116,7 @@ class KernelTest < Id58TestBase
     RUBY
     report = nil
     on_exit = ->(&block) { report = block }
-    ConditionCoverage.start(on_exit:) do
+    PathCoverage.start(on_exit:) do
       root dir
       cover '*.rb'
       coverage_dir dir
@@ -141,7 +141,7 @@ class KernelTest < Id58TestBase
     RUBY
     report = nil
     on_exit = ->(&block) { report = block }
-    ConditionCoverage.start(on_exit:) do
+    PathCoverage.start(on_exit:) do
       root dir
       cover '*.rb'
       coverage_dir dir
@@ -155,7 +155,7 @@ class KernelTest < Id58TestBase
     ].join("\n")
     assert_output("#{expected}\n") { report.call }
 
-    json = JSON.parse(File.read("#{dir}/condition_coverage.json"))
+    json = JSON.parse(File.read("#{dir}/path_coverage.json"))
     expected = {
       'fee.rb:2:23' => {
         'leaves' => [%w(2:23 2:36), %w(2:40 2:50)],
@@ -184,7 +184,7 @@ class KernelTest < Id58TestBase
     RUBY
     report = nil
     on_exit = ->(&block) { report = block }
-    ConditionCoverage.start(on_exit:) do
+    PathCoverage.start(on_exit:) do
       root dir
       cover '*.rb'
       coverage_dir dir
@@ -215,7 +215,7 @@ class KernelTest < Id58TestBase
     RUBY
     report = nil
     on_exit = ->(&block) { report = block }
-    ConditionCoverage.start(on_exit:) do
+    PathCoverage.start(on_exit:) do
       root dir
       cover '*.rb'
       coverage_dir dir
@@ -238,7 +238,7 @@ class KernelTest < Id58TestBase
     RUBY
     exit_report = nil
     on_exit = ->(&block) { exit_report = block }
-    ConditionCoverage.start(on_exit:) do
+    PathCoverage.start(on_exit:) do
       root dir
       cover '*.rb'
       coverage_dir dir
@@ -269,7 +269,7 @@ class KernelTest < Id58TestBase
     out = "#{dir}/reports/condition"
     exit_report = nil
     on_exit = ->(&block) { exit_report = block }
-    ConditionCoverage.start(on_exit:) do
+    PathCoverage.start(on_exit:) do
       root dir
       cover '*.rb'
       coverage_dir out
@@ -277,7 +277,7 @@ class KernelTest < Id58TestBase
     end
     exit_report.call
 
-    assert File.file?("#{out}/condition_coverage.json")
+    assert File.file?("#{out}/path_coverage.json")
     assert File.file?("#{out}/index.html")
   end
 
@@ -291,22 +291,22 @@ class KernelTest < Id58TestBase
     File.write("#{dir}/source/kata.rb", "def kata?(id) = id\n")
     File.write("#{dir}/lib/team.rb", "def team?(id) = id\n")
     env = {
-      'CONDITION_COVERAGE_ROOT' => dir,
-      'CONDITION_COVERAGE_COVER' => 'source/*.rb,lib/*.rb',
-      'CONDITION_COVERAGE_DIR' => "#{dir}/condition",
-      'CONDITION_COVERAGE_COLLECTOR' => 'http://10.0.0.7:4570/runs'
+      'PATH_COVERAGE_ROOT' => dir,
+      'PATH_COVERAGE_COVER' => 'source/*.rb,lib/*.rb',
+      'PATH_COVERAGE_DIR' => "#{dir}/condition",
+      'PATH_COVERAGE_COLLECTOR' => 'http://10.0.0.7:4570/runs'
     }
     on_exit = ->(&_report) {} # this test checks the settings only
-    ConditionCoverage.start_from_env(env, on_exit:)
+    PathCoverage.start_from_env(env, on_exit:)
 
-    config = ConditionCoverage.config
+    config = PathCoverage.config
     actual = [
       config.files, config.json_path,
       config.collector_url, config.reporters
     ]
     expected = [
       ["#{dir}/lib/team.rb", "#{dir}/source/kata.rb"],
-      "#{dir}/condition/condition_coverage.json",
+      "#{dir}/condition/path_coverage.json",
       'http://10.0.0.7:4570/runs', [:post]
     ]
     assert_equal expected, actual
@@ -329,7 +329,7 @@ class KernelTest < Id58TestBase
     live = "#{dir}/live"
     exit_report = nil
     on_exit = ->(&block) { exit_report = block }
-    ConditionCoverage.start(on_exit:) do
+    PathCoverage.start(on_exit:) do
       root dir
       cover '*.rb'
       coverage_dir live
@@ -342,14 +342,14 @@ class KernelTest < Id58TestBase
 
     later = "#{dir}/later"
     FileUtils.mkdir_p(later)
-    FileUtils.cp("#{live}/condition_coverage.json", later)
-    config = ConditionCoverage::Configuration.new do
+    FileUtils.cp("#{live}/path_coverage.json", later)
+    config = PathCoverage::Configuration.new do
       root dir
       cover '*.rb'
       coverage_dir later
       report :html
     end
-    ConditionCoverage::Render.from_json(config)
+    PathCoverage::Render.from_json(config)
 
     %w(index.html files/gang.rb.html).each do |page|
       expected = File.read("#{live}/#{page}")
@@ -360,7 +360,8 @@ class KernelTest < Id58TestBase
   test '6rTS41', %w(
   | measuring paths too, a covered file's methods with two
   | or more decisions record each call's path, and the
-  | exit report prints each path never taken
+  | exit report prints each path never taken: each if's own,
+  | as a site, then its method's
   ) do
     dir = Dir.mktmpdir('6rTS41')
     File.write("#{dir}/fee.rb", <<~RUBY)
@@ -379,7 +380,7 @@ class KernelTest < Id58TestBase
     RUBY
     report = nil
     on_exit = ->(&block) { report = block }
-    ConditionCoverage.start(on_exit:) do
+    PathCoverage.start(on_exit:) do
       root dir
       cover '*.rb'
       coverage_dir dir
@@ -388,6 +389,8 @@ class KernelTest < Id58TestBase
     require "#{dir}/fee.rb"
     assert_equal 95, Fee6rTS41.fee(true, false)
     expected = [
+      'fee.rb:4:4 path never taken: `member` false',
+      'fee.rb:7:4 path never taken: `big` true',
       'fee.rb:2:2 fee path never taken: line 4 true, line 7 true',
       'fee.rb:2:2 fee path never taken: line 4 false, line 7 true',
       'fee.rb:2:2 fee path never taken: line 4 false, line 7 false'
@@ -401,8 +404,8 @@ class KernelTest < Id58TestBase
   ) do
     on_exit = ->(&_report) {}
     assert_silent do
-      ConditionCoverage.start(on_exit:) { root '/app' }
-      ConditionCoverage.start(on_exit:) { root '/app' }
+      PathCoverage.start(on_exit:) { root '/app' }
+      PathCoverage.start(on_exit:) { root '/app' }
     end
   end
 end

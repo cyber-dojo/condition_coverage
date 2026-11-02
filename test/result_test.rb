@@ -1,5 +1,5 @@
 require_relative 'test_helper'
-require 'condition_coverage/result'
+require 'path_coverage/result'
 
 class ResultTest < Id58TestBase
   test 'DYTY10', %w(
@@ -25,7 +25,7 @@ class ResultTest < Id58TestBase
         { truthy: 0, falsy: 0 }
       ]
     }
-    actual = ConditionCoverage::Result.new(sites, counts).operands
+    actual = PathCoverage::Result.new(sites, counts).operands
     assert_equal expected, actual
   end
 
@@ -47,7 +47,7 @@ class ResultTest < Id58TestBase
         { truthy: 1, falsy: 0, only: :truthy }
       ]
     }
-    actual = ConditionCoverage::Result.new(sites, counts).operands
+    actual = PathCoverage::Result.new(sites, counts).operands
     assert_equal expected, actual
   end
 
@@ -75,7 +75,7 @@ class ResultTest < Id58TestBase
         { path: [false, false], count: 0 }
       ]
     }
-    result = ConditionCoverage::Result.new(sites, {}, site_paths)
+    result = PathCoverage::Result.new(sites, {}, site_paths)
     assert_equal expected, result.paths
   end
 end

@@ -1,6 +1,6 @@
-require 'condition_coverage'
+require 'path_coverage'
 
-ConditionCoverage.start do
+PathCoverage.start do
   root __dir__
   cover 'source/**/*.rb'
   coverage_dir ENV.fetch('COVERAGE_DIR')

@@ -7,7 +7,7 @@ AllCops:
   Exclude:
     - reports/**/*
     - demo/source/shop.rb
-    - lib/condition_coverage/html_paths.rb
+    - lib/path_coverage/html_paths.rb
 
 Layout/LineLength:
   Max: 70

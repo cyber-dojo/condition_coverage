@@ -2,14 +2,14 @@
 set -Eeu
 
 readonly ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-readonly IMAGE=condition_coverage-test
+readonly IMAGE=path_coverage-test
 
 show_help()
 {
   cat <<EOF
 Usage: bin/build_demo.sh [OPTIONS]
 
-Runs demo/run.rb, a mock source tree under condition coverage, in
+Runs demo/run.rb, a mock source tree under path coverage, in
 the Docker image built from the repo's Dockerfile, writing its
 HTML report to site/ (index.html first). The same site is what
 the GitHub Pages workflow publishes.

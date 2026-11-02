@@ -1,5 +1,5 @@
 require_relative 'test_helper'
-require 'condition_coverage/source_lines'
+require 'path_coverage/source_lines'
 
 class SourceLinesTest < Id58TestBase
   test 'MDBw10', %w(
@@ -40,7 +40,7 @@ class SourceLinesTest < Id58TestBase
         status: :covered, span: 4..4 },
       { number: 5, text: 'end', status: nil, span: nil }
     ]
-    source_lines = ConditionCoverage::SourceLines
+    source_lines = PathCoverage::SourceLines
     actual = source_lines.of(source, sites, operands)
     assert_equal expected, actual
   end
@@ -69,7 +69,7 @@ class SourceLinesTest < Id58TestBase
         { truthy: 1, falsy: 1 }
       ]
     }
-    source_lines = ConditionCoverage::SourceLines
+    source_lines = PathCoverage::SourceLines
     line = source_lines.of(source, sites, operands)[1]
     assert_equal :gaps, line[:status]
   end
@@ -94,7 +94,7 @@ class SourceLinesTest < Id58TestBase
         { truthy: 1, falsy: 0, only: :truthy }
       ]
     }
-    source_lines = ConditionCoverage::SourceLines
+    source_lines = PathCoverage::SourceLines
     line = source_lines.of(source, sites, operands)[1]
     assert_equal :covered, line[:status]
   end
@@ -123,7 +123,7 @@ class SourceLinesTest < Id58TestBase
         { truthy: 1, falsy: 1 }
       ]
     }
-    source_lines = ConditionCoverage::SourceLines
+    source_lines = PathCoverage::SourceLines
     lines = source_lines.of(source, sites, operands)
     expected = [nil, 2..3, 2..3, nil]
     actual = lines.map { |line| line[:span] }
@@ -163,7 +163,7 @@ class SourceLinesTest < Id58TestBase
       { number: 5, text: '  end', status: nil, span: nil },
       { number: 6, text: 'end', status: nil, span: nil }
     ]
-    source_lines = ConditionCoverage::SourceLines
+    source_lines = PathCoverage::SourceLines
     actual = source_lines.of(source, sites, operands)
     assert_equal expected, actual
   end
