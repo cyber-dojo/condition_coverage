@@ -1,12 +1,7 @@
 # path_coverage
 
 Path coverage for Ruby, to run alongside SimpleCov's line and branch
-coverage, at two scopes:
-
-- within each expression (a site): which combinations of its leaf
-  outcomes ran, eg `ok?(id)` true then `new?(id)` false
-- across each method: which combinations of its decisions ran, eg the
-  `if` on line 4 true then the `if` on line 7 false
+coverage.
 
 Gem: https://rubygems.org/gems/path_coverage (which shows the latest
 version).
@@ -20,17 +15,42 @@ Demo: https://cyber-dojo.github.io/path_coverage/ shows the HTML report
 for the mock source tree in `demo/`. `make demo` builds and opens the
 same report locally.
 
-## The gap it fills
-
-Ruby's built-in `Coverage` (which SimpleCov reads) tracks branches, not the
-conditions inside them, nor the combinations of branches taken:
+Take this method:
 
 ```ruby
-return :ok if ok?(id) && id.start_with?('N')
+def fee(user, order)
+  total = 100
+  if user.member? && order.paid?
+    total -= 5
+  end
+  if order.big?
+    total -= 10
+  end
+  total
+end
 ```
 
-is two branches. Tests that reach both can still leave `id.start_with?('N')`
-never false, or never evaluated, and branch coverage reports 100%.
+Tests that run both `if`s both ways reach every line and every branch,
+so SimpleCov, which reads Ruby's built-in `Coverage`, reports 100%. Yet
+they can still miss paths, at two scopes, and path_coverage lists each
+path no test took.
+
+## Within each decision
+
+The first `if` can go three ways: member and paid, member and not
+paid, not a member. A member who has not paid may never have been
+tried.
+
+![The first if's grid: a column per way it can go, each headed by
+its count, the member who has not paid at 0](docs/decision.png)
+
+## Across a method's decisions
+
+The two `if`s can go four ways together. A paying member with a small
+order may never have been tried.
+
+![fee's grid: a column per way its two ifs can go together, each
+headed by its count, true then false at 0 and selected](docs/method.png)
 
 ## Use
 
@@ -58,9 +78,9 @@ step, can be covered from its environment alone:
 
 ```sh
 RUBYOPT=-rpath_coverage/auto
-PATH_COVERAGE_ROOT=/app                  # root
+PATH_COVERAGE_ROOT=/app                   # root
 PATH_COVERAGE_COVER=src/**/*.rb,lib/*.rb  # cover, comma-separated
-PATH_COVERAGE_DIR=/tmp/paths             # coverage_dir
+PATH_COVERAGE_DIR=/tmp/paths              # coverage_dir
 PATH_COVERAGE_COLLECTOR=http://host.docker.internal:4570/runs
 ```
 
@@ -134,12 +154,12 @@ A site is an outermost condition. Its leaves are numbered left to right
 across the whole of it, nested conditions included:
 
 ```ruby
-ok?(id) && new?(id) && id.size == 6     # one && site, leaves 0 1 2
-ok?(id) && (new?(id) || id.size == 6)   # an || nested in an && site, 0 1 2
-ok?(id) && new?(id) || id.size == 6     # an && nested in an || site, 0 1 2
-ids.any? { |k| k && k.ok? } && ok?(id)  # two sites: the block's is its own
-ok?(id) ? :ok : :no                     # a ?: site, its predicate leaf 0
-ok?(id) && new?(id) ? :ok : :no         # an && nested in a ?: site, 0 1
+ok?(id) && new?(id) && id.size == 6       # one && site, leaves 0 1 2
+ok?(id) && (new?(id) || id.size == 6)     # an || nested in an && site, 0 1 2
+ok?(id) && new?(id) || id.size == 6       # an && nested in an || site, 0 1 2
+ids.any? { |k| k && k.ok? } && ok?(id)    # two sites: the block's is its own
+ok?(id) ? :ok : :no                       # a ?: site, its predicate leaf 0
+ok?(id) && new?(id) ? :ok : :no           # an && nested in a ?: site, 0 1
 ok?(id) ? new?(id) && id.size == 6 : :no  # one ?: site, its then arm 1 2
 ```
 
@@ -290,3 +310,7 @@ the run never loaded are read and parsed then.
 `bin/build_demo.sh`, writing the report to `site/` and opening it. The
 Pages workflow (`.github/workflows/pages.yml`) runs the same script on
 each push to `main` and publishes `site/`.
+
+`bin/capture_readme_images.sh` rebuilds the demo and saves this README's
+two screenshots, `docs/decision.png` and `docs/method.png`, from it with
+headless Chrome. Run it again whenever the report's look changes.

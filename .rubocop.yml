@@ -17,3 +17,9 @@ Layout/LineLength:
 # then behaves the same whatever its consumer sets.
 Style/FrozenStringLiteralComment:
   Enabled: false
+
+# fee.rb is the README's example, whose ifs keep their end, as
+# a modifier if is no site and so would draw no grid.
+Style/IfUnlessModifier:
+  Exclude:
+    - demo/source/fee.rb

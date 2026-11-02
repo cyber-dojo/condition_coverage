@@ -14,6 +14,7 @@ require_relative 'source/kata'
 require_relative 'source/group'
 require_relative 'source/team'
 require_relative 'source/shop'
+require_relative 'source/fee'
 
 KataState = Data.define(:started, :finished)
 GroupState = Data.define(:size, :open)
@@ -80,3 +81,19 @@ Shop.greeting({ name: 'Ann' })
 # No name, and an empty one: greeting is covered.
 Shop.greeting({})
 Shop.greeting({ name: '' })
+
+# The README's fee: each if taken both ways, so every line and
+# branch is covered, yet no member who has not paid is tried,
+# nor a paying member with a small order.
+FeeUser = Data.define(:member) do
+  # True for a member.
+  def member? = member
+end
+FeeOrder = Data.define(:paid, :big) do
+  # True for an order that has been paid for.
+  def paid? = paid
+  # True for a big order.
+  def big? = big
+end
+fee(FeeUser.new(member: true), FeeOrder.new(paid: true, big: true))
+fee(FeeUser.new(member: false), FeeOrder.new(paid: false, big: false))
