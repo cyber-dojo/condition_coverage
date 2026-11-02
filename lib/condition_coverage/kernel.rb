@@ -4,6 +4,7 @@ require_relative 'json_writer'
 require_relative 'manifest'
 require_relative 'path_gaps'
 require_relative 'path_manifest'
+require_relative 'paths_report'
 require_relative 'recorder'
 require_relative 'render'
 require_relative 'result'
@@ -37,10 +38,16 @@ module ConditionCoverage
     @recorder.record(site, index, value)
   end
 
-  # The call rewritten code makes around what decides each
-  # site's own outcome; returns value unchanged.
-  def self.outcome(site, value)
-    @recorder.outcome(site, value)
+  # The call rewritten code makes before a site's first leaf,
+  # site having size leaves; returns the evaluation's trail.
+  def self.enter(site, size)
+    @recorder.enter(site, size)
+  end
+
+  # The call rewritten code makes around a site as a whole,
+  # with the trail enter gave it; returns value unchanged.
+  def self.leave(trail, value)
+    @recorder.leave(trail, value)
   end
 
   # The call rewritten code makes as a call reaches its
@@ -127,7 +134,7 @@ module ConditionCoverage
     result = collect(files, config)
     paths = config.measures.include?(:paths) ? @recorder.paths : nil
     Render.run(
-      result.operands, files, config, paths, outcomes: result.outcomes
+      result.operands, files, config, paths, site_paths: result.paths
     )
     return unless config.reporters.include?(:gaps)
 
@@ -144,15 +151,15 @@ module ConditionCoverage
     all.reduce({}, :merge)
   end
 
-  # The Result of every covered file, with the counts this run
-  # recorded, once its operands and outcomes are written as the
-  # JSON report.
+  # The Result of every covered file, with the counts and site
+  # paths this run recorded, once its operands and paths are
+  # written as the JSON report.
   def self.collect(files, config)
     sites = merged_sites(files)
-    result = Result.new(sites, @recorder.counts, @recorder.outcomes)
+    result = Result.new(sites, @recorder.counts, @recorder.site_paths)
     FileUtils.mkdir_p(config.output_dir)
-    path = config.json_path
-    JsonWriter.write(result.operands, path, result.outcomes)
+    report = PathsReport.of(result.paths, files)
+    JsonWriter.write(result.operands, config.json_path, report)
     result
   end
 

@@ -1,48 +1,44 @@
 module ConditionCoverage
-  # The terminal worklist: one line per missing outcome, and
-  # nothing for a site seen both ways. Every count stays in
-  # the operands for reporters that show them all.
+  # The terminal worklist: one line per path a site never
+  # took, and nothing for a site that took them all. Every
+  # count stays in the operands and paths for reporters that
+  # show them all.
   module Gaps
-    # The gap lines of operands and outcomes, as Result gives
-    # them, eg "k.rb:2:2 operand 0 never false", in manifest
-    # order.
-    def self.lines(operands, outcomes = {})
+    # The gap lines of operands and paths, as Result gives
+    # them, in manifest order; texts is { site => each leaf's
+    # source text }.
+    def self.lines(operands, paths: {}, texts: {})
       operands.flat_map do |site, counts|
-        site_gaps(site, counts, outcomes[site])
-      end
-    end
-
-    # One line for a site that never ran, else one for a gap
-    # in its outcome, then one per gap in its operands.
-    def self.site_gaps(site, operands, outcome)
-      if operands.all? { |counts| never_ran?(counts) }
-        return ["#{site} never reached"]
-      end
-
-      own = outcome_gap(outcome, operands.size)
-      own.map { |gap| "#{site} outcome #{gap}" } +
-        operand_gaps(site, operands)
-    end
-
-    # One line per gap in a site's operands.
-    def self.operand_gaps(site, operands)
-      operands.each_with_index.flat_map do |counts, index|
-        operand_gap(counts).map do |gap|
-          "#{site} operand #{index} #{gap}"
+        if counts.all? { |each| never_ran?(each) }
+          next ["#{site} never reached"]
         end
+
+        path_gaps(site, paths.fetch(site, []), texts[site])
       end
     end
 
-    # The one outcome a ternary of several leaves is missing,
-    # if any: an arm that never ran. A ternary of one leaf has
-    # that leaf's gap instead, and any other site's outcome is
-    # shown but is never a gap, its leaves' gaps telling more.
-    def self.outcome_gap(outcome, leaves)
-      return [] unless outcome&.dig(:ternary) && leaves > 1
-      return ['never true'] if outcome[:truthy].zero?
-      return ['never false'] if outcome[:falsy].zero?
+    # One line per path site never took, as Result#paths gives
+    # them, naming the outcome of each leaf the path reaches,
+    # texts being each leaf's source text.
+    def self.path_gaps(site, paths, texts)
+      paths.select { |each| each[:count].zero? }.map do |each|
+        steps = each[:path].zip(texts).filter_map do |outcome, text|
+          "#{code(text)} #{outcome}" unless outcome.nil?
+        end
+        "#{site} path never taken: #{steps.join(', ')}"
+      end
+    end
 
-      []
+    # text as a markdown code span on one line: each run of
+    # whitespace one space, fenced by a run of backticks one
+    # longer than any inside it, with a space inside the fence
+    # when text starts or ends with one.
+    def self.code(text)
+      text = text.gsub(/\s+/, ' ')
+      longest = text.scan(/`+/).map(&:size).max || 0
+      fence = '`' * (longest + 1)
+      pad = text.start_with?('`') || text.end_with?('`') ? ' ' : ''
+      "#{fence}#{pad}#{text}#{pad}#{fence}"
     end
 
     # The one outcome this operand is missing, if any; a fixed

@@ -1,3 +1,5 @@
+require_relative 'site_paths'
+
 module ConditionCoverage
   # What a run found: every site the manifest knows of, with
   # the counts its operands were recorded with. Every
@@ -6,22 +8,25 @@ module ConditionCoverage
     NEVER_RAN = { truthy: 0, falsy: 0 }.freeze
 
     # sites is { site => Condition }, from the manifest;
-    # counts is { [site, index] => counts } and outcomes is
-    # { site => counts }, both from the recorder.
-    def initialize(sites, counts, outcomes = {})
+    # counts is { [site, index] => counts } and site_paths is
+    # { site => { path => evaluations } }, both from the
+    # recorder.
+    def initialize(sites, counts, site_paths = {})
       @sites = sites
       @counts = counts
-      @outcomes = outcomes
+      @site_paths = site_paths
     end
 
-    # { site => counts of its own outcome }, with zero counts
-    # for a site that never ran, and ternary: true for a
-    # ternary, whose outcome picks an arm.
-    def outcomes
+    # { site => [{ path:, count: }, ...] }: every possible path
+    # of each site, as SitePaths gives them, with the number of
+    # evaluations that took it, zero for one never taken.
+    def paths
       @sites.to_h do |site, condition|
-        counts = @outcomes.fetch(site, NEVER_RAN)
-        ternary = condition.operator == '?:'
-        [site, ternary ? counts.merge(ternary: true) : counts]
+        taken = @site_paths.fetch(site, {})
+        all = SitePaths.possible(condition).map do |path|
+          { path:, count: taken.fetch(path, 0) }
+        end
+        [site, all]
       end
     end
 

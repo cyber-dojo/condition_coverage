@@ -8,8 +8,9 @@ class RewriterTest < Id58TestBase
   | keyed by the && site's path:line:column
   | and the operand's index, at the byte ranges
   | the manifest found, with no parse of its own; the
-  | whole && is wrapped in an outcome call, outside them,
-  | so its own value is counted too
+  | whole && is wrapped in a leave call, outside them, whose
+  | first argument enters the site, so each evaluation's
+  | path through it is counted
   ) do
     source = <<~RUBY
       def kata?(id)
@@ -20,7 +21,8 @@ class RewriterTest < Id58TestBase
     sites = { 'k.rb:2:2' => both }
     expected = [
       'def kata?(id)',
-      '  ConditionCoverage.outcome("k.rb:2:2", ' \
+      '  ConditionCoverage.leave(' \
+      'ConditionCoverage.enter("k.rb:2:2", 2), ' \
       'ConditionCoverage.record("k.rb:2:2", 0, ok?(id)) && ' \
       'ConditionCoverage.record("k.rb:2:2", 1, new?(id)))',
       'end',
@@ -45,7 +47,8 @@ class RewriterTest < Id58TestBase
     sites = { 'k.rb:2:2' => both }
     expected = [
       'def kata?(id)',
-      '  ConditionCoverage.outcome("k.rb:2:2", ' \
+      '  ConditionCoverage.leave(' \
+      'ConditionCoverage.enter("k.rb:2:2", 3), ' \
       'ConditionCoverage.record("k.rb:2:2", 0, ok?(id)) && ' \
       '(ConditionCoverage.record("k.rb:2:2", 1, new?(id)) || ' \
       'ConditionCoverage.record("k.rb:2:2", 2, id.size == 6)))',
@@ -61,7 +64,7 @@ class RewriterTest < Id58TestBase
   | own, since id.include? 'N' is no bare argument; other
   | leaves are not, as parentheses would give a continuation
   | line a line-coverage count of its own; a whole and or or
-  | is no bare argument either, so its outcome call holds it
+  | is no bare argument either, so its leave call holds it
   | in parentheses
   ) do
     source = <<~RUBY
@@ -75,7 +78,8 @@ class RewriterTest < Id58TestBase
     sites = { 'k.rb:2:2' => site }
     expected = [
       'def kata?(id)',
-      '  ConditionCoverage.outcome("k.rb:2:2", (' \
+      '  ConditionCoverage.leave(' \
+      'ConditionCoverage.enter("k.rb:2:2", 2), (' \
       'ConditionCoverage.record("k.rb:2:2", 0, ok?(id)) and ' \
       "ConditionCoverage.record(\"k.rb:2:2\", 1, (id.include? 'N'))" \
       '))',
@@ -102,7 +106,7 @@ class RewriterTest < Id58TestBase
   | a method's path starts just before its first decision,
   | on the same line, and each decision's predicate is
   | wrapped in a decide call outside any record and
-  | outcome calls in it; a command-call predicate is
+  | leave calls in it; a command-call predicate is
   | parenthesised
   ) do
     source = <<~RUBY
@@ -136,7 +140,8 @@ class RewriterTest < Id58TestBase
       '  __condition_coverage_path = ' \
       'ConditionCoverage.path("k.rb:1:0", 2); ' \
       'if ConditionCoverage.decide(__condition_coverage_path, 0, ' \
-      'ConditionCoverage.outcome("k.rb:2:5", ' \
+      'ConditionCoverage.leave(' \
+      'ConditionCoverage.enter("k.rb:2:5", 2), ' \
       'ConditionCoverage.record("k.rb:2:5", 0, user.member?) && ' \
       'ConditionCoverage.record("k.rb:2:5", 1, order.paid?)))',
       '    5',
@@ -197,22 +202,24 @@ class RewriterTest < Id58TestBase
   end
 
   test '6D1Kd1', %w(
-  | a ternary's predicate is wrapped in an outcome call,
-  | outside its leaves' record calls, so the arm it chose
-  | is counted for the site as a whole
+  | a ternary is wrapped whole, its arms included, in a leave
+  | call, so each evaluation's path runs on into the arm its
+  | predicate picks
   ) do
     source = <<~RUBY
       def kata?(id)
         ok?(id) ? :ok : :no
       end
     RUBY
+    arms = [arm(:then, 26...29), arm(:else, 32...35)]
     sites = {
-      'k.rb:2:2' => condition('?:', 16...23, extent: 16...35)
+      'k.rb:2:2' => condition('?:', 16...23, *arms, extent: 16...35)
     }
     expected = [
       'def kata?(id)',
-      '  ConditionCoverage.outcome("k.rb:2:2", ' \
-      'ConditionCoverage.record("k.rb:2:2", 0, ok?(id))) ? :ok : :no',
+      '  ConditionCoverage.leave(' \
+      'ConditionCoverage.enter("k.rb:2:2", 1), ' \
+      'ConditionCoverage.record("k.rb:2:2", 0, ok?(id)) ? :ok : :no)',
       'end',
       ''
     ].join("\n")
@@ -222,7 +229,7 @@ class RewriterTest < Id58TestBase
 
   test '6D1Kd3', %w(
   | a ternary whose predicate is a nested condition has that
-  | whole condition wrapped in its outcome call
+  | condition's leaves recorded first, as operands 0 and 1
   ) do
     source = <<~RUBY
       def kata?(id)
@@ -230,13 +237,46 @@ class RewriterTest < Id58TestBase
       end
     RUBY
     both = condition('&&', 16...23, 27...35, extent: 16...35)
-    sites = { 'k.rb:2:2' => condition('?:', both, extent: 16...47) }
+    arms = [arm(:then, 38...41), arm(:else, 44...47)]
+    ternary = condition('?:', both, *arms, extent: 16...47)
+    sites = { 'k.rb:2:2' => ternary }
     expected = [
       'def kata?(id)',
-      '  ConditionCoverage.outcome("k.rb:2:2", ' \
+      '  ConditionCoverage.leave(' \
+      'ConditionCoverage.enter("k.rb:2:2", 2), ' \
       'ConditionCoverage.record("k.rb:2:2", 0, ok?(id)) && ' \
-      'ConditionCoverage.record("k.rb:2:2", 1, new?(id))) ' \
-      '? :ok : :no',
+      'ConditionCoverage.record("k.rb:2:2", 1, new?(id)) ' \
+      '? :ok : :no)',
+      'end',
+      ''
+    ].join("\n")
+    rewriter = ConditionCoverage::Rewriter
+    assert_equal expected, rewriter.rewrite(source, sites)
+  end
+
+  test '6D1Kd4', %w(
+  | the leaves of a condition folded in as a ternary's arm
+  | are recorded under the ternary's site, numbered on from
+  | its predicate's
+  ) do
+    source = <<~RUBY
+      def kata?(id)
+        ok?(id) ? new?(id) && id.size == 6 : :no
+      end
+    RUBY
+    both = condition('&&', 26...34, 38...50, extent: 26...50)
+    ternary = condition(
+      '?:', 16...23, arm(:then, 26...50, both), arm(:else, 53...56),
+      extent: 16...56
+    )
+    sites = { 'k.rb:2:2' => ternary }
+    expected = [
+      'def kata?(id)',
+      '  ConditionCoverage.leave(' \
+      'ConditionCoverage.enter("k.rb:2:2", 3), ' \
+      'ConditionCoverage.record("k.rb:2:2", 0, ok?(id)) ? ' \
+      'ConditionCoverage.record("k.rb:2:2", 1, new?(id)) && ' \
+      'ConditionCoverage.record("k.rb:2:2", 2, id.size == 6) : :no)',
       'end',
       ''
     ].join("\n")

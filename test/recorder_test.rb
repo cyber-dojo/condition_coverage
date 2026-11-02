@@ -79,18 +79,89 @@ class RecorderTest < Id58TestBase
     assert_equal expected, recorder.paths
   end
 
-  test '8TuB40', %w(
-  | each site's own outcome, eg the predicate deciding a
-  | ternary's arm, is counted truthy or falsy, keyed by its
-  | site, and returned unchanged
+  test '8TuB50', %w(
+  | each evaluation of a site, entered before its first leaf
+  | and left after its last, counts its path: the outcome of
+  | each leaf it reached, nil for one it never did; leaving
+  | returns the site's value unchanged
   ) do
     recorder = ConditionCoverage::Recorder.new
     site = 'k.rb:2:2'
-    # ok?(id) ? :ok : :no, called three times
-    assert_same :gold, recorder.outcome(site, :gold)
-    assert_same :gold, recorder.outcome(site, :gold)
-    assert_nil recorder.outcome(site, nil)
-    expected = { site => { truthy: 2, falsy: 1 } }
-    assert_equal expected, recorder.outcomes
+    # ok?(id) && new?(id), called twice
+    trail = recorder.enter(site, 2)
+    recorder.record(site, 0, true)
+    recorder.record(site, 1, false)
+    assert_same false, recorder.leave(trail, false)
+    trail = recorder.enter(site, 2)
+    recorder.record(site, 0, nil)
+    assert_nil recorder.leave(trail, nil)
+    expected = { site => { [true, false] => 1, [false, nil] => 1 } }
+    assert_equal expected, recorder.site_paths
+  end
+
+  test '8TuB51', %w(
+  | an evaluation of a site in another thread, while one is
+  | under way, fills in a trail of its own, so neither
+  | thread's path takes the other's outcomes
+  ) do
+    recorder = ConditionCoverage::Recorder.new
+    site = 'k.rb:2:2'
+    # ok?(id) && new?(id), in two threads at once
+    entered = Queue.new
+    resume = Queue.new
+    trail = recorder.enter(site, 2)
+    recorder.record(site, 0, true)
+    other = Thread.new do
+      mine = recorder.enter(site, 2)
+      recorder.record(site, 0, false)
+      entered.push(:entered)
+      resume.pop
+      recorder.leave(mine, false)
+    end
+    entered.pop
+    recorder.record(site, 1, true)
+    resume.push(:resume)
+    other.join
+    recorder.leave(trail, true)
+    expected = { site => { [false, nil] => 1, [true, true] => 1 } }
+    assert_equal expected, recorder.site_paths
+  end
+
+  test '8TuB52', %w(
+  | an evaluation left while one of the same site it called
+  | is still entered, eg after that one raised, counts no
+  | path, since its later outcomes went to the other; so no
+  | path is ever claimed as seen that was not, and the stack
+  | is cleared down to it
+  ) do
+    recorder = ConditionCoverage::Recorder.new
+    site = 'k.rb:2:2'
+    # ok?(id) || retry?(id), whose retry? recursed and raised
+    outer = recorder.enter(site, 2)
+    recorder.record(site, 0, false)
+    recorder.enter(site, 2)
+    recorder.record(site, 1, true)
+    assert_same true, recorder.leave(outer, true)
+    assert_equal({}, recorder.site_paths)
+
+    trail = recorder.enter(site, 2)
+    recorder.record(site, 0, true)
+    recorder.leave(trail, true)
+    expected = { site => { [true, nil] => 1 } }
+    assert_equal expected, recorder.site_paths
+  end
+
+  test '8TuB53', %w(
+  | an evaluation left in a fiber other than the one that
+  | entered it is not on that fiber's stack, so it counts
+  | no path, and leaving it still returns
+  ) do
+    recorder = ConditionCoverage::Recorder.new
+    site = 'k.rb:2:2'
+    trail = Fiber.new do
+      recorder.enter(site, 2).tap { recorder.record(site, 0, true) }
+    end.resume
+    assert_same :ok, recorder.leave(trail, :ok)
+    assert_equal({}, recorder.site_paths)
   end
 end

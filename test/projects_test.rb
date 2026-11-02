@@ -5,11 +5,13 @@ require 'tmpdir'
 class ProjectsTest < Id58TestBase
   test '4WXv10', %w(
   | a project run with condition coverage started prints,
-  | as it exits, a line for each && outcome its run missed
+  | as it exits, a line for each path through an && its run
+  | never took
   ) do
     stdout, stderr, status = run_project('single_and')
     expected = [
-      'source/kata.rb:3:23 operand 1 never false',
+      'source/kata.rb:3:23 path never taken: ' \
+      "`ok?(id)` true, `id.start_with?('N')` false",
       'source/kata.rb:4:24 never reached'
     ].join("\n")
     assert_equal "#{expected}\n", stdout
@@ -20,20 +22,30 @@ class ProjectsTest < Id58TestBase
   test '4WXv20', %w(
   | || sites, chains, nested and grouped conditions, a site
   | inside a block, and an and whose operand is a command call
-  | all run unchanged when instrumented, and their gaps are
-  | listed in source order, each leaf indexed left to right
+  | all run unchanged when instrumented, and their paths
+  | never taken are listed in source order
   ) do
     stdout, stderr, status = run_project('nested_conditions')
+    never = 'path never taken:'
     expected = [
-      'source/kata.rb:5:4 operand 1 never false',
-      'source/kata.rb:9:4 operand 1 never false',
-      'source/kata.rb:9:4 operand 2 never false',
-      'source/kata.rb:13:4 operand 1 never false',
-      'source/kata.rb:13:4 operand 2 never evaluated',
-      'source/kata.rb:17:4 operand 1 never false',
-      'source/kata.rb:17:20 operand 0 never false',
-      'source/kata.rb:17:20 operand 1 never false',
-      'source/kata.rb:21:4 operand 1 never false'
+      "source/kata.rb:5:4 #{never} " \
+      "`id.start_with?('N')` false, `id.size == 6` false",
+      "source/kata.rb:9:4 #{never} " \
+      '`ok?(id)` true, `id.size > 1` true, `id.size < 9` false',
+      "source/kata.rb:9:4 #{never} " \
+      '`ok?(id)` true, `id.size > 1` false',
+      "source/kata.rb:13:4 #{never} `ok?(id)` true, " \
+      "`id.start_with?('G')` false, `id.end_with?('G')` true",
+      "source/kata.rb:13:4 #{never} `ok?(id)` true, " \
+      "`id.start_with?('G')` false, `id.end_with?('G')` false",
+      "source/kata.rb:17:4 #{never} " \
+      '`ids.any? { |id| ok?(id) && id.size == 2 }` false, ' \
+      '`ids.empty?` false',
+      "source/kata.rb:17:20 #{never} " \
+      '`ok?(id)` true, `id.size == 2` false',
+      "source/kata.rb:17:20 #{never} `ok?(id)` false",
+      "source/kata.rb:21:4 #{never} " \
+      "`ok?(id)` true, `id.include? 'N'` false"
     ].join("\n")
     assert_equal "#{expected}\n", stdout
     assert_equal '', stderr
@@ -61,7 +73,8 @@ class ProjectsTest < Id58TestBase
   ) do
     stdout, stderr, status = run_project('two_decisions')
     expected = [
-      'source/shop.rb:5:19 operand 1 never false',
+      'source/shop.rb:5:19 path never taken: ' \
+      '`order.fetch(:total) > 100` true, `order.fetch(:paid)` false',
       'source/shop.rb:2:2 fee path never taken: ' \
       'line 4 true, line 5 true',
       'source/shop.rb:2:2 fee path never taken: ' \

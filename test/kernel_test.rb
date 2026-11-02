@@ -1,6 +1,7 @@
 require_relative 'test_helper'
 require 'condition_coverage/kernel'
 require 'json'
+require 'rexml/document'
 require 'tmpdir'
 
 class KernelTest < Id58TestBase
@@ -86,9 +87,10 @@ class KernelTest < Id58TestBase
     end
     require "#{dir}/group.rb"
     Group6rTS40.group?('Kp9sA2')
+    never = 'group.rb:3:24 path never taken: `ok?(id)`'
     expected = [
-      'group.rb:3:24 operand 0 never false',
-      'group.rb:3:24 operand 1 never false'
+      "#{never} true, `id.size == 6` false",
+      "#{never} false"
     ].join("\n")
     assert_output("#{expected}\n") { report.call }
 
@@ -103,8 +105,8 @@ class KernelTest < Id58TestBase
   end
 
   test '6rTS42', %w(
-  | a ternary's predicate is recorded as it runs, so one
-  | only ever taken one way is reported as a gap
+  | a ternary's path is recorded as it runs, so one whose
+  | predicate was only ever true lists its false path as a gap
   ) do
     dir = Dir.mktmpdir('6rTS42')
     File.write("#{dir}/fee.rb", <<~RUBY)
@@ -121,15 +123,15 @@ class KernelTest < Id58TestBase
     end
     require "#{dir}/fee.rb"
     Fee6rTS42.fee(true)
-    expected = "fee.rb:2:25 operand 0 never false\n"
+    expected = "fee.rb:2:25 path never taken: `member` false\n"
     assert_output(expected) { report.call }
   end
 
   test '6rTS43', %w(
-  | a ternary's own outcome is recorded as it runs, so one
-  | whose predicate of several leaves only ever picked one
-  | arm is reported as a gap of its own, and written to the
-  | JSON report beside the operands
+  | each evaluation's path through a site is recorded as it
+  | runs, so each path a site never took is reported as a
+  | gap, and every path's count written to the JSON report
+  | beside the operands, with each leaf's span
   ) do
     dir = Dir.mktmpdir('6rTS43')
     File.write("#{dir}/fee.rb", <<~RUBY)
@@ -146,19 +148,25 @@ class KernelTest < Id58TestBase
     end
     require "#{dir}/fee.rb"
     Fee6rTS43.fee({ member: true })
+    never = 'fee.rb:2:23 path never taken: `user[:member]` false'
     expected = [
-      'fee.rb:2:23 outcome never false',
-      'fee.rb:2:23 operand 0 never false',
-      'fee.rb:2:23 operand 1 never evaluated'
+      "#{never}, `user[:vip]` true",
+      "#{never}, `user[:vip]` false"
     ].join("\n")
     assert_output("#{expected}\n") { report.call }
 
     json = JSON.parse(File.read("#{dir}/condition_coverage.json"))
     expected = {
-      'fee.rb:2:23' =>
-        { 'truthy' => 1, 'falsy' => 0, 'ternary' => true }
+      'fee.rb:2:23' => {
+        'leaves' => [%w(2:23 2:36), %w(2:40 2:50)],
+        'taken' => [
+          { 'path' => [true, nil], 'count' => 1 },
+          { 'path' => [false, true], 'count' => 0 },
+          { 'path' => [false, false], 'count' => 0 }
+        ]
+      }
     }
-    assert_equal expected, json['outcomes']
+    assert_equal expected, json['paths']
   end
 
   test '6rTS45', %w(
@@ -185,9 +193,10 @@ class KernelTest < Id58TestBase
     Team6rTS45.team?('Kp9sA2')
     # A re-read of the file now would find no &&.
     File.write(path, "module Team6rTS45; end\n")
+    never = 'team.rb:3:23 path never taken: `ok?(id)`'
     expected = [
-      'team.rb:3:23 operand 0 never false',
-      'team.rb:3:23 operand 1 never false'
+      "#{never} true, `id.size == 6` false",
+      "#{never} false"
     ].join("\n")
     assert_output("#{expected}\n") { report.call }
   end
@@ -216,8 +225,9 @@ class KernelTest < Id58TestBase
 
   test '6rTS48', %w(
   | with report :html the exit report writes the index page
-  | and a page per covered file into coverage_dir, and
-  | prints no gaps, since :gaps was not chosen
+  | and a page per covered file into coverage_dir, each site
+  | counting the paths it took, and prints no gaps, since
+  | :gaps was not chosen
   ) do
     dir = Dir.mktmpdir('6rTS48')
     File.write("#{dir}/crew.rb", <<~RUBY)
@@ -240,7 +250,9 @@ class KernelTest < Id58TestBase
     assert_output('', '') { exit_report.call }
 
     assert File.file?("#{dir}/index.html")
-    assert File.file?("#{dir}/files/crew.rb.html")
+    page = REXML::Document.new(File.read("#{dir}/files/crew.rb.html"))
+    counts = page.elements.to_a('//*[@data-count]')
+    assert_equal(%w(0 0 1), counts.map { |count| text_of(count) })
   end
 
   test '6rTS49', %w(

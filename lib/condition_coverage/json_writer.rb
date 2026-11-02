@@ -4,17 +4,17 @@ module ConditionCoverage
   # The base reporter: the result as raw JSON, which every
   # other reporter can read back.
   module JsonWriter
-    # Writes operands and outcomes, as Result gives them, to
-    # path as {"sites": {site: [counts, ...]}, "outcomes":
-    # {site: counts}}.
-    def self.write(operands, path, outcomes = {})
-      File.write(path, json(operands, outcomes))
+    # Writes operands, as Result gives them, and paths, as
+    # PathsReport gives them, to path as {"sites": {site:
+    # [counts, ...]}, "paths": {site: {leaves:, taken:}}}.
+    def self.write(operands, path, paths = {})
+      File.write(path, json(operands, paths))
     end
 
-    # operands, and any outcomes, as the JSON report's text.
-    def self.json(operands, outcomes = {})
+    # operands, and any paths, as the JSON report's text.
+    def self.json(operands, paths = {})
       report = { 'sites' => operands }
-      report['outcomes'] = outcomes unless outcomes.empty?
+      report['paths'] = paths unless paths.empty?
       JSON.pretty_generate(report)
     end
   end

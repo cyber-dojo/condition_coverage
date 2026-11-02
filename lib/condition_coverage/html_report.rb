@@ -12,12 +12,11 @@ module ConditionCoverage
   # each covered file, written to the configuration's
   # output_dir.
   module HtmlReport
-    # Writes every page. operands and outcomes are as Result
-    # gives them; files is { full path => {source:, sites:} }
-    # for each covered file, as the kernel parsed it.
-    def self.write(
-      operands, files, config, paths = nil, outcomes = {}
-    )
+    # Writes every page. operands and site_paths are as Result
+    # gives them, site_paths holding every site in files; files
+    # is { full path => {source:, sites:} } for each covered
+    # file, as the kernel parsed it.
+    def self.write(operands, files, config, paths = nil, site_paths:)
       dir = config.output_dir
       index = HtmlIndex.page(Summary.files(operands))
       File.write("#{dir}/index.html", index)
@@ -27,8 +26,7 @@ module ConditionCoverage
         # simplecov:disable
         grids = paths ? path_grids(path, parsed, paths) : ''
         # simplecov:enable
-        counts = { operands:, outcomes: }
-        write_page(out, path, parsed, counts, grids)
+        write_page(out, path, parsed, [operands, site_paths], grids)
       end
     end
 
@@ -41,52 +39,51 @@ module ConditionCoverage
     end
     # simplecov:enable
 
-    # Writes one file's page to out. counts is { operands:,
-    # outcomes: }, as Result gives them.
-    def self.write_page(out, path, parsed, counts, grids = '')
+    # Writes one file's page to out, from its sites' operand
+    # counts and paths.
+    def self.write_page(out, path, parsed,
+                        (operands, site_paths), grids)
       source, sites = parsed.values_at(:source, :sites)
-      lines = SourceLines.of(source, sites, counts[:operands])
-      trees = trees(source, sites, lines, counts)
+      lines = SourceLines.of(source, sites, operands)
+      trees = trees(source, sites, lines, site_paths)
       FileUtils.mkdir_p(File.dirname(out))
       File.write(out, HtmlFile.page(path, lines, trees, grids))
     end
 
     # { first line of a span => [SiteTree.of, ...] } for the
-    # sites of one file, each under the span its line is in,
-    # each root with its site's own outcome when there is one.
-    def self.trees(source, sites, lines, counts)
+    # sites of one file, each under the span its line is in.
+    def self.trees(source, sites, lines, site_paths)
       trees = Hash.new { |all, first| all[first] = [] }
       sites.each do |site, condition|
         first = lines[SourceLines.line_of(site) - 1][:span].begin
-        tree = tree_of(source, site, condition, counts)
+        tree = SiteTree.of(source, condition, site_paths.fetch(site))
         trees[first] << located(source, condition, tree)
       end
       trees
     end
 
-    # The SiteTree of one site, with its operands' counts and
-    # its own outcome's.
-    def self.tree_of(source, site, condition, counts)
-      operands = counts[:operands].fetch(site)
-      outcome = counts[:outcomes][site]
-      SiteTree.of(source, condition, operands, outcome)
-    end
-
     # simplecov:disable
     # SPIKE: tree with an at: of [line, column, line, column]
     # on it and on each of its operands: a leaf's from its byte
-    # range, a condition's from its extent, the whole of it as
-    # written. Columns count characters, not bytes.
+    # range, a condition's and an arm's from its extent, the
+    # whole of it as written. Columns count characters, not
+    # bytes.
     def self.located(source, condition, tree)
       pairs = condition.operands.zip(tree[:operands])
       operands = pairs.map do |operand, node|
-        if operand.is_a?(Condition)
-          next located(source, operand, node)
+        case operand
+        when Condition then located(source, operand, node)
+        when Arm then located_arm(source, operand, node)
+        else node.merge(at: at(source, operand))
         end
-
-        node.merge(at: at(source, operand))
       end
       tree.merge(at: at(source, condition.extent), operands:)
+    end
+
+    # An arm's node with its at:, and its body's tree located.
+    def self.located_arm(source, arm, node)
+      body = arm.body && located(source, arm.body, node[:body])
+      node.merge(at: at(source, arm.extent), body:)
     end
 
     # [line, column, line, column] of the byte range in source.

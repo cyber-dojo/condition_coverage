@@ -42,23 +42,31 @@ class MergeTest < Id58TestBase
   end
 
   test 'Mg8q20', %w(
-  | the site outcomes of several runs merge by adding their
-  | true and false counts, keeping a ternary's mark, so an
-  | arm one run never took another can
+  | the site paths of several runs merge by adding each
+  | path's counts, so a path one run never took another can
   ) do
     first = {
-      'source/fee.rb:2:23' => { truthy: 2, falsy: 0, ternary: true },
-      'source/kata.rb:3:23' => { truthy: 1, falsy: 0 }
+      'source/kata.rb:3:23' => [
+        { path: [true, true], count: 2 },
+        { path: [true, false], count: 0 },
+        { path: [false, nil], count: 0 }
+      ]
     }
     second = {
-      'source/fee.rb:2:23' => { truthy: 0, falsy: 1, ternary: true },
-      'source/kata.rb:3:23' => { truthy: 0, falsy: 0 }
+      'source/kata.rb:3:23' => [
+        { path: [true, true], count: 0 },
+        { path: [true, false], count: 1 },
+        { path: [false, nil], count: 0 }
+      ]
     }
     expected = {
-      'source/fee.rb:2:23' => { truthy: 2, falsy: 1, ternary: true },
-      'source/kata.rb:3:23' => { truthy: 1, falsy: 0 }
+      'source/kata.rb:3:23' => [
+        { path: [true, true], count: 2 },
+        { path: [true, false], count: 1 },
+        { path: [false, nil], count: 0 }
+      ]
     }
-    actual = ConditionCoverage::Merge.outcomes([first, second])
+    actual = ConditionCoverage::Merge.paths([first, second])
     assert_equal expected, actual
   end
 end

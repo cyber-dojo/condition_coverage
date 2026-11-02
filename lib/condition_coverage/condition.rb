@@ -1,4 +1,9 @@
 module ConditionCoverage
+  # One arm of a ternary: kind is :then or :else, extent its
+  # byte range, and body the Condition it is, when it is one,
+  # else nil for a plain value, which decides nothing.
+  Arm = Data.define(:kind, :extent, :body)
+
   # One site's condition as the manifest found it: its operator
   # and its operands, each the byte range of a leaf or a nested
   # Condition. A site's commands are the byte ranges of its
@@ -19,11 +24,16 @@ module ConditionCoverage
       super
     end
 
-    # The byte range of every leaf operand, left to right; a
-    # leaf's index here is the index it is recorded under.
+    # The byte range of every leaf operand, left to right, a
+    # ternary's arms' after its predicate's; a leaf's index here
+    # is the index it is recorded under.
     def leaves
       operands.flat_map do |operand|
-        operand.is_a?(Condition) ? operand.leaves : [operand]
+        case operand
+        when Condition then operand.leaves
+        when Arm then operand.body&.leaves || []
+        else [operand]
+        end
       end
     end
   end

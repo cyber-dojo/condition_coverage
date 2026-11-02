@@ -163,6 +163,14 @@ class Id58TestBase < Minitest::Test
     )
   end
 
+  # One arm of a ternary as the manifest finds it, eg
+  # arm(:then, 26...50, both): kind is :then or :else, extent
+  # its byte range, and body the condition it holds, nil for a
+  # plain value.
+  def arm(kind, extent, body = nil)
+    ConditionCoverage::Arm.new(kind:, extent:, body:)
+  end
+
   # All the text inside a parsed REXML element, its children's
   # included, unescaped.
   def text_of(element)

@@ -6,15 +6,15 @@ module ConditionCoverage
     PATH_NAME = '__condition_coverage_path'.freeze
 
     # Returns source with each operand in sites wrapped in a
-    # record call, what decides each site's own outcome in an
-    # outcome call, and each method in methods starting a path
-    # that its decisions are wrapped in decide calls to add to.
-    # Only text is inserted, never a newline, so backtrace line
-    # numbers still match the file on disk.
+    # record call, each site as a whole in a leave call that
+    # enters it first, and each method in methods starting a
+    # path that its decisions are wrapped in decide calls to add
+    # to. Only text is inserted, never a newline, so backtrace
+    # line numbers still match the file on disk.
     def self.rewrite(source, sites, methods = {})
       inserts = sites.flat_map do |site, condition|
         record_inserts(site, condition) +
-          outcome_inserts(site, condition)
+          trail_inserts(site, condition)
       end
       apply(source.dup, inserts + path_inserts(methods))
     end
@@ -28,31 +28,19 @@ module ConditionCoverage
       end
     end
 
-    # The inserts that wrap what decides site's own outcome in
-    # an outcome call, outside its leaves' record calls.
-    def self.outcome_inserts(site, condition)
-      range, parens = decided(condition)
-      call = "ConditionCoverage.outcome(#{site.inspect}, "
-      wrap(call, range, parens, 1)
-    end
-
     WORD_OPERATORS = %w[and or].freeze
 
-    # The byte range deciding condition's own outcome, and
-    # whether it needs parentheses to be an argument: a
-    # ternary's predicate, parenthesised when a command call;
-    # any other site as a whole, parenthesised when an and or
-    # or, which, like a command call, is no bare argument.
-    def self.decided(condition)
-      unless condition.operator == '?:'
-        word = WORD_OPERATORS.include?(condition.operator)
-        return [condition.extent, word]
-      end
-
-      predicate = condition.operands.first
-      return [predicate.extent, false] if predicate.is_a?(Condition)
-
-      [predicate, condition.commands.include?(predicate)]
+    # The inserts that wrap site as a whole in a leave call,
+    # outside its leaves' record calls, whose first argument
+    # enters the site before any leaf runs, so each evaluation
+    # fills in a trail of its own. An and or or is held in
+    # parentheses, being, like a command call, no bare argument.
+    def self.trail_inserts(site, condition)
+      enter = "ConditionCoverage.enter(#{site.inspect}, " \
+              "#{condition.leaves.size})"
+      call = "ConditionCoverage.leave(#{enter}, "
+      word = WORD_OPERATORS.include?(condition.operator)
+      wrap(call, condition.extent, word, 1)
     end
 
     # The opening of the record call around operand index of

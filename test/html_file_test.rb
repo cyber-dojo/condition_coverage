@@ -79,7 +79,8 @@ class HtmlFileTest < Id58TestBase
   test 'gae530', %w(
   | a covered span's tree is hidden until its button opens it,
   | and sits straight after the span, so it never splits it;
-  | it has one row per operand: text, true, false and gap
+  | it has one row per operand: its text, then its outcome on
+  | each path, T or F, blank where the path never reached it
   ) do
     lines = [
       { number: 1, text: 'module Kata', status: nil, span: nil },
@@ -90,11 +91,14 @@ class HtmlFileTest < Id58TestBase
     ]
     trees = {
       2 => [
-        { operator: '&&', operands: [
-          { text: 'ok?(id)', truthy: 1, falsy: 1, gap: nil },
-          { text: "id.start_with?('N')", truthy: 1, falsy: 1,
-            gap: nil }
-        ] }
+        {
+          operator: '&&', counts: [1, 1, 1],
+          cells: [true, false, false],
+          operands: [
+            { text: 'ok?(id)', cells: [true, true, false] },
+            { text: "id.start_with?('N')", cells: [true, false, nil] }
+          ]
+        }
       ]
     }
     listing = ConditionCoverage::HtmlFile.listing(lines, trees)
@@ -108,21 +112,20 @@ class HtmlFileTest < Id58TestBase
 
     rows = tree.elements.to_a('.//*[@data-operand]')
     actual = rows.map do |row|
-      %w(text truthy falsy gap).map do |cell|
-        text_of(row.elements["*[@data-#{cell}]"])
-      end
+      cells = row.elements.to_a('*[@data-cell]').map { text_of(_1) }
+      [text_of(row.elements['*[@data-text]']), *cells]
     end
-    # an operand with no gap says so, as none
     expected = [
-      ['ok?(id)', '1', '1', 'none'],
-      ["id.start_with?('N')", '1', '1', 'none']
+      ['ok?(id)', 'T', 'T', 'F'],
+      ["id.start_with?('N')", 'T', 'F', '']
     ]
     assert_equal expected, actual
   end
 
   test 'gae535', %w(
-  | a tree opens with a heading row, then for each site
-  | a row naming its operator, its operands branching below
+  | a tree opens, for each site, with a row naming its
+  | operator and each path's count, a path never taken marked
+  | as a gap; its operands branch below
   ) do
     lines = [
       { number: 1, text: '  ok?(id) && new?(id)', status: :gaps,
@@ -130,22 +133,27 @@ class HtmlFileTest < Id58TestBase
     ]
     trees = {
       1 => [
-        { operator: '&&', operands: [
-          { text: 'ok?(id)', truthy: 1, falsy: 1, gap: nil },
-          { text: 'new?(id)', truthy: 0, falsy: 1, gap: 'never true' }
-        ] }
+        {
+          operator: '&&', counts: [0, 2, 1],
+          cells: [false, true, false],
+          operands: [
+            { text: 'ok?(id)', cells: [true, true, false] },
+            { text: 'new?(id)', cells: [false, true, nil] }
+          ]
+        }
       ]
     }
     listing = ConditionCoverage::HtmlFile.listing(lines, trees)
     html = REXML::Document.new(listing)
     tree = html.elements["//*[@id='tree-1']"]
 
-    headings = tree.elements.to_a('.//*[@data-heading]/*')
-    actual = headings.map { |element| text_of(element) }
-    assert_equal %w(condition true false gap), actual
-
     operator = tree.elements['.//*[@data-operator]']
     assert_equal '&&', text_of(operator)
+
+    counts = operator.parent.elements.to_a('*[@data-count]')
+    actual = counts.map { [text_of(_1), _1.attributes['class']] }
+    expected = [['0', 'count never'], %w(2 count), %w(1 count)]
+    assert_equal expected, actual
 
     branches = tree.elements.to_a('.//*[@data-branch]')
     actual = branches.map { |element| text_of(element) }
@@ -161,16 +169,22 @@ class HtmlFileTest < Id58TestBase
       { number: 1, text: '  ok?(id) && (new?(id) || id.size == 6)',
         status: :gaps, span: 1..1 }
     ]
-    either = { operator: '||', operands: [
-      { text: 'new?(id)', truthy: 1, falsy: 1, gap: nil },
-      { text: 'id.size == 6', truthy: 0, falsy: 1, gap: 'never true' }
-    ] }
+    either = {
+      operator: '||', cells: [true, false],
+      operands: [
+        { text: 'new?(id)', cells: [true, false] },
+        { text: 'id.size == 6', cells: [nil, false] }
+      ]
+    }
     trees = {
       1 => [
-        { operator: '&&', operands: [
-          { text: 'ok?(id)', truthy: 2, falsy: 1, gap: nil },
-          either
-        ] }
+        {
+          operator: '&&', counts: [2, 1], cells: [true, false],
+          operands: [
+            { text: 'ok?(id)', cells: [true, true] },
+            either
+          ]
+        }
       ]
     }
     listing = ConditionCoverage::HtmlFile.listing(lines, trees)
@@ -199,16 +213,22 @@ class HtmlFileTest < Id58TestBase
       { number: 1, text: '  (ok?(id) || new?(id)) && id.size == 6',
         status: :covered, span: 1..1 }
     ]
-    either = { operator: '||', operands: [
-      { text: 'ok?(id)', truthy: 1, falsy: 1, gap: nil },
-      { text: 'new?(id)', truthy: 1, falsy: 1, gap: nil }
-    ] }
+    either = {
+      operator: '||', cells: [true, true],
+      operands: [
+        { text: 'ok?(id)', cells: [true, false] },
+        { text: 'new?(id)', cells: [nil, true] }
+      ]
+    }
     trees = {
       1 => [
-        { operator: '&&', operands: [
-          either,
-          { text: 'id.size == 6', truthy: 1, falsy: 1, gap: nil }
-        ] }
+        {
+          operator: '&&', counts: [1, 1], cells: [true, true],
+          operands: [
+            either,
+            { text: 'id.size == 6', cells: [true, true] }
+          ]
+        }
       ]
     }
     listing = ConditionCoverage::HtmlFile.listing(lines, trees)
@@ -218,6 +238,62 @@ class HtmlFileTest < Id58TestBase
     branches = tree.elements.to_a('.//*[@data-branch]')
     actual = branches.map { |element| text_of(element) }
     expected = ['├─ ', '│  ├─ ', '│  └─ ', '└─ ']
+    assert_equal expected, actual
+  end
+
+  test 'gae531', %w(
+  | a ternary's arm has a row of its own, ? or : before it: an
+  | arm holding a condition is named by its operator, shows
+  | its value on each path, and has the condition's operands
+  | branching below; a plain arm is named by its text, and
+  | marks each path that took it
+  ) do
+    lines = [
+      { number: 1, text: '  ok?(id) ? new?(id) && id.size == 6 : :no',
+        status: :gaps, span: 1..1 }
+    ]
+    both = {
+      operator: '&&', cells: [false, true, nil],
+      operands: [
+        { text: 'new?(id)', cells: [true, true, nil] },
+        { text: 'id.size == 6', cells: [false, true, nil] }
+      ]
+    }
+    trees = {
+      1 => [
+        {
+          operator: '?:', counts: [0, 1, 2],
+          cells: [false, true, nil],
+          operands: [
+            { text: 'ok?(id)', cells: [true, true, false] },
+            {
+              arm: :then, text: 'new?(id) && id.size == 6',
+              cells: [true, true, false], body: both
+            },
+            {
+              arm: :else, text: ':no',
+              cells: [false, false, true], body: nil
+            }
+          ]
+        }
+      ]
+    }
+    listing = ConditionCoverage::HtmlFile.listing(lines, trees)
+    html = REXML::Document.new(listing)
+    tree = html.elements["//*[@id='tree-1']"]
+
+    rows = tree.elements.to_a('.//*[@data-arm]')
+    actual = rows.map do |row|
+      cells = row.elements.to_a('*[@data-cell]').map { text_of(_1) }
+      [text_of(row.elements['*[@data-label]']), *cells]
+    end
+    bullet = [0x2022].pack('U')
+    expected = [['? &&', 'F', 'T', ''], [': :no', '', '', bullet]]
+    assert_equal expected, actual
+
+    branches = tree.elements.to_a('.//*[@data-branch]')
+    actual = branches.map { |element| text_of(element) }
+    expected = ['├─ ', '├─ ', '│  ├─ ', '│  └─ ', '└─ ']
     assert_equal expected, actual
   end
 
@@ -232,10 +308,13 @@ class HtmlFileTest < Id58TestBase
       { number: 2, text: '  ok?(c) && new?(c)', status: :covered,
         span: 2..2 }
     ]
-    site = { operator: '&&', operands: [
-      { text: 'ok?(a)', truthy: 1, falsy: 1, gap: nil },
-      { text: 'new?(a)', truthy: 1, falsy: 1, gap: nil }
-    ] }
+    site = {
+      operator: '&&', counts: [1], cells: [true],
+      operands: [
+        { text: 'ok?(a)', cells: [true] },
+        { text: 'new?(a)', cells: [true] }
+      ]
+    }
     trees = { 1 => [site, site], 2 => [site] }
     listing = ConditionCoverage::HtmlFile.listing(lines, trees)
     html = REXML::Document.new(listing)

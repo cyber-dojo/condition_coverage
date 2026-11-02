@@ -3,9 +3,11 @@ require 'condition_coverage/site_tree'
 
 class SiteTreeTest < Id58TestBase
   test 'EuNs10', %w(
-  | a site's tree names its operator, and gives each operand
-  | its source text, cut from the manifest's byte range with
-  | no parse, its true and false counts, and its gap
+  | a site's tree names its operator and has a column for
+  | each of its paths, never taken first, with each path's
+  | count; each leaf has its source text, cut from the
+  | manifest's byte range with no parse, and its outcome on
+  | each path, nil where unreached; the site its value
   ) do
     source = <<~RUBY
       module Kata
@@ -14,43 +16,27 @@ class SiteTreeTest < Id58TestBase
       end
     RUBY
     site = condition('&&', 67...74, 78...97)
-    counts = [
-      { truthy: 1, falsy: 1 },
-      { truthy: 1, falsy: 0 }
+    paths = [
+      { path: [true, true], count: 1 },
+      { path: [true, false], count: 0 },
+      { path: [false, nil], count: 1 }
     ]
     expected = {
-      operator: '&&',
+      operator: '&&', counts: [0, 1, 1],
+      cells: [false, true, false],
       operands: [
-        { text: 'ok?(id)', truthy: 1, falsy: 1, gap: nil },
-        { text: "id.start_with?('N')", truthy: 1, falsy: 0,
-          gap: 'never false' }
+        { text: 'ok?(id)', cells: [true, true, false] },
+        { text: "id.start_with?('N')", cells: [false, true, nil] }
       ]
     }
-    actual = ConditionCoverage::SiteTree.of(source, site, counts)
+    actual = ConditionCoverage::SiteTree.of(source, site, paths)
     assert_equal expected, actual
   end
 
-  test 'EuNs20', %w(
-  | an || site's tree is named by its || operator
-  ) do
-    source = <<~RUBY
-      module Kata
-        def self.ok?(id) = !id.empty?
-        def self.kata?(id) = ok?(id) || id.start_with?('N')
-      end
-    RUBY
-    site = condition('||', 67...74, 78...97)
-    counts = [
-      { truthy: 1, falsy: 1 },
-      { truthy: 1, falsy: 1 }
-    ]
-    tree = ConditionCoverage::SiteTree.of(source, site, counts)
-    assert_equal '||', tree[:operator]
-  end
-
   test 'EuNs30', %w(
-  | a nested condition is a subtree under its operator,
-  | its leaves taking their counts in left to right order
+  | a nested condition is a subtree under its operator, its
+  | leaves taking their outcomes in left to right order, and
+  | its value on each path that of the last operand it reached
   ) do
     source = <<~RUBY
       def kata?(id)
@@ -59,80 +45,75 @@ class SiteTreeTest < Id58TestBase
     RUBY
     either = condition('||', 28...36, 40...52)
     site = condition('&&', 16...23, either)
-    counts = [
-      { truthy: 2, falsy: 1 },
-      { truthy: 1, falsy: 1 },
-      { truthy: 0, falsy: 1 }
+    paths = [
+      { path: [true, true, nil], count: 2 },
+      { path: [true, false, true], count: 0 },
+      { path: [true, false, false], count: 1 },
+      { path: [false, nil, nil], count: 1 }
     ]
     expected = {
-      operator: '&&',
+      operator: '&&', counts: [0, 2, 1, 1],
+      cells: [true, true, false, false],
       operands: [
-        { text: 'ok?(id)', truthy: 2, falsy: 1, gap: nil },
+        { text: 'ok?(id)', cells: [true, true, true, false] },
         {
-          operator: '||',
+          operator: '||', cells: [true, true, false, nil],
           operands: [
-            { text: 'new?(id)', truthy: 1, falsy: 1, gap: nil },
-            { text: 'id.size == 6', truthy: 0, falsy: 1,
-              gap: 'never true' }
+            { text: 'new?(id)', cells: [false, true, false, nil] },
+            { text: 'id.size == 6', cells: [true, nil, false, nil] }
           ]
         }
       ]
     }
-    actual = ConditionCoverage::SiteTree.of(source, site, counts)
+    actual = ConditionCoverage::SiteTree.of(source, site, paths)
     assert_equal expected, actual
   end
 
-  test 'EuNs40', %w(
-  | given its site's own outcome, a tree's root has that
-  | outcome's true and false counts and its gap, so a
-  | ternary shows which of its arms ran
+  test 'EuNs70', %w(
+  | a ternary's predicate decides which arm each path took;
+  | each arm has its text, the tree of the condition it holds,
+  | nil for a plain arm, and whether each path took it; the
+  | ternary's value on a path is its taken arm's, nil for a
+  | plain arm
   ) do
     source = <<~RUBY
-      module Fee
-        def self.fee(u) = u[:a] || u[:b] ? 5 : 7
+      def kata?(id)
+        ok?(id) ? new?(id) && id.size == 6 : :no
       end
     RUBY
-    either = condition('||', 31...36, 40...45)
-    site = condition('?:', either)
-    counts = [
-      { truthy: 1, falsy: 1 },
-      { truthy: 1, falsy: 0 }
+    both = condition('&&', 26...34, 38...50)
+    site = condition(
+      '?:', 16...23, arm(:then, 26...50, both), arm(:else, 53...56)
+    )
+    paths = [
+      { path: [true, true, true], count: 1 },
+      { path: [true, true, false], count: 0 },
+      { path: [true, false, nil], count: 2 },
+      { path: [false, nil, nil], count: 3 }
     ]
-    outcome = { truthy: 2, falsy: 0, ternary: true }
     expected = {
-      operator: '?:', truthy: 2, falsy: 0, gap: 'never false',
+      operator: '?:', counts: [0, 1, 2, 3],
+      cells: [false, true, false, nil],
       operands: [
+        { text: 'ok?(id)', cells: [true, true, true, false] },
         {
-          operator: '||',
-          operands: [
-            { text: 'u[:a]', truthy: 1, falsy: 1, gap: nil },
-            { text: 'u[:b]', truthy: 1, falsy: 0,
-              gap: 'never false' }
-          ]
+          arm: :then, text: 'new?(id) && id.size == 6',
+          cells: [true, true, true, false],
+          body: {
+            operator: '&&', cells: [false, true, false, nil],
+            operands: [
+              { text: 'new?(id)', cells: [true, true, false, nil] },
+              { text: 'id.size == 6', cells: [false, true, nil, nil] }
+            ]
+          }
+        },
+        {
+          arm: :else, text: ':no',
+          cells: [false, false, false, true], body: nil
         }
       ]
     }
-    tree = ConditionCoverage::SiteTree
-    assert_equal expected, tree.of(source, site, counts, outcome)
-  end
-
-  test 'EuNs50', %w(
-  | any site's root shows its own outcome's gap, eg an && never
-  | true, though only a ternary's is listed among the gaps
-  ) do
-    source = <<~RUBY
-      module Shop
-        def self.loud? = VERBOSE && $stdout.tty?
-      end
-    RUBY
-    site = condition('&&', 30...37, 41...53)
-    counts = [
-      { truthy: 0, falsy: 1 },
-      { truthy: 0, falsy: 0 }
-    ]
-    outcome = { truthy: 0, falsy: 1 }
-    tree = ConditionCoverage::SiteTree
-    root = tree.of(source, site, counts, outcome)
-    assert_equal 'never true', root[:gap]
+    actual = ConditionCoverage::SiteTree.of(source, site, paths)
+    assert_equal expected, actual
   end
 end

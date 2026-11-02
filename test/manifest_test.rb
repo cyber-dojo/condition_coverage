@@ -251,15 +251,16 @@ class ManifestTest < Id58TestBase
 
   test '6asy90', %w(
   | a ternary is a choice too, so it is a site, named ?:,
-  | whose one operand is its predicate, and whose extent is
-  | the whole ternary, its arms included
+  | whose operands are its predicate and its two arms, and
+  | whose extent is the whole ternary
   ) do
     source = <<~RUBY
       def kata?(id)
         ok?(id) ? :ok : :no
       end
     RUBY
-    ternary = condition('?:', 16...23, extent: 16...35)
+    arms = [arm(:then, 26...29), arm(:else, 32...35)]
+    ternary = condition('?:', 16...23, *arms, extent: 16...35)
     expected = { 'k.rb:2:2' => ternary }
     actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
@@ -276,40 +277,91 @@ class ManifestTest < Id58TestBase
       end
     RUBY
     both = condition('&&', 16...23, 27...35, extent: 16...35)
-    ternary = condition('?:', both, extent: 16...47)
+    arms = [arm(:then, 38...41), arm(:else, 44...47)]
+    ternary = condition('?:', both, *arms, extent: 16...47)
     expected = { 'k.rb:2:2' => ternary }
     actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end
 
   test '6asy92', %w(
-  | a condition in a ternary's arm decides something else,
-  | so it is a site of its own, after the ternary's
+  | a condition that is a ternary's arm is part of the one
+  | expression, so it folds into the ternary's site as that
+  | arm's body, and a plain arm is an arm with no body
   ) do
     source = <<~RUBY
       def kata?(id)
         ok?(id) ? new?(id) && id.size == 6 : :no
       end
     RUBY
-    ternary = condition('?:', 16...23, extent: 16...56)
     both = condition('&&', 26...34, 38...50, extent: 26...50)
-    expected = { 'k.rb:2:2' => ternary, 'k.rb:2:12' => both }
+    ternary = condition(
+      '?:', 16...23, arm(:then, 26...50, both), arm(:else, 53...56),
+      extent: 16...56
+    )
+    expected = { 'k.rb:2:2' => ternary }
     actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end
 
   test '6asy93', %w(
-  | a condition in a ternary's else arm is a site of its own
-  | too, after the ternary's
+  | a condition that is a ternary's else arm folds into the
+  | ternary's site too
   ) do
     source = <<~RUBY
       def kata?(id)
         ok?(id) ? :ok : new?(id) && id.size == 6
       end
     RUBY
-    ternary = condition('?:', 16...23, extent: 16...56)
     both = condition('&&', 32...40, 44...56, extent: 32...56)
-    expected = { 'k.rb:2:2' => ternary, 'k.rb:2:18' => both }
+    ternary = condition(
+      '?:', 16...23, arm(:then, 26...29), arm(:else, 32...56, both),
+      extent: 16...56
+    )
+    expected = { 'k.rb:2:2' => ternary }
+    actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
+    assert_equal expected, actual
+  end
+
+  test '6asy94', %w(
+  | a condition inside a plain arm, eg in a block, decides
+  | something else, so it is a site of its own, after the
+  | ternary's
+  ) do
+    source = <<~RUBY
+      def kata?(id)
+        ok?(id) ? ids.any? { |k| k && k.ok? } : :no
+      end
+    RUBY
+    ternary = condition(
+      '?:', 16...23, arm(:then, 26...53), arm(:else, 56...59),
+      extent: 16...59
+    )
+    inner = condition('&&', 41...42, 46...51, extent: 41...51)
+    expected = { 'k.rb:2:2' => ternary, 'k.rb:2:27' => inner }
+    actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
+    assert_equal expected, actual
+  end
+
+  test '6asy95', %w(
+  | a ternary that is an arm of a ternary, in parentheses,
+  | folds in as that arm's body, so the whole expression is
+  | one site
+  ) do
+    source = <<~RUBY
+      def k(x, y)
+        x ? (y ? 1 : 2) : 3
+      end
+    RUBY
+    inner = condition(
+      '?:', 19...20, arm(:then, 23...24), arm(:else, 27...28),
+      extent: 19...28
+    )
+    outer = condition(
+      '?:', 14...15, arm(:then, 18...29, inner), arm(:else, 32...33),
+      extent: 14...33
+    )
+    expected = { 'k.rb:2:2' => outer }
     actual = ConditionCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end

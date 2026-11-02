@@ -40,28 +40,41 @@ class PostTest < Id58TestBase
   end
 
   test 'Pq3s11', %w(
-  | the site outcomes are POSTed in the JSON report too, so
-  | a collector's render shows which arms each ternary ran
+  | the site paths are POSTed in the JSON report too, each
+  | leaf's span with them, so a collector's render shows
+  | every path each site took
   ) do
     server = TCPServer.new('127.0.0.1', 0)
     port = server.addr[1]
     received = Thread.new { request_body(server.accept) }
-    operands = {
-      'source/fee.rb:2:23' => [{ truthy: 1, falsy: 1 }]
-    }
-    outcomes = {
-      'source/fee.rb:2:23' => { truthy: 1, falsy: 1, ternary: true }
+    source = "def fee(u) = u ? 5 : 7\n"
+    site = condition(
+      '?:', 13...14, arm(:then, 17...18), arm(:else, 21...22)
+    )
+    sites = { 'fee.rb:1:13' => site }
+    files = { '/app/fee.rb' => { source:, sites: } }
+    operands = { 'fee.rb:1:13' => [{ truthy: 1, falsy: 1 }] }
+    site_paths = {
+      'fee.rb:1:13' => [
+        { path: [true], count: 1 }, { path: [false], count: 1 }
+      ]
     }
     config = post_config('Pq3s11', "http://127.0.0.1:#{port}/runs")
+    render = ConditionCoverage::Render
     assert_output('', '') do
-      ConditionCoverage::Render.run(operands, {}, config, outcomes:)
+      render.run(operands, files, config, site_paths:)
     end
     expected = {
-      'source/fee.rb:2:23' =>
-        { 'truthy' => 1, 'falsy' => 1, 'ternary' => true }
+      'fee.rb:1:13' => {
+        'leaves' => [%w(1:13 1:14)],
+        'taken' => [
+          { 'path' => [true], 'count' => 1 },
+          { 'path' => [false], 'count' => 1 }
+        ]
+      }
     }
     json = JSON.parse(received.join(5).value)
-    assert_equal expected, json['outcomes']
+    assert_equal expected, json['paths']
   end
 
   test 'Pq3s20', %w(

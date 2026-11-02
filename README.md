@@ -80,7 +80,7 @@ As the process exits:
 
 - `condition_coverage.json` is always written to `coverage_dir`: every site
   of every covered file, with each operand's true and false counts under
-  `sites`, and each site's own true and false counts under `outcomes`. It is
+  `sites`, and each site's paths under `paths`. It is
   the base the other reporters read, so they can also be run later, in
   another process, from it alone:
   `ConditionCoverage::Render.from_json(config)`, where `config` is a
@@ -88,16 +88,37 @@ As the process exits:
   Given several runs' reports, `Render.from_json(config, paths)` adds
   their counts together first, so the report shows only the gaps that
   every run left.
-- `:gaps` prints one line per missing outcome, in manifest order:
+- `:gaps` prints one line per path a site never took, in manifest order,
+  naming the outcome of each leaf on that path:
 
 ```text
-source/kata.rb:3:23 operand 1 never false
+source/kata.rb:3:23 path never taken: `ok?(id)` true, `new?(id)` false
 source/kata.rb:4:24 never reached
 ```
 
 A site is named by the `path:line:column` where its condition starts, the
 path relative to `root`. A site in a covered file the run never loaded is
 still reported, as `never reached`.
+
+A path is the outcome of each leaf one evaluation of the site reached, in
+order; a leaf that short-circuiting skipped is not on it. Each leaf is
+quoted as a Markdown code span, on one line, its fence one backtick longer
+than any run of backticks inside it. The gap lines are for people; a tool
+should read the JSON, whose `paths` give each site's leaves as
+`line:column` spans, and each possible path with its count:
+
+```json
+"paths": {
+  "source/kata.rb:3:23": {
+    "leaves": [["3:23", "3:30"], ["3:34", "3:42"]],
+    "taken": [
+      { "path": [true, true], "count": 2 },
+      { "path": [true, false], "count": 0 },
+      { "path": [false, null], "count": 1 }
+    ]
+  }
+}
+```
 
 A site is an outermost condition. Its operands are numbered left to right
 across the whole of it, nested conditions included:
@@ -109,23 +130,15 @@ ok?(id) && new?(id) || id.size == 6     # an && nested in an || site, 0 1 2
 ids.any? { |k| k && k.ok? } && ok?(id)  # two sites: the block's is its own
 ok?(id) ? :ok : :no                     # a ?: site, its predicate operand 0
 ok?(id) && new?(id) ? :ok : :no         # an && nested in a ?: site, 0 1
-ok?(id) ? new?(id) && id.size == 6 : :no  # two sites: an arm's is its own
+ok?(id) ? new?(id) && id.size == 6 : :no  # one ?: site, its then arm 1 2
 ```
 
-A ternary is a site even when its predicate is a single operand: its one
-operand is its predicate, and its arms, like a block, decide something
-else.
-
-Each site's own outcome is counted too: a ternary's predicate as a whole,
-which picks its arm, and any other site's value. A ternary whose predicate
-has several operands has a gap of its own when only one arm ever ran:
-
-```text
-source/shop.rb:34:15 outcome never false
-```
-
-Any other site's outcome is shown but is never a gap, as its operands'
-gaps say more.
+A ternary is a site even when its predicate is a single operand. An arm
+holding a condition of `&&`, `||`, `and`, `or` or `?:` is part of the
+ternary's site, its leaves numbered after the predicate's, so the site's
+paths run through whichever arm the predicate picks. Any other arm, like a
+block, is not part of it, though a condition inside it is a site of its
+own.
 
 A chain of one operator is flat; a change of operator, by precedence or by
 parentheses, nests. Parentheses are not part of the tree, since they decide
@@ -148,9 +161,13 @@ falsy:
   column sortable. Each file name opens `files/<path>.html`, the file's
   source. On a line holding a condition the line number is a button (blue
   and outlined when every outcome was seen, solid orange when any is
-  missing) that opens a tree of the condition: its operators, nested as
-  Ruby groups them, the site's own true and false counts on its top row,
-  and each leaf operand's true and false counts and its gap. A condition
+  missing) that opens a grid of the condition's paths. Its rows are the
+  condition's tree: its operators, nested as Ruby groups them, a
+  ternary's arms marked `?` and `:`, and its leaves. Its columns are the
+  site's paths, never taken first, each headed by its count, orange when
+  zero; a leaf shows its outcome on each path, T or F, blank where the
+  path never reached it, and a plain arm a dot on each path that took
+  it. A condition
   written over several lines has one button over all of
   its line numbers. Trees with gaps start open. A header that stays at
   the top of the page lists every site as a link to its line, covered
@@ -168,26 +185,30 @@ falsy:
 At load time each covered file is read and parsed once, with Prism. The
 parse gives the manifest: each site's condition tree and the byte range of
 each of its leaf operands. The rewriter then inserts a record call around
-each leaf, and an outcome call around what decides the site's own outcome,
-without parsing again, and the result is compiled in place of the file:
+each leaf, and a leave call around the whole site, whose first argument
+enters it, without parsing again, and the result is compiled in place of
+the file:
 
 ```ruby
 ok?(id) && new?(id)
 # compiles as
-ConditionCoverage.outcome("k.rb:2:2", ConditionCoverage.record("k.rb:2:2", 0, ok?(id)) && ConditionCoverage.record("k.rb:2:2", 1, new?(id)))
+ConditionCoverage.leave(ConditionCoverage.enter("k.rb:2:2", 2), ConditionCoverage.record("k.rb:2:2", 0, ok?(id)) && ConditionCoverage.record("k.rb:2:2", 1, new?(id)))
 ```
 
 A command call such as `ok? id` (after `and`) is not valid as a bare
 argument, so that operand alone gets parentheses of its own, and so does a
-whole `and` or `or` inside its outcome call. Nothing else does:
+whole `and` or `or` inside its leave call. Nothing else does:
 parentheses make a statement, and a statement on a continuation line gives
 that line a line-coverage count of its own, which changes SimpleCov's line
 totals. So a command call, or an `and` or `or`, written over several lines
 can add to SimpleCov's relevant lines; nothing else does.
 
-`record` and `outcome` count whether their value was truthy or falsy and
-return it unchanged, so short-circuiting and the value of the expression
-are preserved. Only text is inserted, never a newline, so backtrace line numbers
+`record` counts whether its value was truthy or falsy, and notes it on the
+site's current path; `enter` starts that path, and `leave` counts it.
+Each returns its value unchanged, so short-circuiting and the value of
+the expression are preserved. Paths are kept per fiber, so threads never
+mix their outcomes; an evaluation cut short by a raise counts no path,
+so no path is ever claimed that was not taken. Only text is inserted, never a newline, so backtrace line numbers
 still match the file. The rewrite happens in memory; no file on disk
 changes. An `if` or `unless` whose condition is a single operand is left
 alone, since branch coverage already sees both its outcomes.
@@ -203,6 +224,10 @@ the run never loaded are read and parsed then.
   - `find` / `detect`: found vs nil
   - `fetch(k, default)`, `dig`, `Hash#[]` with a default: present vs default
   - `x || default` in value context, `&.` safe navigation: nil vs not nil
+  - `||=` and `&&=`, on variables, attributes and index targets: the
+    right side evaluated vs skipped, counted without evaluating the
+    target twice
+  - `x rescue y` modifier: raised vs not raised
   - `unless`, modifier `if`, `case`/`when` and `in` patterns
   - regex matches: nil vs MatchData
 

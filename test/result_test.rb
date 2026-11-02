@@ -51,21 +51,31 @@ class ResultTest < Id58TestBase
     assert_equal expected, actual
   end
 
-  test 'DYTY30', %w(
-  | the result lists every site's own outcome counts, zero
-  | for a site that never ran, a ternary's marked as such,
-  | since its outcome picks an arm
+  test 'DYTY40', %w(
+  | the result lists every possible path of every site, in
+  | order, with how many evaluations took it, zero for a
+  | path never taken and for every path of a site never run
   ) do
     sites = {
       'k.rb:2:2' => condition('&&', 16...23, 27...35),
-      'k.rb:6:4' => condition('?:', 57...64)
+      'k.rb:6:4' => condition('||', 57...64, 68...77)
     }
-    outcomes = { 'k.rb:2:2' => { truthy: 2, falsy: 1 } }
+    site_paths = {
+      'k.rb:2:2' => { [true, false] => 2, [false, nil] => 1 }
+    }
     expected = {
-      'k.rb:2:2' => { truthy: 2, falsy: 1 },
-      'k.rb:6:4' => { truthy: 0, falsy: 0, ternary: true }
+      'k.rb:2:2' => [
+        { path: [true, true], count: 0 },
+        { path: [true, false], count: 2 },
+        { path: [false, nil], count: 1 }
+      ],
+      'k.rb:6:4' => [
+        { path: [true, nil], count: 0 },
+        { path: [false, true], count: 0 },
+        { path: [false, false], count: 0 }
+      ]
     }
-    result = ConditionCoverage::Result.new(sites, {}, outcomes)
-    assert_equal expected, result.outcomes
+    result = ConditionCoverage::Result.new(sites, {}, site_paths)
+    assert_equal expected, result.paths
   end
 end
