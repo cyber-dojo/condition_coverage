@@ -6,7 +6,7 @@ module PathCoverage
   class Configuration
     GLOB_FLAGS = File::FNM_PATHNAME | File::FNM_EXTGLOB
     SETTINGS = %w[
-      collector cover coverage_dir measure report root skip
+      collector cover coverage_dir group measure report root skip
     ].freeze
     REPORTERS = %w[gaps html post].freeze
     MEASURES = %w[decisions methods].freeze
@@ -15,6 +15,7 @@ module PathCoverage
     def initialize(&)
       @globs = []
       @skips = []
+      @groups = {}
       @reporters = [:gaps]
       @measures = [:decisions]
       instance_eval(&)
@@ -65,6 +66,17 @@ module PathCoverage
     # though a cover glob matches them, eg skip 'source/vendor/**'.
     def skip(glob)
       @skips << glob
+    end
+
+    # { name => [glob, ...] } of each group given, in order.
+    # Eg { 'Models' => ['source/models/**/*.rb'] }.
+    attr_reader :groups
+
+    # Names a group of covered files, those matching any of
+    # globs, relative to root, so the HTML index gives them a
+    # tab of their own, eg group 'Models', 'source/models/**'.
+    def group(name, *globs)
+      @groups[name] = globs
     end
 
     # Chooses the reporters run at exit, eg report :gaps;

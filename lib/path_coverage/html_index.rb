@@ -1,29 +1,81 @@
 require 'cgi/escape'
+require_relative 'html_tabs'
 require_relative 'html_template'
 
 module PathCoverage
   # The HTML index page: one sortable row per covered file,
-  # each linking to that file's own page, then a Total row.
+  # each linking to that file's own page, then a Total row; with
+  # groups, one such table per tab.
   module HtmlIndex
-    # The whole index page: the files table, sortable by any
-    # column, with one row per Summary.files row, and total, as
-    # Summary.total gives it, as its footer.
-    def self.page(rows, total)
+    # The whole index page. rows are Summary.files rows and total
+    # their Summary.total. groups are [name, rows, total] for
+    # each group, each given a tab after All files; with none
+    # there is no tab bar, just the one table.
+    def self.page(rows, total, groups = [])
+      tables = [['All files', rows, total], *groups]
+      names = tables.map(&:first)
       HtmlTemplate.fill(
         HtmlTemplate.asset('index.html'),
         'style' => HtmlTemplate.asset('style.css'),
-        'script' => HtmlTemplate.asset('sort.js'),
-        'rows' => rows.map { |row| row(row) }.join("\n"),
-        'total' => total_row(total),
-        'across' => total[:methods] ? ACROSS : ''
+        'script' => script(groups),
+        'tabs' => groups.empty? ? '' : HtmlTabs.bar(names),
+        'tables' => tables_of(tables)
       )
     end
+
+    # Each of tables, [name, rows, total], as the table of its
+    # tab.
+    def self.tables_of(tables)
+      tables.each_with_index.map do |(_, rows, total), index|
+        table(index, rows, total)
+      end.join("\n")
+    end
+
+    # The page's script: its column sorting, and, with groups,
+    # its tab switching.
+    def self.script(groups)
+      sort = HtmlTemplate.asset('sort.js')
+      groups.empty? ? sort : sort + HtmlTemplate.asset('tabs.js')
+    end
+
+    # The headings of the columns every table has.
+    HEAD = [
+      '<th aria-sort="none"><button type="button" data-column="0" ' \
+      'data-type="text">File</button></th>',
+      '<th class="num" aria-sort="none"><button type="button" ' \
+      'data-column="1" data-type="number">Sites</button></th>',
+      '<th class="num" aria-sort="none"><button type="button" ' \
+      'data-column="2" data-type="number">Within each decision' \
+      '</button></th>'
+    ].join("\n").freeze
 
     # The heading of the across column, there only when methods
     # are measured.
     ACROSS = '<th class="num" aria-sort="none"><button ' \
              'type="button" data-column="3" data-type="number">' \
              "Across a method's decisions</button></th>".freeze
+
+    # The index-th tab's table of rows, total as its footer; any
+    # but the first starts hidden.
+    def self.table(index, rows, total)
+      head = HEAD + (total[:methods] ? "\n#{ACROSS}" : '')
+      body = rows.map { |row| row(row) }.join("\n")
+      [
+        open_tag(index),
+        "<thead>\n<tr>\n#{head}\n</tr>\n</thead>",
+        "<tbody>\n#{body}\n</tbody>",
+        "<tfoot>\n#{total_row(total)}\n</tfoot>",
+        '</table>'
+      ].join("\n")
+    end
+
+    # The opening tag of the index-th tab's table, which the tab
+    # of the same index controls; any but the first is hidden.
+    def self.open_tag(index)
+      hidden = index.zero? ? '' : ' hidden="hidden"'
+      id = %(id="files-#{index}")
+      %(<table class="files" #{id} role="tabpanel"#{hidden}>)
+    end
 
     # The table row of one Summary.files row; each cell has a
     # data-sort value for the page's column sorting.
@@ -33,7 +85,7 @@ module PathCoverage
       "<tr>#{cell(path, link)}#{counts(row).join}</tr>"
     end
 
-    # The footer row: the sums over every file.
+    # The footer row: the sums over the table's files.
     def self.total_row(total)
       "<tr>#{cell('Total', 'Total')}#{counts(total).join}</tr>"
     end

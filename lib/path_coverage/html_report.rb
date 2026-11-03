@@ -33,7 +33,8 @@ module PathCoverage
     # The index page: a row per file of its totals within each
     # decision, and, when paths are given, as they are when
     # methods are measured, across each method's decisions too;
-    # then their Total row.
+    # then their Total row. With groups configured, each group,
+    # and the files in none, get a tab of their own too.
     def self.index(files, config, paths, site_paths)
       methods = files.map do |full_path, parsed|
         path = config.relative(full_path)
@@ -41,7 +42,9 @@ module PathCoverage
       end
       all = methods.reduce({}, :merge)
       rows = Summary.files(site_paths, all, paths)
-      HtmlIndex.page(rows, Summary.total(rows))
+      groups = config.groups
+      tabs = groups.empty? ? [] : Summary.groups(rows, groups)
+      HtmlIndex.page(rows, Summary.total(rows), tabs)
     end
 
     # simplecov:disable

@@ -269,6 +269,35 @@ class KernelTest < Id58TestBase
     assert_equal(expected, total.map { text_of(_1) })
   end
 
+  test '6rTS4h', %w(
+  | Example: report :html with group 'Models', 'models/*.rb', of
+  | covered files models/crew.rb and lib/zip.rb
+  | index.html has a tab for All files, Models, and Ungrouped.
+  | The Models tab's table lists models/crew.rb alone.
+  ) do
+    dir = Dir.mktmpdir('6rTS4h')
+    FileUtils.mkdir_p(%W[#{dir}/models #{dir}/lib])
+    File.write("#{dir}/models/crew.rb", "def crew?(a, b) = a && b\n")
+    File.write("#{dir}/lib/zip.rb", "def zip?(a, b) = a || b\n")
+    exit_report = nil
+    on_exit = ->(&block) { exit_report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '**/*.rb'
+      coverage_dir dir
+      report :html
+      group 'Models', 'models/*.rb'
+    end
+    exit_report.call
+
+    index = REXML::Document.new(File.read("#{dir}/index.html"))
+    tabs = index.elements.to_a("//*[@role='tab']").map { text_of(_1) }
+    assert_equal ['All files', 'Models', 'Ungrouped'], tabs
+    xpath = "//table[@id='files-1']/tbody/tr/td[1]"
+    models = index.elements.to_a(xpath)
+    assert_equal(['models/crew.rb'], models.map { text_of(_1) })
+  end
+
   test '6rTS48', %w(
   | Example: report :html, and crew? called once
   | The exit report writes index.html into coverage_dir.

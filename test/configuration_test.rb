@@ -16,9 +16,30 @@ class ConfigurationTest < Id58TestBase
     expected = [
       'unknown setting covr in PathCoverage.start',
       'the settings are: ' \
-      'collector, cover, coverage_dir, measure, report, root, skip'
+      'collector, cover, coverage_dir, group, measure, report, ' \
+      'root, skip'
     ].join("\n")
     assert_equal expected, error.message
+  end
+
+  test 'A9MJ50', %w(
+  | Example: group 'Models', 'source/models/**/*.rb'
+  | and group 'Routes', 'source/app/routes_*.rb', 'source/api/*.rb'
+  | groups names each group's globs, in the order given.
+  | With no group setting there are none.
+  ) do
+    config = PathCoverage::Configuration.new do
+      root '/app'
+      group 'Models', 'source/models/**/*.rb'
+      group 'Routes', 'source/app/routes_*.rb', 'source/api/*.rb'
+    end
+    expected = {
+      'Models' => ['source/models/**/*.rb'],
+      'Routes' => ['source/app/routes_*.rb', 'source/api/*.rb']
+    }
+    assert_equal expected, config.groups
+    plain = PathCoverage::Configuration.new { root '/app' }
+    assert_equal({}, plain.groups)
   end
 
   test 'A9MJ40', %w(

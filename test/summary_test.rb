@@ -72,6 +72,51 @@ class SummaryTest < Id58TestBase
     assert_equal expected, actual
   end
 
+  test 'SEye40', %w(
+  | Example: rows for models/kata.rb, models/team.rb, app/fee.rb
+  | and lib/zip.rb, with groups Models and App
+  | Each group gets the rows whose path matches any of its globs,
+  | with their own total.
+  | The rows no group matches get a group of their own, Ungrouped.
+  ) do
+    row = lambda do |path, taken|
+      { path:, sites: 1, decisions: [taken, 2], methods: nil }
+    end
+    kata = row.call('source/models/kata.rb', 1)
+    team = row.call('source/models/team.rb', 2)
+    fee = row.call('source/app/fee.rb', 0)
+    zip = row.call('lib/zip.rb', 2)
+    groups = {
+      'Models' => ['source/models/**/*.rb'],
+      'App' => ['source/app/*.rb', 'source/api/*.rb']
+    }
+    rows = [kata, team, fee, zip]
+    actual = PathCoverage::Summary.groups(rows, groups)
+    expected = [
+      ['Models', [kata, team],
+       { sites: 2, decisions: [3, 4], methods: nil }],
+      ['App', [fee], { sites: 1, decisions: [0, 2], methods: nil }],
+      ['Ungrouped', [zip],
+       { sites: 1, decisions: [2, 2], methods: nil }]
+    ]
+    assert_equal expected, actual
+  end
+
+  test 'SEye41', %w(
+  | Example: rows for models/kata.rb and app/fee.rb, with groups
+  | Models and App covering both
+  | Every row is in a group, so there is no Ungrouped group.
+  ) do
+    kata = { path: 'source/models/kata.rb', sites: 1,
+             decisions: [1, 2], methods: nil }
+    fee = { path: 'source/app/fee.rb', sites: 1,
+            decisions: [0, 2], methods: nil }
+    groups = { 'Models' => ['source/models/*.rb'],
+               'App' => ['source/app/*.rb'] }
+    found = PathCoverage::Summary.groups([kata, fee], groups)
+    assert_equal %w(Models App), found.map(&:first)
+  end
+
   test 'SEye30', %w(
   | Example: rows for kata.rb and fee.rb
   | The total row adds up each column over every file.

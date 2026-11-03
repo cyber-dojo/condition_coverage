@@ -1,3 +1,4 @@
+require_relative 'configuration'
 require_relative 'totals'
 
 module PathCoverage
@@ -37,6 +38,29 @@ module PathCoverage
         decisions: add(rows.map { |row| row[:decisions] }),
         methods: methods.first && add(methods)
       }
+    end
+
+    # [name, rows, total] for each of groups, { name => [glob,
+    # ...] }, in order: the rows whose path matches any of its
+    # globs, and their total. Then Ungrouped, the rows no group
+    # matches, when there are any.
+    def self.groups(rows, groups)
+      grouped = groups.map do |name, globs|
+        own = rows.select { |row| matches?(row[:path], globs) }
+        [name, own, total(own)]
+      end
+      every = groups.values.flatten
+      rest = rows.reject { |row| matches?(row[:path], every) }
+      return grouped if rest.empty?
+
+      grouped << ['Ungrouped', rest, total(rest)]
+    end
+
+    # True when path matches any of globs.
+    def self.matches?(path, globs)
+      globs.any? do |glob|
+        File.fnmatch?(glob, path, Configuration::GLOB_FLAGS)
+      end
     end
 
     # [taken, possible] pairs added together.

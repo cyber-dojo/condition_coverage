@@ -100,6 +100,44 @@ class HtmlIndexTest < Id58TestBase
     assert_equal [expected, '-'], [actual, text_of(cell)]
   end
 
+  test 'zr0H60', %w(
+  | Example: kata.rb and fee.rb, with a group 'Models' of fee.rb
+  | The page has a tab for All files, then one per group.
+  | Each tab has a table of its own files, with its own Total.
+  | Only the first tab's table shows; the others are hidden.
+  | With no groups there is no tab bar, just the one table.
+  ) do
+    kata = { path: 'source/kata.rb', sites: 2, decisions: [3, 6],
+             methods: nil }
+    fee = { path: 'source/fee.rb', sites: 3, decisions: [2, 4],
+            methods: nil }
+    all = { sites: 5, decisions: [5, 10], methods: nil }
+    models = { sites: 3, decisions: [2, 4], methods: nil }
+    page = PathCoverage::HtmlIndex.page(
+      [kata, fee], all, [['Models', [fee], models]]
+    )
+    html = REXML::Document.new(page)
+    tabs = html.elements.to_a("//*[@role='tab']")
+    assert_equal(['All files', 'Models'], tabs.map { text_of(_1) })
+    tables = html.elements.to_a('//table')
+    actual = tables.map do |table|
+      cells = table.elements.to_a('tbody/tr/td[1]')
+      files = cells.map { text_of(_1) }
+      total = text_of(table.elements['tfoot/tr/td[3]'])
+      [files, total, table.attributes['hidden']]
+    end
+    expected = [
+      [['source/kata.rb', 'source/fee.rb'], '5 / 10 (50%)', nil],
+      [['source/fee.rb'], '2 / 4 (50%)', 'hidden']
+    ]
+    assert_equal expected, actual
+    page = PathCoverage::HtmlIndex.page([kata], all)
+    plain = REXML::Document.new(page)
+    tab_count = plain.elements.to_a("//*[@role='tab']").size
+    table_count = plain.elements.to_a('//table').size
+    assert_equal [0, 1], [tab_count, table_count]
+  end
+
   test 'zr0H50', %w(
   | Example: rows whose methods totals are nil
   | :methods is not measured.

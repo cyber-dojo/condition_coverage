@@ -74,13 +74,17 @@ PathCoverage.start do
   coverage_dir '/tmp/coverage' # where path_coverage.json is written
   measure :decisions, :methods # :decisions alone unless :methods is named
   report :gaps, :html          # the reporters run at exit (default :gaps)
+  group 'Models', 'source/models/**/*.rb'   # a tab of its own on index.html
 end
 ```
 
 A misspelt setting or an unknown reporter is refused by name, with the list
 of the ones there are. Calling `start` again replaces the configuration.
 `cover` and `skip` can each be given more than once; a file matching any
-`skip` glob is neither instrumented nor reported.
+`skip` glob is neither instrumented nor reported. Each `group`, given a name
+and one or more globs, gets a tab of its own on the HTML index, after All
+files, with its own Total row; covered files no group matches get an
+Ungrouped tab. A file may be in more than one group.
 
 A run whose code cannot be changed, such as a script in a `docker build`
 step, can be covered from its environment alone:
