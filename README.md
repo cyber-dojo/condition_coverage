@@ -63,7 +63,7 @@ Each popout has two sections:
 - `T` the expression was true.
 - `F` the expression was false.
 
-So in this example, there was no test which exercised the path where `name.size > 2` was `true`, and 
+In this example, there was no test which exercised the path where `name.size > 2` was `true`, and 
 `name.ascii_only?` was `false`.
 
 ### Unreachable: blank 
@@ -91,7 +91,7 @@ second, `paid` true, took `then`.
 - `∅` the receiver was nil, so `&.` skipped the rest of the chain.
 - `●` the receiver was not nil, so `&.` made the call.
 
-So in this example, there was no test which exercised the path where
+In this example, there was no test which exercised the path where
 `user` was nil.
 
 ### Count: `0` `1` `*`
@@ -102,8 +102,8 @@ So in this example, there was no test which exercised the path where
 - `1` the block was called with one item.
 - `*` the block was called with two or more items.
 
-So in this example, there was no test which exercised the path where
-the block was called with two or more items and its last answer was
+In this example, there was no test which exercised the path where
+the block was called with two or more items and every answer was
 `false`.
 
 ### Both: `TF`
@@ -114,7 +114,7 @@ the block was called with two or more items and its last answer was
 - `F` every answer of the block was false.
 - `TF` the block's answers were both true and false.
 
-So in this example, there was no test which exercised the path where
+In this example, there was no test which exercised the path where
 the block was called with two or more items and every answer was
 `false`.
 

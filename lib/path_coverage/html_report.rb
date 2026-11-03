@@ -88,17 +88,26 @@ module PathCoverage
     # on it and on each of its operands: a leaf's from its byte
     # range, a condition's and an arm's from its extent, the
     # whole of it as written. Columns count characters, not
-    # bytes.
+    # bytes. A node past the condition's operands, eg owner at
+    # the end of user&.account&.owner, is kept as it is.
     def self.located(source, condition, tree)
       pairs = condition.operands.zip(tree[:operands])
       operands = pairs.map do |operand, node|
-        case operand
-        when Condition then located(source, operand, node)
-        when Arm then located_arm(source, operand, node)
-        else node.merge(at: at(source, operand))
-        end
+        located_operand(source, operand, node)
       end
-      tree.merge(at: at(source, condition.extent), operands:)
+      rest = tree[:operands].drop(pairs.size)
+      tree.merge(at: at(source, condition.extent),
+                 operands: operands + rest)
+    end
+
+    # SPIKE: the node of operand with its at:, as located gives
+    # a condition's, an arm's or a leaf's.
+    def self.located_operand(source, operand, node)
+      case operand
+      when Condition then located(source, operand, node)
+      when Arm then located_arm(source, operand, node)
+      else node.merge(at: at(source, operand))
+      end
     end
 
     # An arm's node with its at:, nil for an arm with no

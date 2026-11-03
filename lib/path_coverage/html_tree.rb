@@ -147,12 +147,16 @@ module PathCoverage
 
     # One operand's row: its branch, text, and its outcome on
     # each path.
+    # An operand that is only called, eg owner at the end of
+    # user&.account&.owner, has a tick on each path that called
+    # it instead.
     def self.operand_row(operand, branch)
       text = CGI.escapeHTML(operand[:text].to_s)
       lead = branch_cell(branch) +
              %(<span class="text" data-text="">#{text}</span>)
       attrs = %( data-operand=""#{at(operand)})
-      row(attrs, lead, cells(operand[:cells]))
+      names = operand[:called] ? TAKEN : OUTCOMES
+      row(attrs, lead, cells(operand[:cells], names))
     end
 
     # The cell drawing a row's branch from its operator.

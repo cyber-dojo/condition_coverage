@@ -1610,4 +1610,40 @@ class KernelTest < Id58TestBase
     calls.each { |ids, c| Odds6rTS54.k(ids, c) }
     assert_output('') { report.call }
   end
+
+  test '6rTS55', %w(
+  | Example: user&.account&.owner, called with no user, and
+  | with a user whose account has an owner
+  | The popout shows the chain's rows as user, account, then
+  | owner, so they read as the code does.
+  | owner is ticked on the one path that called it.
+  ) do
+    dir = Dir.mktmpdir('6rTS55')
+    File.write("#{dir}/owner.rb", <<~RUBY)
+      module Owner6rTS55
+        def self.of(user) = user&.account&.owner
+      end
+    RUBY
+    exit_report = nil
+    on_exit = ->(&block) { exit_report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+      report :html
+    end
+    require "#{dir}/owner.rb"
+    account = Struct.new(:owner).new('kim')
+    users = [nil, Struct.new(:account).new(account)]
+    assert_equal([nil, 'kim'], users.map { Owner6rTS55.of(_1) })
+    exit_report.call
+
+    page = File.read("#{dir}/files/owner.rb.html")
+    tree = REXML::Document.new(page).elements["//*[@id='tree-2']"]
+    rows = tree.elements.to_a('.//*[@data-operand]')
+    texts = rows.map { text_of(_1.elements['*[@data-text]']) }
+    assert_equal %w(user account owner), texts
+    cells = rows.last.elements.to_a('*[@data-cell]')
+    assert_includes cells.map { text_of(_1) }, [0x2713].pack('U')
+  end
 end
