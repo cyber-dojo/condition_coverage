@@ -87,6 +87,8 @@ and one or more globs, gets a tab of its own on the HTML index, after All
 files, with its own Total row; covered files no group matches get an
 Ungrouped tab. A file may be in more than one group.
 
+## When you cannot change the code!
+
 A run whose code cannot be changed, such as a script in a `docker build`
 step, can be covered from its environment alone:
 
@@ -154,7 +156,8 @@ source/fee.rb:2:2 fee path never taken: line 4 true, line 7 false
 
 ### Decisions
 
-Measured always, as `:decisions`: the paths within each decision.
+The paths within each decision are always measured, whatever `measure`
+names.
 
 A site is named by the `path:line:column` where it starts, the path
 relative to `root`. A site in a covered file the run never loaded is
@@ -181,16 +184,40 @@ should read the JSON, whose `paths` give each site's leaves as
 ```
 
 A site is an outermost condition. Its leaves are numbered left to right
-across the whole of it, nested conditions included:
+across the whole of it, nested conditions included. Each example below is
+a line of code, then its site's tree, as a popout draws it:
 
-```ruby
-ok?(id) && new?(id) && id.size == 6       # one && site, leaves 0 1 2
-ok?(id) && (new?(id) || id.size == 6)     # an || nested in an && site, 0 1 2
-ok?(id) && new?(id) || id.size == 6       # an && nested in an || site, 0 1 2
-ids.map { |k| k && k.ok? } && ok?(id)     # two sites: the block's is its own
-ok?(id) ? :ok : :no                       # a ?: site, its predicate leaf 0
-ok?(id) && new?(id) ? :ok : :no           # an && nested in a ?: site, 0 1
-ok?(id) ? new?(id) && id.size == 6 : :no  # one ?: site, its then arm 1 2
+```text
+ok?(id) && (new?(id) || id.size == 6)
+
+&&                            one site
+├─ ok?(id)                    leaf 0
+└─ ||                         nested by parentheses, no site of its own
+   ├─ new?(id)                leaf 1
+   └─ id.size == 6            leaf 2
+```
+
+```text
+ids.map { |k| k && k.ok? } && ok?(id)
+
+&&                            one site
+├─ ids.map { ... }            leaf 0
+└─ ok?(id)                    leaf 1
+
+&&                            a second site, inside the block
+├─ k                          leaf 0
+└─ k.ok?                      leaf 1
+```
+
+```text
+ok?(id) ? new?(id) && id.size == 6 : :no
+
+?:                            one site
+├─ ok?(id)                    leaf 0
+├─ ? &&                       an arm holding a condition, part of the site
+│  ├─ new?(id)                leaf 1
+│  └─ id.size == 6            leaf 2
+└─ : :no                      a plain arm
 ```
 
 A ternary is a site even when its predicate is a single leaf. An arm
