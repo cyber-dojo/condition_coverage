@@ -29,6 +29,37 @@ class CoverageMetricsCheckTest < Id58TestBase
     assert_equal expected, actual
   end
 
+  test 'p0Kj60', %w(
+  | Example: code.lines.missed 1 and code.branches.missed 1, the
+  | report naming where each was missed
+  | Each breach of a missed bound is followed by one line per
+  | place missed, so a run that misses one only now and then
+  | says which there and then.
+  ) do
+    report = {
+      'code' => {
+        'lines' => {
+          'total' => 22, 'missed' => 1,
+          'where' => ['lib/path_coverage/collector.rb:17']
+        },
+        'branches' => {
+          'total' => 4, 'missed' => 1,
+          'where' => ['lib/path_coverage/summary.rb:54 then']
+        }
+      }
+    }
+    missed = { 'missed' => { 'min' => 0, 'max' => 0 } }
+    bounds = { 'code' => { 'lines' => missed, 'branches' => missed } }
+    expected = [
+      'code.lines.missed: 1 is outside 0..0',
+      '  missed: lib/path_coverage/collector.rb:17',
+      'code.branches.missed: 1 is outside 0..0',
+      '  missed: lib/path_coverage/summary.rb:54 then'
+    ]
+    actual = CoverageMetricsCheck.breaches(report, bounds)
+    assert_equal expected, actual
+  end
+
   test 'p0Kj20', %w(
   | a total below its min is a breach, so an all-zeros report
   | from a run that loaded no code cannot pass

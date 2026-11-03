@@ -18,12 +18,17 @@ With ID58 arguments, runs only the tests whose id contains one of
 them, and skips the coverage check: a partial run covers only
 part of the code, so its report cannot meet the bounds.
 
+The run's seed, printed first, orders both the test files and the
+tests. Give SEED to replay a run's order, eg one whose coverage
+check failed only once.
+
 Options:
   -h    Show this help
 
 Examples:
   bin/run_tests.sh
   bin/run_tests.sh 2m4 Kp9
+  SEED=26820 bin/run_tests.sh
 EOF
 }
 
@@ -34,6 +39,11 @@ fi
 
 docker build --quiet --tag "${IMAGE}" "${ROOT_DIR}" > /dev/null
 
+# One seed for the whole run: Minitest reads SEED for the order of
+# the tests, and the loader below for the order of the files.
+readonly SEED="${SEED:-${RANDOM}}"
+echo "seed: ${SEED}"
+
 # A run that dies before SimpleCov writes must not leave the
 # previous run's report for the check to pass on. It is deleted
 # from inside the container, the side that writes it: deleted on
@@ -43,7 +53,8 @@ $stdout.sync = true
 report = "/reports/coverage_metrics.json"
 File.delete(report) if File.exist?(report)
 require "/gem/test/simplecov_config"
-Dir["test/**/*_test.rb"].shuffle.each { |file| require File.expand_path(file) }
+order = Random.new(Integer(ENV.fetch("SEED")))
+Dir["test/**/*_test.rb"].sort.shuffle(random: order).each { |file| require File.expand_path(file) }
 '
 
 mkdir -p "${ROOT_DIR}/reports"
@@ -54,6 +65,7 @@ run_in_image()
     --volume "${ROOT_DIR}:/gem:ro" \
     --volume "${ROOT_DIR}/reports:/reports" \
     --env RUBYOPT='-W2 --enable-frozen-string-literal' \
+    --env SEED="${SEED}" \
     "${IMAGE}" \
     "$@"
 }

@@ -5,7 +5,7 @@ module CoverageMetricsCheck
   # empty when every bound is met.
   def self.breaches(report, bounds, path = [])
     if bound?(bounds)
-      breach(report.dig(*path), bounds, path)
+      breach(report, bounds, path)
     else
       bounds.flat_map do |name, inner|
         breaches(report, inner, path + [name])
@@ -18,10 +18,17 @@ module CoverageMetricsCheck
     node.key?('min') || node.key?('max')
   end
 
-  # [] when value is within bounds, else its one breach line.
-  def self.breach(value, bounds, path)
+  # [] when the value at path in report is within bounds, else
+  # its breach line, then a line for each place the report
+  # names, in a where list beside it, eg each line missed.
+  def self.breach(report, bounds, path)
+    value = report.dig(*path)
     problem = bound_problem(bounds) || value_problem(value, bounds)
-    problem ? ["#{path.join('.')}: #{problem}"] : []
+    return [] unless problem
+
+    where = report.dig(*path[0..-2], 'where') || []
+    places = where.map { |place| "  missed: #{place}" }
+    ["#{path.join('.')}: #{problem}", *places]
   end
 
   # Why a bound naming only one side cannot be applied.

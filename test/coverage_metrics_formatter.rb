@@ -18,18 +18,44 @@ class CoverageMetricsFormatter
 
   private
 
-  # The line and branch totals of one group's files.
+  # The line and branch totals of one group's files, each with
+  # where it was missed, so a run missing a line only now and
+  # then names it in the run that missed it.
   def group_totals(files)
+    branches = missed_branches_of(files)
     {
-      lines: {
-        total: files.lines_of_code,
-        missed: files.missed_lines
-      },
-      branches: {
-        total: files.total_branches,
-        missed: files.missed_branches
-      }
+      lines: metric(files.lines_of_code, missed_lines_of(files)),
+      branches: metric(files.total_branches, branches)
     }
+  end
+
+  # One metric's total, its missed count, and where each was
+  # missed.
+  def metric(total, where)
+    { total:, missed: where.size, where: }
+  end
+
+  # Each line missed in files, eg "lib/path_coverage/x.rb:17".
+  def missed_lines_of(files)
+    files.flat_map do |file|
+      file.missed_lines.map do |line|
+        "#{name_of(file)}:#{line.line_number}"
+      end
+    end
+  end
+
+  # Each branch missed in files, eg "lib/path_coverage/x.rb:54 then".
+  def missed_branches_of(files)
+    files.flat_map do |file|
+      file.missed_branches.map do |branch|
+        "#{name_of(file)}:#{branch.start_line} #{branch.type}"
+      end
+    end
+  end
+
+  # file's path relative to the project root.
+  def name_of(file)
+    file.project_filename.delete_prefix('/')
   end
 
   # Where the metrics land, beside SimpleCov's own report.
