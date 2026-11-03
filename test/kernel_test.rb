@@ -1467,4 +1467,146 @@ class KernelTest < Id58TestBase
       PathCoverage.start(on_exit:) { root '/app' }
     end
   end
+
+  test '6rTS51', %w(
+  | Example: a run with ignore '||=' of @m ||= a && b
+  | Its JSON report names ||= as ignored.
+  | A render from it, ignoring ||= too, prints the gaps the
+  | run printed: those of the && alone.
+  ) do
+    dir = Dir.mktmpdir('6rTS51')
+    File.write("#{dir}/memo.rb", <<~RUBY)
+      module Memo6rTS51
+        def self.m(a, b) = (@m ||= a && b)
+      end
+    RUBY
+    report = nil
+    on_exit = ->(&block) { report = block }
+    settings = proc do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+      ignore '||='
+    end
+    PathCoverage.start(on_exit:, &settings)
+    require "#{dir}/memo.rb"
+    Memo6rTS51.m(true, true)
+    live, = capture_io { report.call }
+    json = JSON.parse(File.read("#{dir}/path_coverage.json"))
+    assert_equal ['||='], json['ignored']
+    config = PathCoverage::Configuration.new(&settings)
+    later, = capture_io { PathCoverage::Render.from_json(config) }
+    never = 'memo.rb:2:29 path never taken: `a`'
+    expected = "#{never} true, `b` false\n#{never} false\n"
+    assert_equal [expected, expected], [live, later]
+  end
+
+  test '6rTS52', %w(
+  | Example: u.name&.size with treat 'name', as: :present,
+  | called with a u whose name is nil
+  | The treatment was wrong: name was nil.
+  | The exit report says so, naming the path it ruled out,
+  | rather than dropping that path unseen.
+  ) do
+    dir = Dir.mktmpdir('6rTS52')
+    File.write("#{dir}/size.rb", <<~RUBY)
+      module Size6rTS52
+        def self.of(u) = u.name&.size
+      end
+    RUBY
+    report = nil
+    on_exit = ->(&block) { report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+      treat 'name', as: :present
+    end
+    require "#{dir}/size.rb"
+    named = Struct.new(:name)
+    sizes = [named.new('kim'), named.new(nil)].map do |u|
+      Size6rTS52.of(u)
+    end
+    assert_equal [3, nil], sizes
+    expected = 'size.rb:2:19 path taken that a treatment rules ' \
+               "out: `u.name` nil\n"
+    assert_output(expected) { report.call }
+  end
+
+  test '6rTS53', %w(
+  | Example: u.name&.size with treat 'name', as: :present, a
+  | name nil in each of two runs
+  | Each JSON report holds the path the treatment ruled out.
+  | A render from both says so, rather than dropping it.
+  ) do
+    dir = Dir.mktmpdir('6rTS53')
+    File.write("#{dir}/size.rb", <<~RUBY)
+      module Size6rTS53
+        def self.of(u) = u.name&.size
+      end
+    RUBY
+    settings = proc do |out|
+      proc do
+        root dir
+        cover '*.rb'
+        coverage_dir out
+        treat 'name', as: :present
+      end
+    end
+    outs = %w(first second).map { |run| "#{dir}/#{run}" }
+    reports = outs.map do |out|
+      report = nil
+      on_exit = ->(&block) { report = block }
+      PathCoverage.start(on_exit:, &settings.call(out))
+      report
+    end
+    require "#{dir}/size.rb"
+    nameless = Struct.new(:name).new(nil)
+    reports.each do |report|
+      Size6rTS53.of(nameless)
+      capture_io { report.call }
+    end
+    jsons = outs.map { |out| "#{out}/path_coverage.json" }
+    outside = JSON.parse(File.read(jsons[0]))['outside']
+    ruled_out = outside.transform_values do |all|
+      all.map { _1['path'] }
+    end
+    assert_equal({ 'size.rb:2:19' => [['nil']] }, ruled_out)
+    config = PathCoverage::Configuration.new(&settings.call(dir))
+    later, = capture_io { PathCoverage::Render.from_json(config, jsons) }
+    line = 'size.rb:2:19 path taken that a treatment rules out: ' \
+           "`u.name` nil\n"
+    assert_includes later, line
+  end
+
+  test '6rTS54', %w(
+  | Example: ids.select { |i| i.odd? }.any? && c with treat
+  | 'any?', as: :nonempty, called on each of its paths
+  | any? true with select keeping nothing can never happen.
+  | So no such path is listed as never taken.
+  | Every possible path was taken, so nothing is printed.
+  ) do
+    dir = Dir.mktmpdir('6rTS54')
+    File.write("#{dir}/odds.rb", <<~RUBY)
+      module Odds6rTS54
+        def self.k(ids, c) = ids.select { |i| i.odd? }.any? && c
+      end
+    RUBY
+    report = nil
+    on_exit = ->(&block) { report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+      treat 'any?', as: :nonempty
+    end
+    require "#{dir}/odds.rb"
+    calls = [
+      [[], true], [[1], true], [[1], false], [[2], true],
+      [[1, 3], true], [[1, 3], false], [[2, 4], true],
+      [[1, 2], true], [[1, 2], false]
+    ]
+    calls.each { |ids, c| Odds6rTS54.k(ids, c) }
+    assert_output('') { report.call }
+  end
 end

@@ -1,12 +1,17 @@
+require_relative 'configuration_paths'
+
 module PathCoverage
   # Raised for a start block that cannot be applied.
   class ConfigurationError < StandardError; end
 
   # The settings given in a PathCoverage.start block.
   class Configuration
+    include ConfigurationPaths
+
     GLOB_FLAGS = File::FNM_PATHNAME | File::FNM_EXTGLOB
     SETTINGS = %w[
-      collector cover coverage_dir group measure report root skip
+      collector cover coverage_dir group ignore measure report root
+      skip treat
     ].freeze
     REPORTERS = %w[gaps html post summary].freeze
     MEASURES = %w[decisions methods].freeze
@@ -18,6 +23,8 @@ module PathCoverage
       @groups = {}
       @reporters = [:gaps]
       @measures = [:decisions]
+      @ignored = []
+      @treats = []
       instance_eval(&)
     end
 

@@ -1,6 +1,6 @@
 require 'cgi/escape'
 require_relative 'condition'
-require_relative 'html_tree_nests'
+require_relative 'kinds'
 
 module PathCoverage
   # The tree of a span's sites on a file's page, from SiteTree.of
@@ -13,9 +13,6 @@ module PathCoverage
       PRESENCE[0] => [0x25CF].pack('U'),
       PRESENCE[1] => [0x2205].pack('U')
     }.freeze
-    # The choices whose arms are named by their kind, eg then,
-    # else or when, as their text is statements.
-    NAMED_ARMS = [*STATEMENT_CHOICES, 'case'].freeze
 
     # A tick marks a path taking an arm.
     TAKEN = { true => [0x2713].pack('U'), false => '' }.freeze
@@ -71,10 +68,10 @@ module PathCoverage
     # branches as those sites, then the leaf, in the order they
     # run.
     def self.operand_rows(condition, indent)
-      safe = condition[:operator] == SAFE
-      return HtmlTreeNests.chain_rows(condition, indent) if safe
+      own = Kinds.of(condition[:operator]).rows(condition, indent)
+      return own if own
 
-      operands = HtmlTreeNests.unfolded(condition[:operands])
+      operands = unfolded(condition[:operands])
       last = operands.size - 1
       operands.each_with_index.flat_map do |operand, i|
         tip = i == last
@@ -111,17 +108,20 @@ module PathCoverage
       body ? [row, *operand_rows(body, under)] : [row]
     end
 
-    # The name of an arm of a condition whose operator is choice:
-    # then or else for an if, ? or : and its text for a ternary,
-    # and the operator and its right side for a write, eg
-    # ||= key.upcase.
+    # The name of an arm of a condition whose operator is choice,
+    # as its kind names it, eg then for an if's.
     def self.arm_label(arm, choice)
-      return arm[:arm].to_s if NAMED_ARMS.include?(choice)
-      return "#{choice} #{arm[:text]}" if WRITES.include?(choice)
+      Kinds.of(choice).arm_label(arm, choice)
+    end
 
-      mark = arm[:arm] == :then ? '?' : ':'
-      body = arm[:body]
-      "#{mark} #{body ? body[:operator] : arm[:text]}"
+    # operands with each node standing for the nodes its kind
+    # unfolds it into, eg a leaf with sites inside it for those
+    # sites, then the leaf; a leaf or an arm for itself.
+    def self.unfolded(operands)
+      operands.flat_map do |operand|
+        operator = operand[:operator]
+        operator ? Kinds.of(operator).unfold(operand) : [operand]
+      end
     end
 
     # A nested condition's row: its branch, its operator, and

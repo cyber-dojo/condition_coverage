@@ -1,5 +1,5 @@
 require_relative 'condition'
-require_relative 'site_tree_values'
+require_relative 'kinds'
 
 module PathCoverage
   # The tree shown under a site's line on its file's page: a
@@ -22,15 +22,12 @@ module PathCoverage
       tree.merge(counts: columns.map { |taken| taken[:count] })
     end
 
-    # The tree of condition, each leaf taking the next index of
-    # leaves, so leaves pair with path entries left to right.
+    # The tree of condition, as its kind builds it, each leaf
+    # taking the next index of leaves, so leaves pair with path
+    # entries left to right.
     def self.node(source, condition, outcomes, leaves)
-      if condition.operator == 'case'
-        return case_arms(source, condition.operands, outcomes, leaves)
-      end
-
-      operands = operands_of(source, condition, outcomes, leaves)
-      arms(source, condition, operands, outcomes, leaves)
+      kind = Kinds.of(condition.operator)
+      kind.node(source, condition, outcomes, leaves)
     end
 
     # condition's operands' nodes, leaves and nested conditions
@@ -43,51 +40,7 @@ module PathCoverage
         else leaf(source, operand, outcomes, leaves.next)
         end
       end
-      texted(source, condition, nodes)
-    end
-
-    # nodes, the nodes of condition's operands, with any texts that
-    # repeat others cut: a &. chain's leaves after the first, and a
-    # leaf with sites inside it.
-    def self.texted(source, condition, nodes)
-      case condition.operator
-      when CONTAINS then outside(source, condition, nodes)
-      when SAFE then segments(source, condition.operands, nodes)
-      else nodes
-      end
-    end
-
-    # Stands in for a site inside a leaf's text, eg ….any?.
-    ELLIPSIS = [0x2026].pack('U').freeze
-
-    # A leaf with sites inside it, its own node texted with only
-    # what it adds to them, each site's text an ellipsis, eg
-    # ….any? for ids.select { |id| id.odd? }.any?, as those sites
-    # have rows of their own.
-    def self.outside(source, condition, nodes)
-      *inner, range = condition.operands
-      extents = inner.map(&:extent).sort_by(&:begin).reverse
-      text = extents.reduce(source.byteslice(range)) do |rest, extent|
-        elide(rest, extent.begin - range.begin, extent.size)
-      end
-      [*nodes[0...-1], nodes.last.merge(text:)]
-    end
-
-    # text with the size bytes from byte from an ellipsis.
-    def self.elide(text, from, size)
-      after = text.byteslice((from + size)..)
-      text.byteslice(0, from) + ELLIPSIS + after
-    end
-
-    # A &. chain's leaves, each after the first texted with only
-    # what it adds to the one before, eg &.account after user.
-    def self.segments(source, ranges, nodes)
-      nodes.each_with_index.map do |node, index|
-        next node if index.zero?
-
-        added = ranges[index - 1].end...ranges[index].end
-        node.merge(text: source.byteslice(added))
-      end
+      Kinds.of(condition.operator).texted(source, condition, nodes)
     end
 
     # condition's node from its operands' nodes, its ternary
@@ -101,37 +54,14 @@ module PathCoverage
         decided = [predicate[:cells], THEN_ON[condition.operator]]
         arm(source, operand, decided, outcomes, leaves)
       end
-      cells = SiteTreeValues.value(condition.operator, operands)
+      operator = condition.operator
+      cells = Kinds.of(operator).value(operator, operands)
       { operator: condition.operator, cells:, operands: }
-    end
-
-    # A case's node from its arms, built in order so its whens'
-    # patterns pair with path entries left to right: a when is
-    # taken on each path one of its patterns matched, and the
-    # else on each none did. A case's value is that of no
-    # choice, so is nil.
-    def self.case_arms(source, arms, outcomes, leaves)
-      matched = []
-      operands = arms.map do |arm|
-        body =
-          arm.body ? node(source, arm.body, outcomes, leaves) : nil
-        matched << body[:cells].map { |cell| cell == true } if body
-        cells = body ? matched.last : unmatched(matched, outcomes)
-        { arm: arm.kind, text: text_of(source, arm), cells:, body: }
-      end
-      { operator: 'case', cells: Array.new(outcomes.size), operands: }
     end
 
     # An arm's text, nil for one with no statements.
     def self.text_of(source, arm)
       arm.extent ? source.byteslice(arm.extent) : nil
-    end
-
-    # Whether each column matched none of its whens' patterns.
-    def self.unmatched(matched, outcomes)
-      outcomes.each_index.map do |column|
-        matched.none? { |taken| taken[column] }
-      end
     end
 
     # One arm of a ternary, an if or an unless: its text, nil

@@ -69,4 +69,29 @@ class MergeTest < Id58TestBase
     actual = PathCoverage::Merge.paths([first, second])
     assert_equal expected, actual
   end
+
+  test 'Mg8q21', %w(
+  | the site paths of runs that list a site's paths differently,
+  | eg one with select's impossible paths cut, do not merge, as
+  | adding counts by position would credit one path's count to
+  | another
+  ) do
+    first = {
+      'source/kata.rb:4:9' => [
+        { path: ['0 items'], count: 1 },
+        { path: ['1 item'], count: 0 },
+        { path: ['2+ items'], count: 3 }
+      ]
+    }
+    second = {
+      'source/kata.rb:4:9' => [
+        { path: ['0 items'], count: 2 },
+        { path: ['2+ items'], count: 0 }
+      ]
+    }
+    error = assert_raises(ArgumentError) do
+      PathCoverage::Merge.paths([first, second])
+    end
+    assert_equal 'runs differ at source/kata.rb:4:9', error.message
+  end
 end

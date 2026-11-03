@@ -78,4 +78,25 @@ class ResultTest < Id58TestBase
     result = PathCoverage::Result.new(sites, {}, site_paths)
     assert_equal expected, result.paths
   end
+
+  test 'DYTY50', %w(
+  | Example: u.name&.size with name treated as present, run
+  | once with name nil
+  | That path is not one of the site's possible paths.
+  | So outside lists it, with how many evaluations took it.
+  | A site whose every path taken is possible is not listed.
+  ) do
+    fixed = { 11...17 => :present }
+    sites = {
+      'k.rb:1:11' => condition('&.', 11...17, fixed:),
+      'k.rb:2:11' => condition('&.', 31...37)
+    }
+    site_paths = {
+      'k.rb:1:11' => { ['not nil'] => 3, ['nil'] => 1 },
+      'k.rb:2:11' => { ['nil'] => 2 }
+    }
+    result = PathCoverage::Result.new(sites, {}, site_paths)
+    expected = { 'k.rb:1:11' => { ['nil'] => 1 } }
+    assert_equal expected, result.outside
+  end
 end

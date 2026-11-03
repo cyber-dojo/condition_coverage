@@ -36,7 +36,8 @@ module PathCoverage
     # decision, and, when paths are given, as they are when
     # methods are measured, within each method too;
     # then their Total row. With groups configured, each group,
-    # and the files in none, get a tab of their own too.
+    # and the files in none, get a tab of their own too. Any
+    # operators config ignored are named after them.
     def self.index(files, config, paths, site_paths)
       methods = files.map do |full_path, parsed|
         path = config.relative(full_path)
@@ -46,7 +47,8 @@ module PathCoverage
       rows = Summary.files(site_paths, all, paths)
       groups = config.groups
       tabs = groups.empty? ? [] : Summary.groups(rows, groups)
-      HtmlIndex.page(rows, Summary.total(rows), tabs)
+      ignored = config.ignored
+      HtmlIndex.page(rows, Summary.total(rows), tabs, ignored:)
     end
 
     # simplecov:disable

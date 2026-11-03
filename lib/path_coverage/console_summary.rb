@@ -49,6 +49,14 @@ module PathCoverage
       end
     end
 
+    # The line naming the operators ignored, eg "Path coverage
+    # ignores: &&="; none when none are.
+    def self.ignored_lines(ignored)
+      return [] if ignored.empty?
+
+      ["Path coverage ignores: #{ignored.join(', ')}"]
+    end
+
     # A line per total, eg "Path coverage within methods: 1 / 4
     # (25.00%)".
     def self.totals_lines(totals)

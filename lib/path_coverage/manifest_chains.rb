@@ -44,11 +44,23 @@ module PathCoverage
       calls = chain_calls(node)
       visit_chain(calls)
       safe = calls.select(&:safe_navigation?).reverse
-      receivers = safe.map { |call| extent_of(call.receiver) }
+      receivers = safe.map { |call| receiver_of(call) }
       extent = extent_of(node)
       @notes[:commands] << extent if Manifest.command?(node)
       operands = value ? [*receivers, extent] : receivers
       Condition.new(operator: SAFE, operands:, extent:)
+    end
+
+    # The byte range of a &. call's receiver, noted among its
+    # site's fixed leaves as :present, never nil, when it is a
+    # call to a method treated as present.
+    def receiver_of(call)
+      receiver = call.receiver
+      range = extent_of(receiver)
+      named = receiver.type == :call_node &&
+              @present.include?(receiver.name.to_s)
+      @notes[:fixed][range] = :present if named
+      range
     end
 
     # Visits the sites inside a chain's calls' arguments and

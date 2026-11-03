@@ -12,11 +12,15 @@ module PathCoverage
     end
 
     # One site paths hash, as Result#paths gives them, each
-    # path's count the sum of every run's; runs of the same
-    # source list the same paths in the same order.
+    # path's count the sum of every run's. Runs that list a
+    # site's paths differently raise, as adding their counts by
+    # position would credit one path's count to another.
     def self.paths(runs)
       runs.reduce do |total, run|
-        total.merge(run) do |_site, mine, theirs|
+        total.merge(run) do |site, mine, theirs|
+          same = mine.map { _1[:path] } == theirs.map { _1[:path] }
+          raise ArgumentError, "runs differ at #{site}" unless same
+
           mine.zip(theirs).map do |a, b|
             { path: a[:path], count: a[:count] + b[:count] }
           end

@@ -41,11 +41,11 @@ module PathCoverage
     end
 
     # range as a leaf, or, with inner sites found in it, a Condition
-    # named contains: those sites, then range, the leaf's outcome.
-    # A leaf that is wholly one block method's call whose value
-    # follows from its path is that call alone, needing no outcome
-    # of its own.
-    def contained(inner, range)
+    # named contains: those sites, then range, the leaf's outcome,
+    # fixed as :nonempty when nonempty. A leaf that is wholly one
+    # block method's call whose value follows from its path is
+    # that call alone, needing no outcome of its own.
+    def contained(inner, range, nonempty: false)
       return range if inner.empty?
 
       only = inner.first
@@ -54,8 +54,23 @@ module PathCoverage
         return only
       end
 
+      fixed = nonempty ? { range => :nonempty } : {}
       Condition.new(operator: CONTAINS, operands: [*inner, range],
-                    extent: range)
+                    extent: range, fixed:)
+    end
+
+    # True for a call, with no arguments or block, to a method
+    # treated as nonempty, eg any?, whose receiver, parenthesised
+    # or not, is one of inner, the sites found in it: its outcome
+    # then follows from that site's path. It relies on its
+    # includer's grouped.
+    def nonempty_call?(node, inner)
+      return false unless node.type == :call_node
+      return false if node.arguments || node.block || !node.receiver
+
+      receiver = extent_of(grouped(node.receiver))
+      @nonempty.include?(node.name.to_s) &&
+        inner.any? { |site| site.extent == receiver }
     end
 
     # A block's body is a new scope: it runs once per item.

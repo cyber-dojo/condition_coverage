@@ -216,9 +216,12 @@ class RecorderTest < Id58TestBase
     recorder = PathCoverage::Recorder.new
     site = 'k.rb:2:6'
     any = lambda do |ids, ok|
-      trail = recorder.enter_items(site)
-      found = ids.any? { |id| recorder.item(site, ok.include?(id)) }
-      recorder.leave_items(trail, found)
+      trail = recorder.enter(site, 2)
+      begun = recorder.begin_items(site, 0)
+      found = ids.any? do |id|
+        recorder.item_at(site, 0, ok.include?(id))
+      end
+      recorder.leave(trail, recorder.end_items(site, 0, begun, found))
     end
     founds = [[[], []], [[:a], [:a]], [%i[a b], []]].map do |ids, ok|
       any.call(ids, ok)
@@ -246,10 +249,11 @@ class RecorderTest < Id58TestBase
   ) do
     recorder = PathCoverage::Recorder.new
     site = 'k.rb:2:6'
-    trail = recorder.enter_items(site)
-    answer = Fiber.new { recorder.item(site, :ok) }.resume
+    trail = recorder.enter(site, 2)
+    begun = recorder.begin_items(site, 0)
+    answer = Fiber.new { recorder.item_at(site, 0, :ok) }.resume
     assert_same :ok, answer
-    recorder.leave_items(trail, false)
+    recorder.leave(trail, recorder.end_items(site, 0, begun, false))
     expected = { site => { ['0 items', nil] => 1 } }
     assert_equal expected, recorder.site_paths
     assert_equal({ truthy: 1, falsy: 0 }, recorder.counts[[site, 1]])
@@ -267,9 +271,10 @@ class RecorderTest < Id58TestBase
     recorder = PathCoverage::Recorder.new
     site = 'k.rb:2:6'
     select = lambda do |ids|
-      trail = recorder.enter_items(site)
-      kept = ids.select { |id| recorder.answer(site, id.odd?) }
-      recorder.leave_items(trail, kept)
+      trail = recorder.enter(site, 2)
+      begun = recorder.begin_items(site, 0)
+      kept = ids.select { |id| recorder.answer_at(site, 0, id.odd?) }
+      recorder.leave(trail, recorder.end_items(site, 0, begun, kept))
     end
     kept = [[], [1], [1, 3], [1, 2]].map { |ids| select.call(ids) }
     assert_equal [[], [1], [1, 3], [1]], kept
@@ -292,10 +297,11 @@ class RecorderTest < Id58TestBase
   ) do
     recorder = PathCoverage::Recorder.new
     site = 'k.rb:2:6'
-    trail = recorder.enter_items(site)
-    answer = Fiber.new { recorder.answer(site, nil) }.resume
+    trail = recorder.enter(site, 2)
+    begun = recorder.begin_items(site, 0)
+    answer = Fiber.new { recorder.answer_at(site, 0, nil) }.resume
     assert_nil answer
-    recorder.leave_items(trail, [])
+    recorder.leave(trail, recorder.end_items(site, 0, begun, []))
     expected = { site => { ['0 items', nil] => 1 } }
     assert_equal expected, recorder.site_paths
     assert_equal({ truthy: 0, falsy: 1 }, recorder.counts[[site, 1]])

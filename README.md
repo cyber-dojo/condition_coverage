@@ -39,6 +39,9 @@ PathCoverage.start do
                                # also :summary and :post
   group 'code', 'source/**/*.rb' # each group a tab of its own on index.html
   group 'test', 'test/**/*.rb'
+  ignore '&&='                 # operators whose sites are not measured
+  treat 'name', as: :present   # a call to name is never nil
+  treat 'any?', as: :nonempty  # any? is true when its receiver has items
 end
 ```
 
@@ -173,13 +176,18 @@ As the process exits:
   of all possible under `totals`, as [taken, possible]: `decisions`,
   `methods` when `:methods` is measured, and, with groups, each group's
   own under `groups`, eg `"groups": {"code": {"decisions": [481, 567]}}`.
+  It also names the kinds of site measured under `kinds`, any `ignored`
+  operators and `treats`, and any paths taken that a treatment rules
+  out under `outside`.
   It is the base the other reporters read, so they can also be run
   later, in another process, from
   it alone: `PathCoverage::Render.from_json(config)`, where `config` is a
   `PathCoverage::Configuration` built from the same settings block.
   Given several runs' reports, `Render.from_json(config, paths)` adds
   their counts together first, so the report shows only the gaps that
-  every run left.
+  every run left. A report whose kinds, `ignored` or `treats` differ
+  from `config`'s is refused, as its sites list their paths
+  differently.
 - `:gaps` prints one line per path never taken, in manifest order: a
   site's naming the outcome of each leaf on it, a method's the outcome
   of each decision on it, by line:
@@ -413,6 +421,29 @@ rewrite happens in memory; no file on disk changes.
 At exit the manifests parsed during the run are reused; only covered files
 the run never loaded are read and parsed then.
 
+## Ignoring and treating
+
+`ignore '&&=', '||='` measures no site of those operators. A site inside
+one, eg on its right side, still is. `&&` is not `and`: each is ignored
+by name. The summary and `index.html` list what is ignored.
+
+`treat` says what you know about a method, so paths that cannot happen
+are not listed as gaps. Add `in: 'source/models/**'` to limit it to
+some files.
+
+- `treat 'name', as: :present`: a call to `name` is never nil, so
+  `user.name&.size` has no path with `user.name` nil.
+- `treat 'any?', as: :nonempty`: `x.any?` is true exactly when `x` has
+  items. When `x` is a `select`, `reject`, `filter`, `filter_map`,
+  `partition` or `take_while`, its path says whether it kept items, so
+  eg `ids.select { |i| i.odd? }.any?` true with 0 items is no path.
+
+A run that breaks a treatment is reported, not dropped:
+
+```text
+source/user.rb:4:9 path taken that a treatment rules out: `user.name` nil
+```
+
 ## Roadmap
 
 - decisions hidden inside calls, each with its own outcome classes:
@@ -423,13 +454,10 @@ the run never loaded are read and parsed then.
   - `x rescue y` modifier: raised vs not raised
   - `case` with no subject, and `case`/`in` patterns
   - regex matches: nil vs MatchData
-- a method that never returns nil or false, declared once at its
-  definition, eg `# path_coverage: returns an Array` above
-  `def self.methods_of`, so each call to it counts as a leaf that is only
-  truthy, as `Foo.new` is. A run where it returns nil or false reports
-  the declaration as wrong, and the report lists the methods so declared.
-  Later, a method's non-nil return type could come from the project's RBS
-  signatures (`sig/*.rbs`) instead.
+- `treat 'methods_of', as: :truthy`, so each call to it counts as a
+  leaf that is only truthy, as `Foo.new` is, and a run where it returns
+  nil or false is reported. Later, treatments could come from the
+  project's RBS signatures (`sig/*.rbs`) too.
 - exceptions the code itself names: a `begin` or `def` with `rescue`
   clauses as a site, like a `case`, whose paths are no raise and each
   clause that rescued, eg `rescue IOError` never taken. Branch coverage

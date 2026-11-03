@@ -16,8 +16,8 @@ class ConfigurationTest < Id58TestBase
     expected = [
       'unknown setting covr in PathCoverage.start',
       'the settings are: ' \
-      'collector, cover, coverage_dir, group, measure, report, ' \
-      'root, skip'
+      'collector, cover, coverage_dir, group, ignore, measure, ' \
+      'report, root, skip, treat'
     ].join("\n")
     assert_equal expected, error.message
   end
@@ -163,6 +163,88 @@ class ConfigurationTest < Id58TestBase
     expected = [
       'unknown measure method in PathCoverage.start',
       'the measures are: decisions, methods'
+    ].join("\n")
+    assert_equal expected, error.message
+  end
+
+  test 'A9MJ80', %w(
+  | Example: ignore '&&=', '||='
+  | ignored names each operator whose sites are not measured.
+  | With no ignore setting none are.
+  ) do
+    config = PathCoverage::Configuration.new do
+      root '/app'
+      ignore '&&=', '||='
+    end
+    assert_equal ['&&=', '||='], config.ignored
+    plain = PathCoverage::Configuration.new { root '/app' }
+    assert_equal [], plain.ignored
+  end
+
+  test 'A9MJ81', %w(
+  | an unknown operator to ignore is refused, naming it and
+  | listing the operators there are, as ignoring nothing would
+  | leave its sites measured unnoticed
+  ) do
+    error = assert_raises(PathCoverage::ConfigurationError) do
+      PathCoverage::Configuration.new do
+        root '/app'
+        ignore '=&&'
+      end
+    end
+    known = PathCoverage::Kinds::BY_OPERATOR.keys.join(', ')
+    expected = [
+      'unknown operator =&& in PathCoverage.start',
+      "the operators are: #{known}"
+    ].join("\n")
+    assert_equal expected, error.message
+  end
+
+  test 'A9MJ82', %w(
+  | Example: treat 'name', as: :present, in: 'source/models/**'
+  | treated names each method treated as never nil in a
+  | covered file its glob matches, and none in any other.
+  | With no in: every covered file matches.
+  ) do
+    config = PathCoverage::Configuration.new do
+      root '/app'
+      treat 'name', as: :present, in: 'source/models/**'
+      treat 'owner', as: :present
+    end
+    models = config.treated('present', 'source/models/user.rb')
+    others = config.treated('present', 'source/app/routes.rb')
+    assert_equal [%w(name owner), %w(owner)], [models, others]
+  end
+
+  test 'A9MJ84', %w(
+  | Example: treat 'any?', as: :nonempty, and treat 'name', as:
+  | :present
+  | Each treatment names only the methods treated as it.
+  ) do
+    config = PathCoverage::Configuration.new do
+      root '/app'
+      treat 'any?', as: :nonempty
+      treat 'name', as: :present
+    end
+    path = 'source/kata.rb'
+    actual = %w(nonempty present).map { config.treated(_1, path) }
+    assert_equal [%w(any?), %w(name)], actual
+  end
+
+  test 'A9MJ83', %w(
+  | a method treated as something other than present is
+  | refused, naming it and listing what a method can be
+  | treated as
+  ) do
+    error = assert_raises(PathCoverage::ConfigurationError) do
+      PathCoverage::Configuration.new do
+        root '/app'
+        treat 'name', as: :presnet
+      end
+    end
+    expected = [
+      'unknown treatment presnet in PathCoverage.start',
+      'the treatments are: present, nonempty'
     ].join("\n")
     assert_equal expected, error.message
   end

@@ -30,6 +30,25 @@ module PathCoverage
       end
     end
 
+    # { site => { path => evaluations } } of each path taken
+    # that is none of its site's possible paths, eg a &. receiver
+    # nil though treated as present; only sites with one. Such a
+    # path shows a treatment to be wrong, so it is reported, never
+    # dropped.
+    def outside
+      all = @sites.to_h do |site, condition|
+        taken = @site_paths.fetch(site, {})
+        [site, taken.except(*SitePaths.possible(condition))]
+      end
+      all.reject { |_, paths| paths.empty? }
+    end
+
+    # The paths taken, as Render.run takes them: site_paths:,
+    # as paths gives them, and outside:.
+    def taken
+      { site_paths: paths, outside: }
+    end
+
     # { site => [counts of operand 0, counts of operand 1, ...] },
     # with zero counts for an operand that never ran, and
     # only: naming the one outcome a fixed leaf can have.

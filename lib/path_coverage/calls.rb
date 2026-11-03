@@ -77,32 +77,6 @@ module PathCoverage
     @recorder.end_items(site, at, trail, value)
   end
 
-  # The call rewritten code makes before a block method's call
-  # at site runs; returns the evaluation's trail.
-  def self.enter_items(site)
-    @recorder.enter_items(site)
-  end
-
-  # The call rewritten code makes around a block method's
-  # block's expression at site; returns value unchanged.
-  def self.item(site, value)
-    @recorder.item(site, value)
-  end
-
-  # The call rewritten code makes around the block's expression
-  # of a block method that calls it with every item; returns
-  # value unchanged.
-  def self.answer(site, value)
-    @recorder.answer(site, value)
-  end
-
-  # The call rewritten code makes around a block method's call
-  # as a whole, with the trail enter_items gave it; returns
-  # value unchanged.
-  def self.leave_items(trail, value)
-    @recorder.leave_items(trail, value)
-  end
-
   # The call rewritten code makes around a &. receiver, the
   # index-th leaf of site, its chain's leaves starting at first;
   # returns value unchanged.
@@ -115,21 +89,6 @@ module PathCoverage
   # returns value unchanged.
   def self.chained(site, index, first, value)
     @recorder.chained(site, index, first, value)
-  end
-
-  # The call rewritten code makes around a ||= or &&= write's
-  # right side, outcome being its target's when it runs;
-  # returns value unchanged.
-  def self.written(site, outcome, value)
-    @recorder.written(site, outcome, value)
-  end
-
-  # The call rewritten code makes around a ||= or &&= write as a
-  # whole, with the trail enter gave it, skipped being its
-  # target's outcome when its right side never ran; returns
-  # value unchanged.
-  def self.leave_write(trail, skipped, value)
-    @recorder.leave_write(trail, skipped, value)
   end
 
   # The call rewritten code makes as a call reaches its

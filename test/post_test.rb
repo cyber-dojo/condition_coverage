@@ -34,7 +34,8 @@ class PostTest < Id58TestBase
           { 'truthy' => 2, 'falsy' => 1 },
           { 'truthy' => 1, 'falsy' => 0, 'only' => 'truthy' }
         ]
-      }
+      },
+      'kinds' => %w(block case chain choice contains safe write)
     }
     assert_equal expected, JSON.parse(received.join(5).value)
   end
@@ -75,6 +76,55 @@ class PostTest < Id58TestBase
     }
     json = JSON.parse(received.join(5).value)
     assert_equal expected, json['paths']
+  end
+
+  test 'Pq3s12', %w(
+  | Example: a run with ignore '&&=' and report :post
+  | The POSTed report names &&= as ignored, so a collector's
+  | render refuses to merge it with a run measuring &&= writes.
+  ) do
+    server = TCPServer.new('127.0.0.1', 0)
+    port = server.addr[1]
+    received = Thread.new { request_body(server.accept) }
+    dir = Dir.mktmpdir('Pq3s12')
+    config = PathCoverage::Configuration.new do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+      collector "http://127.0.0.1:#{port}/runs"
+      report :post
+      ignore '&&='
+    end
+    operands = { 'source/kata.rb:3:23' => [{ truthy: 1, falsy: 0 }] }
+    assert_output('', '') do
+      PathCoverage::Render.run(operands, {}, config)
+    end
+    json = JSON.parse(received.join(5).value)
+    assert_equal ['&&='], json['ignored']
+  end
+
+  test 'Pq3s13', %w(
+  | Example: report :gaps, :post
+  | The gaps are printed and the report is POSTed too, as each
+  | reporter chosen runs.
+  ) do
+    server = TCPServer.new('127.0.0.1', 0)
+    port = server.addr[1]
+    received = Thread.new { request_body(server.accept) }
+    dir = Dir.mktmpdir('Pq3s13')
+    config = PathCoverage::Configuration.new do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+      collector "http://127.0.0.1:#{port}/runs"
+      report :gaps, :post
+    end
+    operands = { 'source/kata.rb:3:23' => [{ truthy: 0, falsy: 0 }] }
+    assert_output("source/kata.rb:3:23 never reached\n", '') do
+      PathCoverage::Render.run(operands, {}, config)
+    end
+    sites = JSON.parse(received.join(5).value)['sites']
+    assert_equal ['source/kata.rb:3:23'], sites.keys
   end
 
   test 'Pq3s20', %w(

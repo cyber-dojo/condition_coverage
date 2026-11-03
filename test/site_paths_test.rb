@@ -1,4 +1,5 @@
 require_relative 'test_helper'
+require 'path_coverage/manifest'
 require 'path_coverage/site_paths'
 
 class SitePathsTest < Id58TestBase
@@ -144,5 +145,120 @@ class SitePathsTest < Id58TestBase
       ['2+ items', 'both']
     ]
     assert_equal expected, PathCoverage::SitePaths.possible(site)
+  end
+
+  test 'Sp3x92', %w(
+  | Example: u.name&.size with name treated as present
+  | name is never nil, so the &. never skips size.
+  | The one possible path is name not nil.
+  | Without the treatment, name nil is possible too.
+  ) do
+    source = "def k(u) = u.name&.size\n"
+    manifest = PathCoverage::Manifest
+    treated = manifest.sites(source, 'k.rb', [], ['name']).values
+    plain = manifest.sites(source, 'k.rb').values
+    actual = (treated + plain).map do |site|
+      PathCoverage::SitePaths.possible(site)
+    end
+    assert_equal [[['not nil']], [['not nil'], ['nil']]], actual
+  end
+
+  test 'Sp3x93', %w(
+  | Example: ids.select { |i| i.odd? }.any? && c with any?
+  | treated as nonempty
+  | any? is true exactly when select kept an item: with 1+
+  | items, and an answer true.
+  | So the paths with any? contradicting select are not
+  | possible, eg 0 items with any? true.
+  ) do
+    source = "def k(ids, c) = ids.select { |i| i.odd? }.any? && c\n"
+    sites = PathCoverage::Manifest.sites(source, 'k.rb', [], [],
+                                         ['any?'])
+    expected = [
+      ['0 items', nil, false, nil],
+      ['1 item', 'all true', true, true],
+      ['1 item', 'all true', true, false],
+      ['1 item', 'all false', false, nil],
+      ['2+ items', 'all true', true, true],
+      ['2+ items', 'all true', true, false],
+      ['2+ items', 'all false', false, nil],
+      ['2+ items', 'both', true, true],
+      ['2+ items', 'both', true, false]
+    ]
+    actual = PathCoverage::SitePaths.possible(sites.values.first)
+    assert_equal expected, actual
+  end
+
+  test 'Sp3x94', %w(
+  | Example: (cached || fetched).any? && c with any? treated as
+  | nonempty
+  | An || cannot tell whether its value has items.
+  | So any? stays true or false on each of its paths.
+  ) do
+    source = 'def k(cached, fetched, c) = ' \
+             "(cached || fetched).any? && c\n"
+    sites = PathCoverage::Manifest.sites(source, 'k.rb', [], [],
+                                         ['any?'])
+    treated = PathCoverage::SitePaths.possible(sites.values.first)
+    plain = PathCoverage::Manifest.sites(source, 'k.rb').values.first
+    assert_equal PathCoverage::SitePaths.possible(plain), treated
+    assert_equal 9, treated.size
+  end
+
+  test 'Sp3x95', %w(
+  | Example: ids.reject { |i| i.odd? }.any?, and each other
+  | block method whose result can have items, over real ids
+  | Whether its result has items, as items? says from the
+  | path the call took, is what Ruby's any? says, or nil when
+  | the path cannot tell.
+  | It is never wrong.
+  ) do
+    idss = [[], [1], [2], [1, 3], [2, 4], [1, 2], [2, 1]]
+    all = [false, true, false, true, false, true, true]
+    told = {
+      'select' => all, 'filter' => all, 'filter_map' => all,
+      'reject' => [false, false, true, false, true, true, true],
+      'partition' => [true] * 7,
+      'take_while' => [false, true, false, true, false, nil, false]
+    }
+    actual = told.keys.to_h do |name|
+      said = idss.map { |ids| told_and_real(name, ids) }
+      wrong = said.reject { |says, real| says.nil? || says == real }
+      [name, [said.map(&:first), wrong]]
+    end
+    expected = told.transform_values { |says| [says, []] }
+    assert_equal expected, actual
+  end
+
+  private
+
+  # [whether items? says the result of ids.name { |i| i.odd? }
+  # has items, from the path the call took, Ruby's any? of it].
+  def told_and_real(name, ids)
+    answers = []
+    result = ids.public_send(name) do |i|
+      i.odd?.tap { |answer| answers << answer }
+    end
+    site = condition(name, 0...3, 10...16)
+    outcomes = {
+      0...3 => items(answers), 10...16 => answer(name, answers)
+    }
+    [PathCoverage::Kinds::Block.items?(site, outcomes), result.any?]
+  end
+
+  # The receiver's leaf outcome of a block method whose block
+  # gave answers.
+  def items(answers)
+    PathCoverage::ITEMS[[answers.size, 2].min]
+  end
+
+  # The block's leaf outcome: its last answer for a method that
+  # stops early, else its answers over every item.
+  def answer(name, answers)
+    return nil if answers.empty?
+    return answers.last if PathCoverage::STOP_EARLY.include?(name)
+    return PathCoverage::ANSWERS[2] if answers.uniq.size == 2
+
+    PathCoverage::ANSWERS[answers.first ? 0 : 1]
   end
 end

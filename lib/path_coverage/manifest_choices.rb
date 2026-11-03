@@ -118,9 +118,9 @@ module PathCoverage
     end
 
     # True for a condition that folds into a ternary's site:
-    # an &&, ||, and, or, or a ternary.
+    # an &&, ||, and, or, or a ternary, none of them ignored.
     def foldable?(node)
-      operator?(node) || ternary?(node)
+      (operator?(node) || ternary?(node)) && !ignored?(node)
     end
 
     # True for a ternary, an if with no if keyword.
@@ -133,6 +133,7 @@ module PathCoverage
     # last leaf, anything else a leaf.
     def predicate_of(node)
       predicate = grouped(node.predicate)
+      return leaf(predicate) if ignored?(predicate)
       return condition_of(predicate) if operator?(predicate)
       if safe_chain?(predicate)
         return chain_condition(predicate, value: true)

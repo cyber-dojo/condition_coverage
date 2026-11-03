@@ -1,7 +1,6 @@
 require_relative 'condition'
-require_relative 'rewriter_chains'
+require_relative 'kinds'
 require_relative 'rewriter_nested'
-require_relative 'rewriter_writes'
 
 module PathCoverage
   # Instruments source text so that each leaf operand records its
@@ -23,51 +22,11 @@ module PathCoverage
       apply(source.dup, inserts + path_inserts(methods))
     end
 
-    # The inserts for one site, by its kind: a case's patterns'
-    # stand-ins, a block method's call and block, or any other
-    # site's leaves' records and its leave.
+    # The inserts for one site, as its kind gives them, eg its
+    # leaves' records and its leave; a block method's call or a
+    # write is noted as if nested at leaf 0.
     def self.site_inserts(site, condition)
-      kind = condition.operator
-      return case_inserts(site, condition) if kind == 'case'
-      if WRITES.include?(kind)
-        return RewriterWrites.inserts(site, condition)
-      end
-      return RewriterChains.inserts(site, condition) if kind == SAFE
-
-      blocks = BLOCK_PATHS.key?(kind)
-      return block_inserts(site, condition) if blocks
-
-      record_inserts(site, condition) + trail_inserts(site, condition)
-    end
-
-    # The inserts that wrap a block method's call whole in a
-    # leave_items call that enters it first, inside any leave of
-    # a site it is the predicate of, and its block's expression,
-    # outside any site's leave there, in an item call, noting its
-    # last answer, or for a method that calls it with every item
-    # an answer call, noting every answer.
-    def self.block_inserts(site, condition)
-      _receiver, body = condition.leaves
-      enter = "PathCoverage.enter_items(#{site.inspect})"
-      call = "PathCoverage.leave_items(#{enter}, "
-      every = EVERY_ITEM.include?(condition.operator)
-      noter = every ? 'answer' : 'item'
-      item = "PathCoverage.#{noter}(#{site.inspect}, "
-      command = condition.commands.include?(body)
-      wrap(call, condition.extent, false, 0.5) +
-        wrap(item, body, command, 1.5)
-    end
-
-    # The inserts that wrap each pattern of a case site in a
-    # when_match call, its stand-in, which enters and leaves the
-    # site itself, as the case tries its patterns one by one.
-    def self.case_inserts(site, condition)
-      size = condition.leaves.size
-      condition.leaves.each_with_index.flat_map do |range, index|
-        call = "PathCoverage.when_match(#{site.inspect}, " \
-               "#{index}, #{size}, "
-        wrap(call, range, false, 0)
-      end
+      Kinds.of(condition.operator).site_inserts(site, condition)
     end
 
     # The inserts that wrap each of site's leaves in a record
@@ -82,7 +41,7 @@ module PathCoverage
         call = nested.fetch(range) { record_call(site, i) }
         next [] unless call
 
-        wrap(call, range, condition.commands.include?(range), 0)
+        wrap(call, range, condition.commands.include?(range), :leaf)
       end
       records + RewriterNested.inserts(site, condition)
     end
@@ -98,22 +57,10 @@ module PathCoverage
       enter = "PathCoverage.enter(#{site.inspect}, " \
               "#{condition.leaves.size})"
       call = "PathCoverage.leave(#{enter}, "
-      wrapped = trailed(condition)
+      wrapped = Kinds.of(condition.operator).trailed(condition)
       nested = wrapped.is_a?(Condition)
       word = nested && WORD_OPERATORS.include?(wrapped.operator)
-      wrap(call, nested ? wrapped.extent : wrapped, word, 1)
-    end
-
-    # What a site's leave call wraps: an if's or an unless's
-    # predicate, a leaf's byte range or a nested Condition, as
-    # its path is decided there and its arms are statements that
-    # may return or raise; any other site as a whole.
-    def self.trailed(condition)
-      unless STATEMENT_CHOICES.include?(condition.operator)
-        return condition
-      end
-
-      condition.operands.first
+      wrap(call, nested ? wrapped.extent : wrapped, word, :site)
     end
 
     # The opening of the record call around operand index of
@@ -129,14 +76,21 @@ module PathCoverage
     def self.path_inserts(methods)
       methods.flat_map do |site, method|
         decisions = method.decisions
-        start = path_start(site, decisions.size)
         decides = decisions.each_with_index.flat_map do |decision, i|
           call = "PathCoverage.decide(#{PATH_NAME}, #{i}, "
           tail = decision.exits.nil? ? '' : ", #{decision.exits}"
-          wrap(call, decision.range, decision.command, 2, tail)
+          command = decision.command
+          wrap(call, decision.range, command, :decision, tail)
         end
-        [[method.entry, start, [Float::INFINITY, 3]]] + decides
+        [start_insert(site, method)] + decides
       end
+    end
+
+    # The insert at method's entry that starts a call's path,
+    # outermost of all there.
+    def self.start_insert(site, method)
+      start = path_start(site, method.decisions.size)
+      [method.entry, start, [Float::INFINITY, LAYERS.index(:path)]]
     end
 
     # The statement that starts a call's path through the
@@ -146,16 +100,23 @@ module PathCoverage
       "#{PATH_NAME} = #{call}; "
     end
 
+    # The layers of inserts, innermost first, that break a tie
+    # between inserts wrapping the same range: a leaf's call, a
+    # nested kind's call around its whole, eg end_items, a site's
+    # leave, a method's decide, and a method's path start.
+    LAYERS = %i[leaf kind site decision path].freeze
+
     # The two inserts that wrap the code at range in call, with
     # tail as the call's further arguments. Their order, [size,
     # rank], nests them among inserts at the same offset: the
-    # longer range outside, rank breaking a tie. A command call
-    # is parenthesised, as it is no bare argument; nothing else
-    # is, since parentheses make a statement, which gives its
-    # line a line-coverage count of its own.
-    def self.wrap(call, range, command, rank, tail = '')
+    # longer range outside, the rank of layer in LAYERS breaking
+    # a tie. A command call is parenthesised, as it is no bare
+    # argument; nothing else is, since parentheses make a
+    # statement, which gives its line a line-coverage count of
+    # its own.
+    def self.wrap(call, range, command, layer, tail = '')
       open, close = command ? ['(', ")#{tail})"] : ['', "#{tail})"]
-      order = [range.size, rank]
+      order = [range.size, LAYERS.index(layer)]
       [
         [range.begin, call + open, order],
         [range.end, close, order, :close]

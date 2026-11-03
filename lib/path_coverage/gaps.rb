@@ -4,17 +4,36 @@ module PathCoverage
   # count stays in the operands and paths for reporters that
   # show them all.
   module Gaps
-    # The gap lines of operands and paths, as Result gives
-    # them, in manifest order; texts is { site => each leaf's
-    # source text }.
-    def self.lines(operands, paths: {}, texts: {})
+    # The gap lines of operands, paths and outside, as Result
+    # gives them, in manifest order; texts is { site => each
+    # leaf's source text }.
+    def self.lines(operands, paths: {}, texts: {}, outside: {})
       operands.flat_map do |site, counts|
         if counts.all? { |each| never_ran?(each) }
           next ["#{site} never reached"]
         end
 
-        path_gaps(site, paths.fetch(site, []), texts[site])
+        path_gaps(site, paths.fetch(site, []), texts[site]) +
+          ruled_out(site, outside.fetch(site, {}), texts[site])
       end
+    end
+
+    # One line per path site took that a treatment rules out,
+    # as Result#outside gives them, texts being each leaf's
+    # source text.
+    def self.ruled_out(site, taken, texts)
+      taken.keys.map do |path|
+        "#{site} path taken that a treatment rules out: " \
+          "#{steps(path, texts)}"
+      end
+    end
+
+    # The outcome of each leaf path reaches, each named by its
+    # text, eg "`u.name` nil".
+    def self.steps(path, texts)
+      path.zip(texts).filter_map do |outcome, text|
+        "#{code(text)} #{outcome}" unless outcome.nil?
+      end.join(', ')
     end
 
     # One line per path site never took, as Result#paths gives
@@ -22,10 +41,7 @@ module PathCoverage
     # texts being each leaf's source text.
     def self.path_gaps(site, paths, texts)
       paths.select { |each| each[:count].zero? }.map do |each|
-        steps = each[:path].zip(texts).filter_map do |outcome, text|
-          "#{code(text)} #{outcome}" unless outcome.nil?
-        end
-        "#{site} path never taken: #{steps.join(', ')}"
+        "#{site} path never taken: #{steps(each[:path], texts)}"
       end
     end
 

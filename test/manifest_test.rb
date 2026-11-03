@@ -750,4 +750,18 @@ class ManifestTest < Id58TestBase
     RUBY
     assert_equal({}, PathCoverage::Manifest.sites(source, 'k.rb'))
   end
+
+  test '6asyb6', %w(
+  | Example: @clock ||= Clock.new(a && b) with ||= ignored
+  | The write is no site.
+  | The && on its right side still is.
+  ) do
+    source = <<~RUBY
+      def k(a, b)
+        @clock ||= Clock.new(a && b)
+      end
+    RUBY
+    sites = PathCoverage::Manifest.sites(source, 'k.rb', ['||='])
+    assert_equal ['&&'], sites.values.map(&:operator)
+  end
 end

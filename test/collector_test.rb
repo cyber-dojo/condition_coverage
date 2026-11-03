@@ -272,9 +272,13 @@ class CollectorTest < Id58TestBase
     reply
   end
 
-  # The parsed JSON report of one operand of one site.
+  # The parsed JSON report of one operand of one site, from a
+  # run measuring every kind.
   def report(truthy, falsy)
     counts = { 'truthy' => truthy, 'falsy' => falsy }
-    { 'sites' => { 'source/kata.rb:3:23' => [counts] } }
+    {
+      'sites' => { 'source/kata.rb:3:23' => [counts] },
+      'kinds' => %w(block case chain choice contains safe write)
+    }
   end
 end

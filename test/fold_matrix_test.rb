@@ -87,6 +87,57 @@ class FoldMatrixTest < Id58TestBase
     assert_equal expected, actual
   end
 
+  test 'Fm7k02', %w(
+  | Example: a && b as the operand of (X) && c, with && ignored,
+  | and every other kind of site in every other position, with
+  | that kind ignored
+  | No site measures the ignored operator, at its top or
+  | nested in it.
+  | The rewritten code returns what the uninstrumented code does.
+  | Every path recorded is one of the site's possible paths.
+  ) do
+    dir = Dir.mktmpdir('Fm7k02')
+    named = Struct.new(:name)
+    users = [nil, named.new('kim')]
+    cases = KINDS.flat_map do |kind, expression|
+      POSITIONS.map do |position, outer|
+        [kind, position, outer.sub('X', expression)]
+      end
+    end
+    inputs = VALUES.product(VALUES, VALUES, IDS, users)
+    actual = cases.each_with_index.map do |(kind, position, body), i|
+      name = "Fm7kIg#{i}"
+      file = "ig#{i}.rb"
+      File.write("#{dir}/#{file}", source(name, body))
+      on_exit = ->(&_report) {} # this test reads the recorder
+      PathCoverage.start(on_exit:) do
+        root dir
+        cover file
+        coverage_dir dir
+        ignore kind
+      end
+      require "#{dir}/#{file}"
+      plain = source("PlainIg#{i}", body)
+      eval(plain, TOPLEVEL_BINDING) # rubocop:disable Security/Eval
+      same = inputs.map { call(name, _1) } ==
+             inputs.map { call("PlainIg#{i}", _1) }
+      sites = PathCoverage::Manifest.sites(source(name, body), file,
+                                           [kind])
+      # a Condition's inspect shows its own and every nested one's
+      shown = sites.values.inspect
+      named = shown.include?("operator=#{kind.inspect}")
+      impossible = sites.flat_map do |site, condition|
+        PathCoverage.recorder.site_paths[site].keys -
+          PathCoverage::SitePaths.possible(condition)
+      end
+      ["#{kind} as #{position}", named, same, impossible]
+    end
+    expected = cases.map do |kind, position, _|
+      ["#{kind} as #{position}", false, true, []]
+    end
+    assert_equal expected, actual
+  end
+
   private
 
   # A module named name, its one method m's body body, on line 3.

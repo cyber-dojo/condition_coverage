@@ -10,8 +10,9 @@ module PathCoverage
     # The whole index page. rows are Summary.files rows and total
     # their Summary.total. groups are [name, rows, total] for
     # each group, each given a tab after All files; with none
-    # there is no tab bar, just the one table.
-    def self.page(rows, total, groups = [])
+    # there is no tab bar, just the one table. Any operators
+    # ignored are named after the tables.
+    def self.page(rows, total, groups = [], ignored: [])
       tables = [['All files', rows, total], *groups]
       names = tables.map(&:first)
       HtmlTemplate.fill(
@@ -19,8 +20,18 @@ module PathCoverage
         'style' => HtmlTemplate.asset('style.css'),
         'script' => script(groups),
         'tabs' => groups.empty? ? '' : HtmlTabs.bar(names),
-        'tables' => tables_of(tables)
+        'tables' => tables_of(tables),
+        'ignored' => ignored_line(ignored)
       )
+    end
+
+    # The paragraph naming the operators ignored, eg
+    # "Ignored: &&="; empty when none are.
+    def self.ignored_line(ignored)
+      return '' if ignored.empty?
+
+      text = CGI.escapeHTML("Ignored: #{ignored.join(', ')}")
+      %(<p class="ignored" data-ignored="">#{text}</p>)
     end
 
     # Each of tables, [name, rows, total], as the table of its

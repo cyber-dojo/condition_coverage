@@ -113,9 +113,7 @@ module PathCoverage
     result = collect(files, config)
     methods = config.measures.include?(:methods)
     paths = methods ? @recorder.paths : nil
-    Render.run(
-      result.operands, files, config, paths, site_paths: result.paths
-    )
+    Render.run(result.operands, files, config, paths, **result.taken)
     return unless config.reporters.include?(:gaps)
 
     methods = path_methods_of(files, config)
@@ -143,13 +141,17 @@ module PathCoverage
   end
 
   # Writes result as the JSON report at config's json_path: its
-  # operands, site paths and totals, and the method paths the
-  # recorder counted, so a render from the JSON alone has them.
+  # operands, site paths, paths a treatment rules out, and
+  # totals, and the method paths the recorder counted, so a
+  # render from the JSON alone has them, and config's
+  # fingerprint.
   def self.write_json(result, files, config)
     report = PathsReport.of(result.paths, files)
     totals = totals(result, files, config)
     JsonWriter.write(result.operands, config.json_path, report,
-                     totals:, method_paths: @recorder.paths)
+                     totals:, method_paths: @recorder.paths,
+                     outside: result.outside,
+                     fingerprint: config.fingerprint)
   end
 
   # The JSON report's totals, each [taken, possible] paths:

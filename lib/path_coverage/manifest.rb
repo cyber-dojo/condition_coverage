@@ -5,6 +5,7 @@ require_relative 'manifest_case'
 require_relative 'manifest_chains'
 require_relative 'manifest_choices'
 require_relative 'manifest_folding'
+require_relative 'manifest_ignoring'
 require_relative 'manifest_writes'
 require_relative 'site'
 
@@ -13,9 +14,15 @@ module PathCoverage
   # outermost &&, ||, and or or, each ternary, if, unless and case
   # with a subject, with the conditions nested in it.
   module Manifest
-    # { site => Condition } for each site in source.
-    def self.sites(source, path)
-      collector = ConditionSites.new(path)
+    # { site => Condition } for each site in source, none of
+    # them named by an operator in ignored; a call to a method
+    # named in present, as a &.'s receiver, is never nil, and a
+    # call to one named in nonempty, eg any?, is true exactly
+    # when its receiver has items.
+    def self.sites(source, path, ignored = [], present = [],
+                   nonempty = [])
+      collector = ConditionSites.new(path, ignored,
+                                     [present, nonempty])
       Prism.parse(source).value.accept(collector)
       collector.sites
     end
@@ -23,7 +30,10 @@ module PathCoverage
     # The source and sites of the covered file at full_path.
     def self.parse(full_path, config)
       source = File.read(full_path)
-      { source:, sites: sites(source, config.relative(full_path)) }
+      path = config.relative(full_path)
+      treated = %w[present nonempty].map { config.treated(_1, path) }
+      ignored = config.ignored
+      { source:, sites: sites(source, path, ignored, *treated) }
     end
 
     # True for a call to a named method with arguments and no
@@ -79,11 +89,18 @@ module PathCoverage
       include ManifestChains
       include ManifestChoices
       include ManifestFolding
+      include ManifestIgnoring
       include ManifestWrites
 
-      # Starts with no sites found.
-      def initialize(path)
+      # Starts with no sites found, to find none named by an
+      # operator in ignored, and to take a call to a method named
+      # in present as never nil, and to one in nonempty as true
+      # exactly when its receiver has items.
+      def initialize(path, ignored, (present, nonempty))
         @path = path
+        @ignored = ignored
+        @present = present
+        @nonempty = nonempty
         @sites = {}
         @notes = nil
         @inner = nil
@@ -141,6 +158,7 @@ module PathCoverage
       # While a leaf is being visited, any site is collected as
       # part of that leaf instead, as it is part of one expression.
       def add_site(node)
+        return visit_child_nodes(node) if ignored?(node)
         return @inner << nested_condition_of(node) if @inner
 
         site = Site.at(@path, site_loc(node))
@@ -177,6 +195,7 @@ module PathCoverage
       def operands_of(node)
         [node.left, node.right].flat_map do |written|
           operand = grouped(written)
+          next [leaf(operand)] if ignored?(operand)
           next operands_of(operand) if operand.type == node.type
           next [condition_of(operand)] if operator?(operand)
           if safe_chain?(operand)
@@ -208,7 +227,8 @@ module PathCoverage
         @notes[:commands] << range if Manifest.command?(operand)
         outcome = Manifest.fixed_outcome(operand)
         @notes[:fixed][range] = outcome if outcome
-        contained(inner, range)
+        nonempty = nonempty_call?(operand, inner)
+        contained(inner, range, nonempty:)
       end
 
       # The one statement inside a parenthesised operand, or the

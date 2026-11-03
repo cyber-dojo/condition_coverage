@@ -154,4 +154,24 @@ class HtmlIndexTest < Id58TestBase
     counts = paths.map { |path| html.elements.to_a(path).size }
     assert_equal [3, 3, 3], counts
   end
+
+  test 'zr0H70', %w(
+  | Example: an index with &&= and ||= ignored
+  | After its tables the page names the operators ignored, so
+  | its totals never pass for ones that measured them.
+  | With none ignored it names none.
+  ) do
+    rows = [
+      { path: 'source/kata.rb', sites: 2, decisions: [3, 6],
+        methods: nil }
+    ]
+    total = { sites: 2, decisions: [3, 6], methods: nil }
+    index = PathCoverage::HtmlIndex
+    page = index.page(rows, total, ignored: ['&&=', '||='])
+    html = REXML::Document.new(page)
+    named = html.elements.to_a('//*[@data-ignored]')
+    assert_equal(['Ignored: &&=, ||='], named.map { text_of(_1) })
+    plain = REXML::Document.new(index.page(rows, total))
+    assert_equal [], plain.elements.to_a('//*[@data-ignored]')
+  end
 end

@@ -209,10 +209,11 @@ class RewriterTest < Id58TestBase
 
   test '6D1Ke6', %w(
   | Example: ids.any? { |id| id.ok? }
-  | The whole call is wrapped in a leave_items call.
-  | Its first argument, an enter_items call, enters the site.
-  | The block's expression (id.ok?) is wrapped in an item call.
-  | So each of the block's answers is noted.
+  | The whole call is wrapped in a leave call that enters it.
+  | Inside that, an end_items call around a begin_items call.
+  | They note the receiver as leaf 0.
+  | The block's expression (id.ok?) is wrapped in an item_at call.
+  | So each of the block's answers is noted, as leaf 1.
   | Nothing else is evaluated, eg ids.size.
   ) do
     source = <<~RUBY
@@ -224,9 +225,11 @@ class RewriterTest < Id58TestBase
     sites = { 'k.rb:2:6' => found }
     expected = [
       'def k(ids)',
-      '  PathCoverage.leave_items(' \
-      'PathCoverage.enter_items("k.rb:2:6"), ' \
-      'ids.any? { |id| PathCoverage.item("k.rb:2:6", id.ok?) })',
+      '  PathCoverage.leave(PathCoverage.enter("k.rb:2:6", 2), ' \
+      'PathCoverage.end_items("k.rb:2:6", 0, ' \
+      'PathCoverage.begin_items("k.rb:2:6", 0), ' \
+      'ids.any? { |id| ' \
+      'PathCoverage.item_at("k.rb:2:6", 0, id.ok?) }))',
       'end',
       ''
     ].join("\n")
@@ -237,8 +240,8 @@ class RewriterTest < Id58TestBase
   test '6D1Ke7', %w(
   | Example: ids.select { |id| id.ok? }
   | select calls its block with every item.
-  | So the block's expression is wrapped in an answer call.
-  | An answer call notes every answer, not only the last.
+  | So the block's expression is wrapped in an answer_at call.
+  | An answer_at call notes every answer, not only the last.
   ) do
     source = <<~RUBY
       def k(ids)
@@ -249,9 +252,11 @@ class RewriterTest < Id58TestBase
     sites = { 'k.rb:2:6' => kept }
     expected = [
       'def k(ids)',
-      '  PathCoverage.leave_items(' \
-      'PathCoverage.enter_items("k.rb:2:6"), ' \
-      'ids.select { |id| PathCoverage.answer("k.rb:2:6", id.ok?) })',
+      '  PathCoverage.leave(PathCoverage.enter("k.rb:2:6", 2), ' \
+      'PathCoverage.end_items("k.rb:2:6", 0, ' \
+      'PathCoverage.begin_items("k.rb:2:6", 0), ' \
+      'ids.select { |id| ' \
+      'PathCoverage.answer_at("k.rb:2:6", 0, id.ok?) }))',
       'end',
       ''
     ].join("\n")
