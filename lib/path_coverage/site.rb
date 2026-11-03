@@ -4,7 +4,12 @@ module PathCoverage
   module Site
     # "path:line:column" of node, eg "k.rb:2:2".
     def self.of(path, node)
-      loc = node.location
+      at(path, node.location)
+    end
+
+    # "path:line:column" of where loc starts, eg an if's keyword,
+    # which a modifier if's statement comes before.
+    def self.at(path, loc)
       "#{path}:#{loc.start_line}:#{loc.start_column}"
     end
   end

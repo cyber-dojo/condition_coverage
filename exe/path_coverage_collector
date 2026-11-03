@@ -9,7 +9,13 @@ if ARGV.first == '-h'
 
     Listens on PORT and saves each JSON report the :post reporter
     sends as DIR/run-0001.json, DIR/run-0002.json, and so on,
-    creating DIR if need be. Runs until stopped.
+    creating DIR if need be. A 200 means the report is saved.
+
+    GET /alive answers 200 while it runs.
+    GET /ready answers 200 when DIR is writable, 503 when not.
+
+    Runs until sent TERM. It then stops accepting connections,
+    finishes the report in hand, and exits 0.
 
     Options:
       -h    Show this help
@@ -23,4 +29,9 @@ end
 port, dir = ARGV
 FileUtils.mkdir_p(dir)
 server = TCPServer.new('0.0.0.0', Integer(port))
+# Closing the server on TERM makes serve return once the
+# report in hand, if any, is saved and answered. The close
+# runs in a thread of its own, as the trap runs on the thread
+# that may be waiting in accept, where a close deadlocks.
+Signal.trap('TERM') { Thread.new { server.close } }
 PathCoverage::Collector.serve(server, dir)

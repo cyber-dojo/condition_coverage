@@ -1,12 +1,14 @@
 require 'prism'
 require_relative 'condition'
+require_relative 'manifest_blocks'
+require_relative 'manifest_case'
 require_relative 'manifest_choices'
 require_relative 'site'
 
 module PathCoverage
   # Finds every condition site in source without running it: each
-  # outermost &&, ||, and or or, each ternary and each if, with the
-  # conditions nested in it.
+  # outermost &&, ||, and or or, each ternary, if, unless and case
+  # with a subject, with the conditions nested in it.
   module Manifest
     # { site => Condition } for each site in source.
     def self.sites(source, path)
@@ -69,6 +71,8 @@ module PathCoverage
 
     # Collects each site and its Condition.
     class ConditionSites < Prism::Visitor
+      include ManifestBlocks
+      include ManifestCase
       include ManifestChoices
 
       # Starts with no sites found.
@@ -94,19 +98,40 @@ module PathCoverage
         add_site(node)
       end
 
-      # Notes a ternary or an if site, its arms included; a
-      # modifier if is no site itself.
+      # Notes a ternary or an if site, a modifier if included,
+      # its arms included.
       def visit_if_node(node)
-        return super if modifier?(node)
+        add_site(node)
+      end
+
+      # Notes an unless site, a modifier unless included, its
+      # arms included.
+      def visit_unless_node(node)
+        add_site(node)
+      end
+
+      # Notes a case site, when its paths can be seen; any other
+      # case is no site, though a condition inside it may be.
+      def visit_case_node(node)
+        return super unless case_site?(node)
 
         add_site(node)
       end
 
-      # Notes node as a site. It claims its place first, so a
-      # site found inside one of its leaves follows it, keeping
-      # the sites in source order.
+      # Notes a block method's call as a site, when its block's
+      # every call can be seen; any other call is no site, though
+      # a condition inside it may be.
+      def visit_call_node(node)
+        return super unless block_site?(node)
+
+        add_site(node)
+      end
+
+      # Notes node as a site, named where it starts: an if or an
+      # unless at its keyword. It claims its place first, so a
+      # site found inside one of its leaves or arms follows it.
       def add_site(node)
-        site = Site.of(@path, node)
+        site = Site.at(@path, site_loc(node))
         @sites[site] = nil
         outer = @notes
         @notes = { commands: [], fixed: {} }
@@ -116,10 +141,13 @@ module PathCoverage
       end
 
       # node as a Condition, operands and all, named by its
-      # operator as written; a ternary is named ?: and an if is
-      # named if, their operands being a predicate and arms.
+      # operator as written; a ternary is named ?:, an if if and
+      # an unless unless, their operands a predicate and arms; a
+      # case case, its operands its arms.
       def condition_of(node)
-        return choice_of(node) if node.type == :if_node
+        return choice_of(node) if CHOICE_TYPES.include?(node.type)
+        return case_condition(node) if node.type == :case_node
+        return block_condition(node) if node.type == :call_node
 
         Condition.new(
           operator: node.operator, operands: operands_of(node),

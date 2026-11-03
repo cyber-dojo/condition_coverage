@@ -2,20 +2,37 @@ require_relative 'condition'
 
 module PathCoverage
   # The part of the manifest's visitor that builds the sites
-  # whose predicate picks an arm: a ternary, named ?:, and an
-  # if, named if. It relies on its includer's condition_of,
-  # extent_of, grouped, leaf and operator?.
+  # whose predicate picks an arm: a ternary, named ?:, an if,
+  # named if, and an unless, named unless. It relies on its
+  # includer's condition_of, extent_of, grouped, leaf and
+  # operator?.
   module ManifestChoices
-    # True for a modifier if, eg `return if done?`, whose
-    # statement comes before its if keyword.
-    def modifier?(node)
-      return false if ternary?(node) || node.statements.nil?
+    # The node types whose predicate picks an arm, a ternary
+    # being an if_node with no if keyword.
+    CHOICE_TYPES = %i[if_node unless_node].freeze
 
-      node.statements.location.start_offset <
-        node.if_keyword_loc.start_offset
+    # Where node's site starts: an if's or an unless's keyword,
+    # which a modifier's statement comes before; anything
+    # else's own start.
+    def site_loc(node)
+      return node.message_loc if node.type == :call_node
+      return node.location unless CHOICE_TYPES.include?(node.type)
+      return node.location if ternary?(node)
+
+      keyword_loc(node)
     end
 
-    # A ternary or an if as a Condition.
+    # The location of an if's or an unless's keyword.
+    def keyword_loc(node)
+      unless?(node) ? node.keyword_loc : node.if_keyword_loc
+    end
+
+    # True for an unless.
+    def unless?(node)
+      node.type == :unless_node
+    end
+
+    # A ternary, an if or an unless as a Condition.
     def choice_of(node)
       ternary?(node) ? ternary_condition(node) : if_condition(node)
     end
@@ -28,24 +45,26 @@ module PathCoverage
       )
     end
 
-    # An if as a Condition, its extent its if keyword to the end
-    # of its predicate, as its arms are statements, not part of
-    # the expression.
+    # An if or an unless as a Condition, named by its keyword,
+    # its extent its keyword to the end of its predicate, as its
+    # arms are statements, not part of the expression.
     def if_condition(node)
-      start = node.if_keyword_loc.start_offset
+      start = keyword_loc(node).start_offset
       Condition.new(
-        operator: 'if', operands: if_of(node),
+        operator: unless?(node) ? 'unless' : 'if',
+        operands: if_of(node),
         extent: start...node.predicate.location.end_offset
       )
     end
 
-    # An if's predicate, then its then arm and, when it has
-    # one, its else arm.
+    # An if's or an unless's predicate, then its then arm and,
+    # when it has one, its else arm.
     def if_of(node)
+      rest = unless?(node) ? node.else_clause : node.subsequent
       [
         predicate_of(node),
         statement_arm(:then, node.statements),
-        *else_arm(node.subsequent)
+        *else_arm(rest)
       ]
     end
 

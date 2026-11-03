@@ -1,9 +1,60 @@
 module PathCoverage
   # The operators whose predicate picks an arm.
-  CHOICES = %w[?: if].freeze
+  CHOICES = %w[?: if unless].freeze
 
-  # One arm of a ternary or an if: kind is :then or :else,
-  # extent its byte range, nil for an if's arm with no
+  # The choices whose arms are statements, so whose path is
+  # decided by their predicate alone.
+  STATEMENT_CHOICES = %w[if unless].freeze
+
+  # The predicate outcome on which each choice takes its then
+  # arm: an unless's is false.
+  THEN_ON = Hash.new(true).merge('unless' => false).freeze
+
+  # The methods that call their block an item at a time until
+  # it decides, its last answer deciding the result.
+  STOP_EARLY = %w[
+    any? all? none? find detect find_index take_while
+  ].freeze
+
+  # How many items a block method's block was called with, as
+  # its receiver's leaf outcome: none, one, or two or more.
+  ITEMS = ['0 items', '1 item', '2+ items'].freeze
+
+  # Every path a stop-early block method's call can take: how
+  # many items its block was called with, and its last answer,
+  # nil when it was never called.
+  STOP_EARLY_PATHS = [
+    [ITEMS[0], nil],
+    [ITEMS[1], true], [ITEMS[1], false],
+    [ITEMS[2], true], [ITEMS[2], false]
+  ].freeze
+
+  # The methods that call their block with every item.
+  EVERY_ITEM = %w[
+    select filter reject partition count filter_map
+  ].freeze
+
+  # A block's answers over every item it was called with.
+  ANSWERS = ['all true', 'all false', 'both'].freeze
+
+  # Every path an every-item block method's call can take: how
+  # many items its block was called with, and its answers,
+  # which can be both only with two or more items.
+  EVERY_ITEM_PATHS = [
+    [ITEMS[0], nil],
+    [ITEMS[1], ANSWERS[0]], [ITEMS[1], ANSWERS[1]],
+    [ITEMS[2], ANSWERS[0]], [ITEMS[2], ANSWERS[1]],
+    [ITEMS[2], ANSWERS[2]]
+  ].freeze
+
+  # Every block method whose call is a site, by its paths.
+  BLOCK_PATHS = [
+    *STOP_EARLY.map { |name| [name, STOP_EARLY_PATHS] },
+    *EVERY_ITEM.map { |name| [name, EVERY_ITEM_PATHS] }
+  ].to_h.freeze
+
+  # One arm of a ternary, an if or an unless: kind is :then or
+  # :else, extent its byte range, nil for an arm with no
   # statements, and body the Condition it is, when it is one,
   # else nil for a plain value or statements, which decide
   # nothing.

@@ -103,9 +103,11 @@ class RewriterTest < Id58TestBase
   end
 
   test '6D1Ke1', %w(
-  | an if site's leave call wraps its predicate alone, as its
-  | path is decided there, so an arm that returns or raises
-  | still leaves the site with its path counted
+  | Example: if order.big? return 5 end
+  | The leave call wraps the predicate (order.big?) only.
+  | The if's path is decided once the predicate is known.
+  | So the return 5 cannot skip the leave call.
+  | The path is still counted.
   ) do
     source = <<~RUBY
       def fee(order)
@@ -134,10 +136,133 @@ class RewriterTest < Id58TestBase
     assert_equal expected, rewriter.rewrite(source, sites)
   end
 
+  test '6D1Ke4', %w(
+  | Example: unless order.big? return 5 end
+  | The leave call wraps the predicate (order.big?) only.
+  | That is the same as for an if.
+  ) do
+    source = <<~RUBY
+      def fee(order)
+        unless order.big?
+          return 5
+        end
+        7
+      end
+    RUBY
+    choice = condition(
+      'unless', 24...34, arm(:then, 39...47), extent: 17...34
+    )
+    sites = { 'k.rb:2:2' => choice }
+    expected = [
+      'def fee(order)',
+      '  unless PathCoverage.leave(' \
+      'PathCoverage.enter("k.rb:2:2", 1), ' \
+      'PathCoverage.record("k.rb:2:2", 0, order.big?))',
+      '    return 5',
+      '  end',
+      '  7',
+      'end',
+      ''
+    ].join("\n")
+    rewriter = PathCoverage::Rewriter
+    assert_equal expected, rewriter.rewrite(source, sites)
+  end
+
+  test '6D1Ke5', %w(
+  | Example: case x when 1, 2 ... else ... end
+  | Each pattern (1 and 2) is wrapped in a when_match call.
+  | The when_match call is a stand-in for its pattern.
+  | The stand-ins enter and leave the site themselves.
+  | So nothing wraps the case, or its subject x.
+  ) do
+    source = <<~RUBY
+      def kind(x)
+        case x
+        when 1, 2
+          :small
+        else
+          :other
+        end
+      end
+    RUBY
+    small = condition('when', 28...29, 31...32, extent: 28...32)
+    choice = condition(
+      'case', arm(:when, 37...43, small), arm(:else, 55...61),
+      extent: 14...20
+    )
+    sites = { 'k.rb:2:2' => choice }
+    expected = [
+      'def kind(x)',
+      '  case x',
+      '  when PathCoverage.when_match("k.rb:2:2", 0, 2, 1), ' \
+      'PathCoverage.when_match("k.rb:2:2", 1, 2, 2)',
+      '    :small',
+      '  else',
+      '    :other',
+      '  end',
+      'end',
+      ''
+    ].join("\n")
+    rewriter = PathCoverage::Rewriter
+    assert_equal expected, rewriter.rewrite(source, sites)
+  end
+
+  test '6D1Ke6', %w(
+  | Example: ids.any? { |id| id.ok? }
+  | The whole call is wrapped in a leave_items call.
+  | Its first argument, an enter_items call, enters the site.
+  | The block's expression (id.ok?) is wrapped in an item call.
+  | So each of the block's answers is noted.
+  | Nothing else is evaluated, eg ids.size.
+  ) do
+    source = <<~RUBY
+      def k(ids)
+        ids.any? { |id| id.ok? }
+      end
+    RUBY
+    found = condition('any?', 13...16, 29...35, extent: 13...37)
+    sites = { 'k.rb:2:6' => found }
+    expected = [
+      'def k(ids)',
+      '  PathCoverage.leave_items(' \
+      'PathCoverage.enter_items("k.rb:2:6"), ' \
+      'ids.any? { |id| PathCoverage.item("k.rb:2:6", id.ok?) })',
+      'end',
+      ''
+    ].join("\n")
+    rewriter = PathCoverage::Rewriter
+    assert_equal expected, rewriter.rewrite(source, sites)
+  end
+
+  test '6D1Ke7', %w(
+  | Example: ids.select { |id| id.ok? }
+  | select calls its block with every item.
+  | So the block's expression is wrapped in an answer call.
+  | An answer call notes every answer, not only the last.
+  ) do
+    source = <<~RUBY
+      def k(ids)
+        ids.select { |id| id.ok? }
+      end
+    RUBY
+    kept = condition('select', 13...16, 31...37, extent: 13...39)
+    sites = { 'k.rb:2:6' => kept }
+    expected = [
+      'def k(ids)',
+      '  PathCoverage.leave_items(' \
+      'PathCoverage.enter_items("k.rb:2:6"), ' \
+      'ids.select { |id| PathCoverage.answer("k.rb:2:6", id.ok?) })',
+      'end',
+      ''
+    ].join("\n")
+    rewriter = PathCoverage::Rewriter
+    assert_equal expected, rewriter.rewrite(source, sites)
+  end
+
   test '6D1Ke2', %w(
-  | an if site whose predicate is an and or an or holds it
-  | in parentheses inside the leave call, as it is no bare
-  | argument
+  | Example: if a and b
+  | The predicate (a and b) cannot be a bare argument.
+  | So it is put in parentheses inside the leave call.
   ) do
     source = <<~RUBY
       def k(a, b)
@@ -167,9 +292,12 @@ class RewriterTest < Id58TestBase
   end
 
   test '6D1Ke3', %w(
-  | calls that close at the same offset close innermost
-  | first, so a decide call's further argument stays its own
-  | when its decision is an if site's predicate
+  | Example: if rates.empty? return end
+  | The predicate is wrapped in a record, a leave, and a
+  | decide call.
+  | All three close at the same offset, after rates.empty?
+  | They close innermost first.
+  | So the decide call's last argument (true) stays its own.
   ) do
     source = <<~RUBY
       def fee(rates)

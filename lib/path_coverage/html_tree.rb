@@ -1,10 +1,19 @@
 require 'cgi/escape'
+require_relative 'condition'
 
 module PathCoverage
   # The tree of a span's sites on a file's page, from SiteTree.of
   # for each site: a grid whose columns are a site's paths.
   module HtmlTree
-    OUTCOMES = { true => 'T', false => 'F', nil => '' }.freeze
+    OUTCOMES = {
+      true => 'T', false => 'F', nil => '',
+      ITEMS[0] => '0', ITEMS[1] => '1', ITEMS[2] => '*',
+      ANSWERS[0] => 'T', ANSWERS[1] => 'F', ANSWERS[2] => 'TF'
+    }.freeze
+    # The choices whose arms are named by their kind, eg then,
+    # else or when, as their text is statements.
+    NAMED_ARMS = [*STATEMENT_CHOICES, 'case'].freeze
+
     # A bullet marks a path taking an arm.
     TAKEN = { true => [0x2022].pack('U'), false => '' }.freeze
 
@@ -92,7 +101,7 @@ module PathCoverage
 
     # The name of an arm of a condition whose operator is choice.
     def self.arm_label(arm, choice)
-      return arm[:arm].to_s if choice == 'if'
+      return arm[:arm].to_s if NAMED_ARMS.include?(choice)
 
       mark = arm[:arm] == :then ? '?' : ':'
       body = arm[:body]

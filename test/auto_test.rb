@@ -72,6 +72,9 @@ class AutoTest < Id58TestBase
   # The body of the one HTTP request on client, after
   # answering it 200, read as the collector reads it.
   def request_body(client)
-    PathCoverage::Collector.request_body(client)
+    body = nil
+    collector = PathCoverage::Collector
+    collector.receive(client, Dir.tmpdir) { |sent| body = sent }
+    body
   end
 end

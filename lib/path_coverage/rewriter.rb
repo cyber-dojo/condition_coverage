@@ -1,3 +1,5 @@
+require_relative 'condition'
+
 module PathCoverage
   # Instruments source text so that each leaf operand records its
   # outcome when the code runs. It inserts text at the byte
@@ -13,10 +15,52 @@ module PathCoverage
     # line numbers still match the file on disk.
     def self.rewrite(source, sites, methods = {})
       inserts = sites.flat_map do |site, condition|
-        record_inserts(site, condition) +
-          trail_inserts(site, condition)
+        site_inserts(site, condition)
       end
       apply(source.dup, inserts + path_inserts(methods))
+    end
+
+    # The inserts for one site, by its kind: a case's patterns'
+    # stand-ins, a block method's call and block, or any other
+    # site's leaves' records and its leave.
+    def self.site_inserts(site, condition)
+      kind = condition.operator
+      return case_inserts(site, condition) if kind == 'case'
+
+      blocks = BLOCK_PATHS.key?(kind)
+      return block_inserts(site, condition) if blocks
+
+      record_inserts(site, condition) + trail_inserts(site, condition)
+    end
+
+    # The inserts that wrap a block method's call whole in a
+    # leave_items call that enters it first, inside any leave of
+    # a site it is the predicate of, and its block's expression,
+    # outside any site's leave there, in an item call, noting its
+    # last answer, or for a method that calls it with every item
+    # an answer call, noting every answer.
+    def self.block_inserts(site, condition)
+      _receiver, body = condition.leaves
+      enter = "PathCoverage.enter_items(#{site.inspect})"
+      call = "PathCoverage.leave_items(#{enter}, "
+      every = EVERY_ITEM.include?(condition.operator)
+      noter = every ? 'answer' : 'item'
+      item = "PathCoverage.#{noter}(#{site.inspect}, "
+      command = condition.commands.include?(body)
+      wrap(call, condition.extent, false, 0.5) +
+        wrap(item, body, command, 1.5)
+    end
+
+    # The inserts that wrap each pattern of a case site in a
+    # when_match call, its stand-in, which enters and leaves the
+    # site itself, as the case tries its patterns one by one.
+    def self.case_inserts(site, condition)
+      size = condition.leaves.size
+      condition.leaves.each_with_index.flat_map do |range, index|
+        call = "PathCoverage.when_match(#{site.inspect}, " \
+               "#{index}, #{size}, "
+        wrap(call, range, false, 0)
+      end
     end
 
     # The inserts that wrap each of site's leaves in a record
@@ -45,12 +89,14 @@ module PathCoverage
       wrap(call, nested ? wrapped.extent : wrapped, word, 1)
     end
 
-    # What a site's leave call wraps: an if's predicate, a leaf's
-    # byte range or a nested Condition, as its path is decided
-    # there and its arms are statements that may return or
-    # raise; any other site as a whole.
+    # What a site's leave call wraps: an if's or an unless's
+    # predicate, a leaf's byte range or a nested Condition, as
+    # its path is decided there and its arms are statements that
+    # may return or raise; any other site as a whole.
     def self.trailed(condition)
-      return condition unless condition.operator == 'if'
+      unless STATEMENT_CHOICES.include?(condition.operator)
+        return condition
+      end
 
       condition.operands.first
     end

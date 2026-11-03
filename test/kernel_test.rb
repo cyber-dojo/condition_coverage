@@ -224,10 +224,11 @@ class KernelTest < Id58TestBase
   end
 
   test '6rTS48', %w(
-  | with report :html the exit report writes the index page
-  | and a page per covered file into coverage_dir, each site
-  | counting the paths it took, and prints no gaps, since
-  | :gaps was not chosen
+  | Example: report :html, and crew? called once
+  | The exit report writes index.html into coverage_dir.
+  | It writes a page per covered file too, eg crew.rb.html.
+  | Each site on the page counts the paths it took.
+  | It prints no gaps, since :gaps was not chosen.
   ) do
     dir = Dir.mktmpdir('6rTS48')
     File.write("#{dir}/crew.rb", <<~RUBY)
@@ -358,10 +359,13 @@ class KernelTest < Id58TestBase
   end
 
   test '6rTS41', %w(
-  | measuring paths too, a covered file's methods with two
-  | or more decisions record each call's path, and the
-  | exit report prints each path never taken: each if's own,
-  | as a site, then its method's
+  | Example: fee with if member ... end and if big ... end
+  | measure :conditions, :paths is chosen.
+  | fee has two decisions, so each call records its path.
+  | fee is called once, with member true and big false.
+  | The exit report prints each path never taken.
+  | First each if's own, as a site, eg `member` false.
+  | Then fee's, eg line 4 true, line 7 true.
   ) do
     dir = Dir.mktmpdir('6rTS41')
     File.write("#{dir}/fee.rb", <<~RUBY)
@@ -394,6 +398,115 @@ class KernelTest < Id58TestBase
       'fee.rb:2:2 fee path never taken: line 4 true, line 7 true',
       'fee.rb:2:2 fee path never taken: line 4 false, line 7 true',
       'fee.rb:2:2 fee path never taken: line 4 false, line 7 false'
+    ].join("\n")
+    assert_output("#{expected}\n") { report.call }
+  end
+
+  test '6rTS4c', %w(
+  | Example: case x when 1, 2 ... when String ... else ... end
+  | kind is called with 2 and with :k.
+  | The covered case still picks :small and :other.
+  | The exit report prints each path its patterns never took.
+  | Eg `1` true, as 1 was never passed.
+  ) do
+    dir = Dir.mktmpdir('6rTS4c')
+    File.write("#{dir}/kind.rb", <<~RUBY)
+      module Kind6rTS4c
+        def self.kind(x)
+          case x
+          when 1, 2 then :small
+          when String then :text
+          else :other
+          end
+        end
+      end
+    RUBY
+    report = nil
+    on_exit = ->(&block) { report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+    end
+    require "#{dir}/kind.rb"
+    actual = [Kind6rTS4c.kind(2), Kind6rTS4c.kind(:k)]
+    assert_equal %i[small other], actual
+    never = 'kind.rb:3:4 path never taken:'
+    expected = [
+      "#{never} `1` true",
+      "#{never} `1` false, `2` false, `String` true"
+    ].join("\n")
+    assert_output("#{expected}\n") { report.call }
+  end
+
+  test '6rTS4d', %w(
+  | Example: if ids.any? { |id| id.start_with?('L') && id.size > 1 }
+  | There are three sites: the if, the any?, and the &&.
+  | led? is called with [], ['Lx'], and ['ab', 'cd'].
+  | It still returns :not, :led, :not.
+  | The exit report prints the paths each site never took.
+  | Eg any? never had `ids` 1 item with its block false.
+  ) do
+    dir = Dir.mktmpdir('6rTS4d')
+    File.write("#{dir}/led.rb", <<~RUBY)
+      module Team6rTS4d
+        def self.led?(ids)
+          if ids.any? { |id| id.start_with?('L') && id.size > 1 }
+            :led
+          else
+            :not
+          end
+        end
+      end
+    RUBY
+    report = nil
+    on_exit = ->(&block) { report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+    end
+    require "#{dir}/led.rb"
+    led = [[], ['Lx'], %w(ab cd)].map { |ids| Team6rTS4d.led?(ids) }
+    assert_equal %i[not led not], led
+    block = "`id.start_with?('L') && id.size > 1`"
+    expected = [
+      "led.rb:3:11 path never taken: `ids` 1 item, #{block} false",
+      "led.rb:3:11 path never taken: `ids` 2+ items, #{block} true",
+      'led.rb:3:23 path never taken: ' \
+      "`id.start_with?('L')` true, `id.size > 1` false"
+    ].join("\n")
+    assert_output("#{expected}\n") { report.call }
+  end
+
+  test '6rTS4e', %w(
+  | Example: ns.select { |n| n.odd? }
+  | odds is called with [], [1], and [1, 2].
+  | The covered select still keeps [], [1], and [1].
+  | The exit report prints the paths never taken.
+  | Eg `ns` 2+ items, `n.odd?` all true.
+  ) do
+    dir = Dir.mktmpdir('6rTS4e')
+    File.write("#{dir}/odds.rb", <<~RUBY)
+      module Odds6rTS4e
+        def self.odds(ns) = ns.select { |n| n.odd? }
+      end
+    RUBY
+    report = nil
+    on_exit = ->(&block) { report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+    end
+    require "#{dir}/odds.rb"
+    odds = [[], [1], [1, 2]].map { |ns| Odds6rTS4e.odds(ns) }
+    assert_equal [[], [1], [1]], odds
+    never = 'odds.rb:2:25 path never taken: `ns`'
+    expected = [
+      "#{never} 1 item, `n.odd?` all false",
+      "#{never} 2+ items, `n.odd?` all true",
+      "#{never} 2+ items, `n.odd?` all false"
     ].join("\n")
     assert_output("#{expected}\n") { report.call }
   end

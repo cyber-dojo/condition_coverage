@@ -6,10 +6,12 @@ coverage.
 Gem: https://rubygems.org/gems/path_coverage (which shows the latest
 version).
 
-Status: sites cover `&&`, `||`, `and`, `or`, the ternary `?:`, and
-`if`/`elsif`/`else`: each leaf operand of a condition, however its
-operators are chained, nested or grouped. Method paths cover `if`
-decisions. Decisions hidden inside calls come next (see Roadmap).
+Status: sites cover `&&`, `||`, `and`, `or`, the ternary `?:`,
+`if`/`elsif`/`else` and `unless` (modifiers included), `case`/`when`
+with a subject, and the block methods `any?` `all?` `none?` `find`
+`detect` `find_index` `take_while` `select` `filter` `reject`
+`partition` `count` `filter_map`. Method paths cover `if` decisions.
+More decisions hidden inside calls come next (see Roadmap).
 
 Demo: https://cyber-dojo.github.io/path_coverage/ shows the HTML report
 for the mock source tree in `demo/`. `make demo` builds and opens the
@@ -93,8 +95,17 @@ each report POSTed to it as a numbered file, and once every run is done
 they render as one report:
 
 ```sh
-path_coverage_collector 4570 /tmp/paths/runs   # until stopped
+path_coverage_collector 4570 /tmp/paths/runs   # until sent TERM
 ```
+
+- A report is saved before it is answered 200, so a 200 means it is on
+  disk. A report cut short, eg by a sender dying mid-send, is answered
+  400 and not saved. One that cannot be saved is answered 500.
+- `GET /alive` answers 200 while the collector runs.
+- `GET /ready` answers 200 when its dir is writable, 503 when not. Wait
+  for it before starting the runs.
+- On TERM it stops accepting connections, finishes the report in hand,
+  and exits 0.
 
 ```ruby
 runs = Dir['/tmp/paths/runs/*.json']
@@ -157,7 +168,7 @@ across the whole of it, nested conditions included:
 ok?(id) && new?(id) && id.size == 6       # one && site, leaves 0 1 2
 ok?(id) && (new?(id) || id.size == 6)     # an || nested in an && site, 0 1 2
 ok?(id) && new?(id) || id.size == 6       # an && nested in an || site, 0 1 2
-ids.any? { |k| k && k.ok? } && ok?(id)    # two sites: the block's is its own
+ids.map { |k| k && k.ok? } && ok?(id)     # two sites: the block's is its own
 ok?(id) ? :ok : :no                       # a ?: site, its predicate leaf 0
 ok?(id) && new?(id) ? :ok : :no           # an && nested in a ?: site, 0 1
 ok?(id) ? new?(id) && id.size == 6 : :no  # one ?: site, its then arm 1 2
@@ -170,12 +181,30 @@ paths run through whichever arm the predicate picks. Any other arm, like a
 block, is not part of it, though a condition inside it is a site of its
 own.
 
-An `if` (with its `end`, not a modifier) is a site too, even when its
-predicate is a single leaf: its predicate nests in it, an `&&` there
+An `if` or an `unless`, a modifier included, is a site too, even when
+its predicate is a single leaf: its predicate nests in it, an `&&` there
 being no site of its own, and its `then` and `else` arms are plain, as
-they are statements. Its extent is the `if` keyword to the end of its
-predicate, so a site inside an arm keeps its own button. An `elsif` is a
-site of its own.
+they are statements; an `unless` takes its `then` arm when its predicate
+is false. It is named at its keyword, and its extent is its keyword to
+the end of its predicate, so a site inside an arm keeps its own button.
+An `elsif` is a site of its own.
+
+A `case` with a subject is a site whose leaves are its `when` patterns,
+tried in order until one matches. Each pattern is wrapped in a stand-in
+whose `===` calls the pattern's `===` once, exactly as the `case` would,
+and notes whether it matched. A `case` with no subject, or with a splat
+among its patterns, is no site.
+
+A call to a block method, with no arguments and a block of one
+expression, is a site named at its method. Its two leaves are its
+receiver, showing how many items its block was called with (`0 items`,
+`1 item` or `2+ items`), and its block's expression: for `any?` `all?`
+`none?` `find` `detect` `find_index` and `take_while`, which stop once
+their block decides, its last answer; for `select` `filter` `reject`
+`partition` `count` and `filter_map`, which call it with every item,
+whether its answers were `all true`, `all false` or `both`. Both are
+noted from the block's own calls, so the receiver is never asked for its
+size, which could consume a sequence that can be read only once.
 
 A chain of one operator is flat; a change of operator, by precedence or by
 parentheses, nests. Parentheses are not part of the tree, since they decide
@@ -275,16 +304,15 @@ the run never loaded are read and parsed then.
 ## Roadmap
 
 - decisions hidden inside calls, each with its own outcome classes:
-  - `any?` / `all?` / `none?`: empty, decided by the first item, decided
-    later, never decided
-  - `find` / `detect`: found vs nil
+  - `one?`, whose last answer does not decide it, and block methods
+    with blocks of more than one expression
   - `fetch(k, default)`, `dig`, `Hash#[]` with a default: present vs default
   - `x || default` in value context, `&.` safe navigation: nil vs not nil
   - `||=` and `&&=`, on variables, attributes and index targets: the
     right side evaluated vs skipped, counted without evaluating the
     target twice
   - `x rescue y` modifier: raised vs not raised
-  - `unless`, modifier `if`, `case`/`when` and `in` patterns
+  - `case` with no subject, and `case`/`in` patterns
   - regex matches: nil vs MatchData
 
 ## Constraints

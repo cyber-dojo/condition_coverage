@@ -3,11 +3,15 @@ require 'path_coverage/site_tree'
 
 class SiteTreeTest < Id58TestBase
   test 'EuNs10', %w(
-  | a site's tree names its operator and has a column for
-  | each of its paths, never taken first, with each path's
-  | count; each leaf has its source text, cut from the
-  | manifest's byte range with no parse, and its outcome on
-  | each path, nil where unreached; the site its value
+  | Example: ok?(id) && id.start_with?('N')
+  | The tree names its operator (&&).
+  | It has one column per path, with that path's count.
+  | Paths never taken (count 0) come first.
+  | Each leaf has its source text, eg ok?(id).
+  | The text is cut from the manifest's byte range.
+  | Each leaf has its outcome on each path.
+  | A leaf a path never reached is nil.
+  | The site has its value on each path too.
   ) do
     source = <<~RUBY
       module Kata
@@ -34,9 +38,10 @@ class SiteTreeTest < Id58TestBase
   end
 
   test 'EuNs30', %w(
-  | a nested condition is a subtree under its operator, its
-  | leaves taking their outcomes in left to right order, and
-  | its value on each path that of the last operand it reached
+  | Example: ok?(id) && (new?(id) || id.size == 6)
+  | The nested || is a subtree under the &&.
+  | Its leaves take their outcomes left to right.
+  | Its value on a path is that of the last leaf reached.
   ) do
     source = <<~RUBY
       def kata?(id)
@@ -70,11 +75,14 @@ class SiteTreeTest < Id58TestBase
   end
 
   test 'EuNs70', %w(
-  | a ternary's predicate decides which arm each path took;
-  | each arm has its text, the tree of the condition it holds,
-  | nil for a plain arm, and whether each path took it; the
-  | ternary's value on a path is its taken arm's, nil for a
-  | plain arm
+  | Example: ok?(id) ? new?(id) && id.size == 6 : :no
+  | The predicate ok?(id) decides which arm each path took.
+  | Each arm has its text, eg :no.
+  | Each arm has whether each path took it.
+  | The then arm holds a condition, so it has its tree.
+  | The else arm (:no) is plain, so its tree is nil.
+  | The ternary's value on a path is its taken arm's value.
+  | A plain arm's value is nil.
   ) do
     source = <<~RUBY
       def kata?(id)
@@ -118,9 +126,10 @@ class SiteTreeTest < Id58TestBase
   end
 
   test 'EuNs80', %w(
-  | an if's tree is a ternary's: its predicate decides which
-  | arm each path took, and its value is its taken arm's, nil
-  | for its plain arms
+  | Example: if order.big? && order.new? 5 else 7 end
+  | An if's tree is the same as a ternary's.
+  | The predicate decides which arm each path took.
+  | Both arms (5 and 7) are plain, so the if's value is nil.
   ) do
     source = <<~RUBY
       def fee(order)
@@ -166,7 +175,9 @@ class SiteTreeTest < Id58TestBase
   end
 
   test 'EuNs81', %w(
-  | an if's arm with no statements has no text
+  | Example: if x end
+  | The then arm has no statements.
+  | So its text is nil.
   ) do
     source = <<~RUBY
       def k(x)
@@ -184,6 +195,107 @@ class SiteTreeTest < Id58TestBase
       operands: [
         { text: 'x', cells: [false, true] },
         { arm: :then, text: nil, cells: [false, true], body: nil }
+      ]
+    }
+    actual = PathCoverage::SiteTree.of(source, site, paths)
+    assert_equal expected, actual
+  end
+
+  test 'EuNs82', %w(
+  | Example: unless order.big? 5 else 7 end
+  | The then arm (5) is taken when order.big? is false.
+  | The else arm (7) is taken when order.big? is true.
+  ) do
+    source = <<~RUBY
+      def fee(order)
+        unless order.big?
+          5
+        else
+          7
+        end
+      end
+    RUBY
+    site = condition(
+      'unless', 24...34, arm(:then, 39...40), arm(:else, 52...53)
+    )
+    paths = [
+      { path: [true], count: 1 },
+      { path: [false], count: 0 }
+    ]
+    expected = {
+      operator: 'unless', counts: [0, 1], cells: [nil, nil],
+      operands: [
+        { text: 'order.big?', cells: [false, true] },
+        { arm: :then, text: '5', cells: [true, false], body: nil },
+        { arm: :else, text: '7', cells: [false, true], body: nil }
+      ]
+    }
+    actual = PathCoverage::SiteTree.of(source, site, paths)
+    assert_equal expected, actual
+  end
+
+  test 'EuNs83', %w(
+  | Example: case x when 1, 2 ... when String ... else ... end
+  | The tree has a row for each when.
+  | The row holds that when's patterns, eg 1 and 2.
+  | A when is taken on a path where one of its patterns
+  | matched.
+  | The tree has a row for the else too.
+  | The else is taken on a path where no pattern matched.
+  ) do
+    source = <<~RUBY
+      def kind(x)
+        case x
+        when 1, 2
+          :small
+        when String
+          :text
+        else
+          :other
+        end
+      end
+    RUBY
+    small = condition('when', 28...29, 31...32)
+    text = condition('when', 51...57)
+    site = condition(
+      'case', arm(:when, 37...43, small), arm(:when, 62...67, text),
+      arm(:else, 79...85)
+    )
+    paths = [
+      { path: [true, nil, nil], count: 1 },
+      { path: [false, true, nil], count: 0 },
+      { path: [false, false, true], count: 2 },
+      { path: [false, false, false], count: 0 }
+    ]
+    expected = {
+      operator: 'case', counts: [0, 0, 1, 2],
+      cells: [nil, nil, nil, nil],
+      operands: [
+        {
+          arm: :when, text: ':small',
+          cells: [true, false, true, false],
+          body: {
+            operator: 'when', cells: [true, false, true, false],
+            operands: [
+              { text: '1', cells: [false, false, true, false] },
+              { text: '2', cells: [true, false, nil, false] }
+            ]
+          }
+        },
+        {
+          arm: :when, text: ':text',
+          cells: [false, false, false, true],
+          body: {
+            operator: 'when', cells: [nil, false, nil, true],
+            operands: [
+              { text: 'String', cells: [nil, false, nil, true] }
+            ]
+          }
+        },
+        {
+          arm: :else, text: ':other',
+          cells: [false, true, false, false], body: nil
+        }
       ]
     }
     actual = PathCoverage::SiteTree.of(source, site, paths)

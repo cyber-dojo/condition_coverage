@@ -1,3 +1,5 @@
+require_relative 'condition'
+
 module PathCoverage
   # Records the outcome of each instrumented operand.
   class Recorder
@@ -94,6 +96,87 @@ module PathCoverage
       trail = trails(site).last
       trail.outcomes[index] = outcome == :truthy if trail
       value
+    end
+
+    # A stand-in for a case's index-th pattern of total: the
+    # case matches its subject against the stand-in, which
+    # matches it against the pattern, once, as the case would
+    # have.
+    WhenMatch = Struct.new(
+      :recorder, :site, :index, :total, :pattern
+    ) do
+      # Whether pattern matches subject, exactly as pattern says,
+      # noted on the site's path.
+      def ===(subject)
+        recorder.matched(site, index, total, pattern === subject)
+      end
+    end
+
+    # The stand-in for pattern, the index-th of size in the case
+    # at site.
+    def when_match(site, index, size, pattern)
+      WhenMatch.new(self, site, index, size, pattern)
+    end
+
+    # Notes whether the index-th of size patterns matched, the
+    # first entering the case's site, and a match or the last
+    # leaving it, as no more patterns are then tried; returns
+    # matched unchanged.
+    def matched(site, index, size, matched)
+      enter(site, size) if index.zero?
+      record(site, index, matched)
+      last = matched || index == size - 1
+      leave(trails(site).last, matched) if last
+      matched
+    end
+
+    # Starts an evaluation of a stop-early block method's call
+    # at site, its block not yet called with any item.
+    def enter_items(site)
+      trail = enter(site, 2)
+      trail.outcomes[0] = ITEMS[0]
+      trail
+    end
+
+    # Notes value, the block's answer, as its last, and one more
+    # item it was called with; returns value unchanged. A block
+    # called where its call was not entered, eg in another
+    # fiber, is counted but noted on no path.
+    def item(site, value)
+      trail = trails(site).last
+      one_more(trail) if trail
+      record(site, 1, value)
+    end
+
+    # Notes value, the block's answer for one more item, among
+    # all its answers so far: all true, all false, or both;
+    # returns value unchanged. A block called where its call
+    # was not entered is counted but noted on no path.
+    def answer(site, value)
+      trail = trails(site).last
+      if trail
+        one_more(trail)
+        now = value ? ANSWERS[0] : ANSWERS[1]
+        same = [nil, now].include?(trail.outcomes[1])
+        trail.outcomes[1] = same ? now : ANSWERS[2]
+      end
+      @counts[[site, 1]][value ? :truthy : :falsy] += 1
+      value
+    end
+
+    # Notes on trail one more item its block was called with.
+    def one_more(trail)
+      called = ITEMS.index(trail.outcomes[0]) + 1
+      trail.outcomes[0] = ITEMS[[called, 2].min]
+    end
+
+    # Ends a block method's call, counting its receiver truthy
+    # when its block was called, falsy when not, and its path;
+    # returns value, the call's, unchanged.
+    def leave_items(trail, value)
+      called = trail.outcomes[0] != ITEMS[0]
+      @counts[[trail.site, 0]][called ? :truthy : :falsy] += 1
+      leave(trail, value)
     end
   end
 end

@@ -24,14 +24,24 @@ module PathCoverage
     # The tree of condition, each leaf taking the next index of
     # leaves, so leaves pair with path entries left to right.
     def self.node(source, condition, outcomes, leaves)
-      operands = condition.operands.map do |operand|
+      if condition.operator == 'case'
+        return case_arms(source, condition.operands, outcomes, leaves)
+      end
+
+      operands = operands_of(source, condition, outcomes, leaves)
+      arms(source, condition, operands, outcomes, leaves)
+    end
+
+    # condition's operands' nodes, leaves and nested conditions
+    # built in order, its arms left for arms to build after.
+    def self.operands_of(source, condition, outcomes, leaves)
+      condition.operands.map do |operand|
         case operand
         when Condition then node(source, operand, outcomes, leaves)
         when Arm then operand
         else leaf(source, operand, outcomes, leaves.next)
         end
       end
-      arms(source, condition, operands, outcomes, leaves)
     end
 
     # condition's node from its operands' nodes, its ternary
@@ -42,21 +52,51 @@ module PathCoverage
       operands = operands.map do |operand|
         next operand unless operand.is_a?(Arm)
 
-        arm(source, operand, predicate[:cells], outcomes, leaves)
+        decided = [predicate[:cells], THEN_ON[condition.operator]]
+        arm(source, operand, decided, outcomes, leaves)
       end
       cells = value(condition.operator, operands)
       { operator: condition.operator, cells:, operands: }
     end
 
-    # One arm of a ternary or an if: its text, nil for an arm
-    # with no statements, whether each column took it, from the
-    # predicate's cells, and the tree of its condition.
-    def self.arm(source, arm, decided, outcomes, leaves)
-      picked = arm.kind == :then
+    # A case's node from its arms, built in order so its whens'
+    # patterns pair with path entries left to right: a when is
+    # taken on each path one of its patterns matched, and the
+    # else on each none did. A case's value is that of no
+    # choice, so is nil.
+    def self.case_arms(source, arms, outcomes, leaves)
+      matched = []
+      operands = arms.map do |arm|
+        body = arm.body && node(source, arm.body, outcomes, leaves)
+        matched << body[:cells].map { |cell| cell == true } if body
+        cells = body ? matched.last : unmatched(matched, outcomes)
+        { arm: arm.kind, text: text_of(source, arm), cells:, body: }
+      end
+      { operator: 'case', cells: Array.new(outcomes.size), operands: }
+    end
+
+    # An arm's text, nil for one with no statements.
+    def self.text_of(source, arm)
+      arm.extent && source.byteslice(arm.extent)
+    end
+
+    # Whether each column matched none of its whens' patterns.
+    def self.unmatched(matched, outcomes)
+      outcomes.each_index.map do |column|
+        matched.none? { |taken| taken[column] }
+      end
+    end
+
+    # One arm of a ternary, an if or an unless: its text, nil
+    # for an arm with no statements, whether each column took
+    # it, from the predicate's cells and the outcome on which
+    # its choice takes its then arm, and the tree of its
+    # condition.
+    def self.arm(source, arm, (decided, then_on), outcomes, leaves)
+      picked = arm.kind == :then ? then_on : !then_on
       body = arm.body && node(source, arm.body, outcomes, leaves)
-      text = arm.extent && source.byteslice(arm.extent)
       {
-        arm: arm.kind, text:,
+        arm: arm.kind, text: text_of(source, arm),
         cells: decided.map { |outcome| outcome == picked }, body:
       }
     end

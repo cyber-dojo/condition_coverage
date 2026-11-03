@@ -6,26 +6,37 @@ module PathCoverage
   # order, nil for a leaf that evaluation never reaches.
   module SitePaths
     # Every possible path through site's condition, true
-    # before false.
+    # before false; a stop-early block method's are fixed by its
+    # shape alone.
     def self.possible(site)
+      shape = BLOCK_PATHS[site.operator]
+      return shape if shape
+
       walk(site, site.fixed).map do |outcomes, _value|
         site.leaves.map { |range| outcomes[range] }
       end
     end
 
     # The outcome of an operand on which each operator goes on
-    # to its next operand; any other ends the chain there.
+    # to its next operand; any other ends the chain there. A
+    # when's patterns, and a case's whens, stop at a match.
     CONTINUES_ON = {
-      '&&' => true, 'and' => true, '||' => false, 'or' => false
+      '&&' => true, 'and' => true, '||' => false, 'or' => false,
+      'when' => false, 'case' => false
     }.freeze
 
     # [[{ leaf range => outcome }, value], ...] for each way
     # node can be evaluated, value being the outcome of node as
     # a whole; fixed is the site's { leaf range => its one
-    # outcome }.
+    # outcome }. A case is the chain of its whens' conditions.
     def self.walk(node, fixed)
       return leaf(node, fixed) unless node.is_a?(Condition)
       return ternary(node, fixed) if CHOICES.include?(node.operator)
+
+      if node.operator == 'case'
+        whens = node.operands.filter_map(&:body)
+        return chain(node.with(operands: whens), fixed)
+      end
 
       chain(node, fixed)
     end
@@ -47,14 +58,15 @@ module PathCoverage
       end
     end
 
-    # The ways a ternary or an if can be evaluated: each way of
-    # its predicate, then each way of the condition the arm it
-    # picks is, if that arm is one; an if with no else arm
-    # picks none. Its value is that of no choice, so is nil.
+    # The ways a ternary, an if or an unless can be evaluated:
+    # each way of its predicate, then each way of the condition
+    # the arm it picks is, if that arm is one; one with no else
+    # arm picks none. Its value is that of no choice, so is nil.
     def self.ternary(node, fixed)
       predicate, then_arm, else_arm = node.operands
+      then_on = THEN_ON[node.operator]
       walk(predicate, fixed).flat_map do |outcomes, value|
-        body = (value ? then_arm : else_arm)&.body
+        body = (value == then_on ? then_arm : else_arm)&.body
         next [[outcomes, nil]] if body.nil?
 
         walk(body, fixed).map do |more, _|

@@ -80,10 +80,11 @@ module PathCoverage
       tree.merge(at: at(source, condition.extent), operands:)
     end
 
-    # An arm's node with its at:, and its body's tree located.
+    # An arm's node with its at:, nil for an arm with no
+    # statements, and its body's tree located.
     def self.located_arm(source, arm, node)
       body = arm.body && located(source, arm.body, node[:body])
-      node.merge(at: at(source, arm.extent), body:)
+      node.merge(at: arm.extent && at(source, arm.extent), body:)
     end
 
     # [line, column, line, column] of the byte range in source.

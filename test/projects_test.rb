@@ -20,10 +20,12 @@ class ProjectsTest < Id58TestBase
   end
 
   test '4WXv20', %w(
-  | || sites, chains, nested and grouped conditions, a site
-  | inside a block, and an and whose operand is a command call
-  | all run unchanged when instrumented, and their paths
-  | never taken are listed in source order
+  | Example: the nested_conditions project's kata.rb
+  | It has || sites, chains, and nested and grouped conditions.
+  | It has an any? with a site inside its block.
+  | It has an and whose operand is a command call.
+  | All of them run unchanged when instrumented.
+  | Their paths never taken are listed in source order.
   ) do
     stdout, stderr, status = run_project('nested_conditions')
     never = 'path never taken:'
@@ -41,6 +43,12 @@ class ProjectsTest < Id58TestBase
       "source/kata.rb:17:4 #{never} " \
       '`ids.any? { |id| ok?(id) && id.size == 2 }` false, ' \
       '`ids.empty?` false',
+      "source/kata.rb:17:8 #{never} " \
+      '`ids` 1 item, `ok?(id) && id.size == 2` false',
+      "source/kata.rb:17:8 #{never} " \
+      '`ids` 2+ items, `ok?(id) && id.size == 2` true',
+      "source/kata.rb:17:8 #{never} " \
+      '`ids` 2+ items, `ok?(id) && id.size == 2` false',
       "source/kata.rb:17:20 #{never} " \
       '`ok?(id)` true, `id.size == 2` false',
       "source/kata.rb:17:20 #{never} `ok?(id)` false",
@@ -53,12 +61,14 @@ class ProjectsTest < Id58TestBase
   end
 
   test '4WXv30', %w(
-  | an instrumented file has the same relevant lines for
-  | line coverage as it has uninstrumented, so SimpleCov's
-  | line totals do not change when path coverage runs,
-  | even for a condition written over several lines, or a
-  | method whose paths are measured, a modifier if among
-  | its decisions
+  | Example: the multiline_condition project, run with
+  | CONDITIONS off and then on
+  | An instrumented file has the same relevant lines for
+  | line coverage as it has uninstrumented.
+  | So SimpleCov's line totals do not change.
+  | That holds for a condition written over several lines.
+  | It holds for a method whose paths are measured, with a
+  | modifier if among its decisions.
   ) do
     off, = run_project('multiline_condition', 'CONDITIONS' => 'off')
     on, = run_project('multiline_condition', 'CONDITIONS' => 'on')
@@ -66,14 +76,17 @@ class ProjectsTest < Id58TestBase
   end
 
   test '4WXv40', %w(
-  | a project run measuring paths too prints, after its
-  | condition gaps, a line for each path a method with two
-  | or more decisions never took, the method running
-  | unchanged when instrumented
+  | Example: total -= 10 if order.fetch(:total) > 100 && ...
+  | The project measures paths too.
+  | It first prints its site gaps.
+  | The modifier if's site is named at its keyword (5:16).
+  | Then it prints each path fee never took.
+  | fee has two decisions, on lines 4 and 5.
+  | fee still runs unchanged when instrumented.
   ) do
     stdout, stderr, status = run_project('two_decisions')
     expected = [
-      'source/shop.rb:5:19 path never taken: ' \
+      'source/shop.rb:5:16 path never taken: ' \
       '`order.fetch(:total) > 100` true, `order.fetch(:paid)` false',
       'source/shop.rb:2:2 fee path never taken: ' \
       'line 4 true, line 5 true',

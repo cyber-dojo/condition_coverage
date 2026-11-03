@@ -1,4 +1,5 @@
 require 'fileutils'
+require_relative 'calls'
 require_relative 'configuration'
 require_relative 'json_writer'
 require_relative 'manifest'
@@ -30,37 +31,6 @@ module PathCoverage
   # hook consults; nil before the first start.
   def self.config
     @config
-  end
-
-  # The call rewritten code makes around each operand; returns
-  # value unchanged.
-  def self.record(site, index, value)
-    @recorder.record(site, index, value)
-  end
-
-  # The call rewritten code makes before a site's first leaf,
-  # site having size leaves; returns the evaluation's trail.
-  def self.enter(site, size)
-    @recorder.enter(site, size)
-  end
-
-  # The call rewritten code makes around a site as a whole,
-  # with the trail enter gave it; returns value unchanged.
-  def self.leave(trail, value)
-    @recorder.leave(trail, value)
-  end
-
-  # The call rewritten code makes as a call reaches its
-  # method's first decision; returns the call's new path.
-  def self.path(site, size)
-    @recorder.path(site, size)
-  end
-
-  # The call rewritten code makes around each decision's
-  # predicate, with exits for one whose arm leaves the method;
-  # returns value unchanged.
-  def self.decide(path, index, value, exits = nil)
-    @recorder.decide(path, index, value, exits)
   end
 
   # Instruments every file later required that the settings

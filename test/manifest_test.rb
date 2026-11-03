@@ -12,10 +12,6 @@ class ManifestTest < Id58TestBase
       def kata?(id)
         ok?(id) && new?(id)
       end
-
-      def group?(id)
-        return :ok if ok?(id)
-      end
     RUBY
     # ok?(id) is bytes 16...23, new?(id) is bytes 27...35
     both = condition('&&', 16...23, 27...35, extent: 16...35)
@@ -239,7 +235,7 @@ class ManifestTest < Id58TestBase
   ) do
     source = <<~RUBY
       def kata?(id)
-        ok?(id) && ids.any? { |k| k && k.ok? }
+        ok?(id) && ids.each { |k| k && k.ok? }
       end
     RUBY
     outer = condition('&&', 16...23, 27...54, extent: 16...54)
@@ -330,7 +326,7 @@ class ManifestTest < Id58TestBase
   ) do
     source = <<~RUBY
       def kata?(id)
-        ok?(id) ? ids.any? { |k| k && k.ok? } : :no
+        ok?(id) ? ids.each { |k| k && k.ok? } : :no
       end
     RUBY
     ternary = condition(
@@ -367,10 +363,13 @@ class ManifestTest < Id58TestBase
   end
 
   test '6asya0', %w(
-  | an if is a choice, so it is a site, named if, whose
-  | operands are its predicate, an && nesting inside it, and
-  | its then and else arms; its extent is the if keyword to
-  | the end of its predicate, its arms being statements
+  | Example: if order.big? && order.new?
+  | The if is a site, named if.
+  | Its first operand is its predicate.
+  | Here that is the && site, nested inside it.
+  | Its other operands are its then arm (5) and else arm (7).
+  | Its extent is "if order.big? && order.new?".
+  | The arms are outside the extent, as they are statements.
   ) do
     source = <<~RUBY
       def fee(order)
@@ -392,8 +391,9 @@ class ManifestTest < Id58TestBase
   end
 
   test '6asya1', %w(
-  | an if with a single operand predicate is a site too, and
-  | an if with no else has its then arm only
+  | Example: if order.big? 5 end
+  | A predicate of a single operand still makes a site.
+  | With no else, the if has a then arm only.
   ) do
     source = <<~RUBY
       def fee(order)
@@ -411,9 +411,9 @@ class ManifestTest < Id58TestBase
   end
 
   test '6asya2', %w(
-  | an elsif is a site of its own, after its if's, as its
-  | statements are no expression of the if's; it is the
-  | if's else arm, which has no body
+  | Example: if order.big? 5 elsif order.new? 6 end
+  | The elsif is a site of its own, named at elsif.
+  | The if's else arm is the whole elsif.
   ) do
     source = <<~RUBY
       def fee(order)
@@ -437,8 +437,10 @@ class ManifestTest < Id58TestBase
   end
 
   test '6asya3', %w(
-  | an if's arm with no statements is still an arm, as the
-  | path that takes it is still a path, with no extent
+  | Example: if x else end
+  | Neither arm has any statements.
+  | Each is still an arm, as taking it is still a path.
+  | Each arm's extent is nil.
   ) do
     source = <<~RUBY
       def k(x)
@@ -451,6 +453,235 @@ class ManifestTest < Id58TestBase
       'if', 14...15, arm(:then, nil), arm(:else, nil), extent: 11...15
     )
     expected = { 'k.rb:2:2' => choice }
+    actual = PathCoverage::Manifest.sites(source, 'k.rb')
+    assert_equal expected, actual
+  end
+
+  test '6asya4', %w(
+  | Example: unless order.big? 5 else 7 end
+  | An unless is a site, named unless, just like an if.
+  | Its then arm (5) runs when order.big? is false.
+  | Its extent is "unless order.big?".
+  ) do
+    source = <<~RUBY
+      def fee(order)
+        unless order.big?
+          5
+        else
+          7
+        end
+      end
+    RUBY
+    choice = condition(
+      'unless', 24...34, arm(:then, 39...40), arm(:else, 52...53),
+      extent: 17...34
+    )
+    expected = { 'k.rb:2:2' => choice }
+    actual = PathCoverage::Manifest.sites(source, 'k.rb')
+    assert_equal expected, actual
+  end
+
+  test '6asya5', %w(
+  | Example: return 1 unless a && b
+  | The site is named at the column of unless (11).
+  | It is not named at the column of return (2).
+  | Its then arm is "return 1", the code left of the unless.
+  | Its extent is "unless a && b".
+  ) do
+    source = <<~RUBY
+      def k(a, b)
+        return 1 unless a && b
+      end
+    RUBY
+    both = condition('&&', 30...31, 35...36, extent: 30...36)
+    choice = condition(
+      'unless', both, arm(:then, 14...22), extent: 23...36
+    )
+    expected = { 'k.rb:2:11' => choice }
+    actual = PathCoverage::Manifest.sites(source, 'k.rb')
+    assert_equal expected, actual
+  end
+
+  test '6asya6', %w(
+  | Example: return :ok if ok?(id)
+  | A modifier if is a site too.
+  | It is named at the column of if (13).
+  ) do
+    source = <<~RUBY
+      def group?(id)
+        return :ok if ok?(id)
+      end
+    RUBY
+    choice = condition(
+      'if', 31...38, arm(:then, 17...27), extent: 28...38
+    )
+    expected = { 'k.rb:2:13' => choice }
+    actual = PathCoverage::Manifest.sites(source, 'k.rb')
+    assert_equal expected, actual
+  end
+
+  test '6asya7', %w(
+  | Example: case x when 1, 2 ... when String ... else ... end
+  | A case with a subject (x) is a site, named case.
+  | Each when is an arm.
+  | Its condition is a when over its patterns, eg 1 and 2.
+  | The else is an arm too.
+  | A pattern is matched against x, not tested for truth.
+  | So a literal pattern, eg 1, is not fixed as always true.
+  | Its extent is "case x".
+  ) do
+    source = <<~RUBY
+      def kind(x)
+        case x
+        when 1, 2
+          :small
+        when String
+          :text
+        else
+          :other
+        end
+      end
+    RUBY
+    small = condition('when', 28...29, 31...32, extent: 28...32)
+    text = condition('when', 51...57, extent: 51...57)
+    choice = condition(
+      'case',
+      arm(:when, 37...43, small), arm(:when, 62...67, text),
+      arm(:else, 79...85),
+      extent: 14...20
+    )
+    expected = { 'k.rb:2:2' => choice }
+    actual = PathCoverage::Manifest.sites(source, 'k.rb')
+    assert_equal expected, actual
+  end
+
+  test '6asya8', %w(
+  | Example: case when x && all ... end
+  | A case with no subject is not a site.
+  | Example: case x when *all ... end
+  | A case with a splat pattern is not a site either.
+  | The x && all inside the first case is still a site.
+  ) do
+    source = <<~RUBY
+      def kind(x, all)
+        case
+        when x && all
+          1
+        end
+        case x
+        when *all
+          2
+        end
+      end
+    RUBY
+    both = condition('&&', 31...32, 36...39, extent: 31...39)
+    expected = { 'k.rb:3:7' => both }
+    actual = PathCoverage::Manifest.sites(source, 'k.rb')
+    assert_equal expected, actual
+  end
+
+  test '6asya9', %w(
+  | Example: case x when 1 then :one end
+  | With no else, the case has its when arms only.
+  ) do
+    source = <<~RUBY
+      def k(x)
+        case x
+        when 1 then :one
+        end
+      end
+    RUBY
+    one = condition('when', 25...26, extent: 25...26)
+    choice = condition(
+      'case', arm(:when, 32...36, one), extent: 11...17
+    )
+    expected = { 'k.rb:2:2' => choice }
+    actual = PathCoverage::Manifest.sites(source, 'k.rb')
+    assert_equal expected, actual
+  end
+
+  test '6asyb0', %w(
+  | Example: ids.any? { |id| id.ok? }
+  | The call is a site, named any?.
+  | It is named at the column of any? (6), not of ids.
+  | So in ids.select {...}.any? {...} each call has its own
+  | site.
+  | Its leaves are its receiver (ids) and its block's
+  | expression (id.ok?).
+  | Its extent is the whole call.
+  ) do
+    source = <<~RUBY
+      def k(ids)
+        ids.any? { |id| id.ok? }
+      end
+    RUBY
+    found = condition('any?', 13...16, 29...35, extent: 13...37)
+    expected = { 'k.rb:2:6' => found }
+    actual = PathCoverage::Manifest.sites(source, 'k.rb')
+    assert_equal expected, actual
+  end
+
+  test '6asyb1', %w(
+  | A block method's call is not a site when:
+  | it has arguments, eg ids.any?(Integer) { ... }
+  | it has no receiver, eg any? { ... }
+  | it has no block, eg ids.any?
+  | its block is an argument, eg ids.any?(&:ok?)
+  | its block is empty, eg ids.none? {}
+  | its block has two expressions, eg { id.ok?; id.new? }
+  | it is called with &., eg ids&.find { ... }
+  | In each of these its block's calls cannot all be seen.
+  ) do
+    source = <<~RUBY
+      def k(ids, x)
+        ids.any?(Integer) { |id| id.ok? }
+        any? { |id| id.ok? }
+        ids.any?
+        ids.any?(&:ok?)
+        ids.none? {}
+        ids.all? { |id| id.ok?; id.new? }
+        ids&.find { |id| id.ok? }
+      end
+    RUBY
+    actual = PathCoverage::Manifest.sites(source, 'k.rb')
+    assert_equal({}, actual)
+  end
+
+  test '6asyb2', %w(
+  | Example: ids.all? { |id| id.include? 'N' }
+  | The block's expression is a command call (no parentheses).
+  | Example: ids.none? { |id| id.ok? or id.new? }
+  | The block's expression is an or.
+  | Neither can be a bare argument to a method.
+  | So each is noted in its site's commands.
+  | That makes the rewriter parenthesise it.
+  ) do
+    source = <<~RUBY
+      def k(ids)
+        ids.all? { |id| id.include? 'N' }
+        ids.none? { |id| id.ok? or id.new? }
+      end
+    RUBY
+    command = 29...44
+    word = 66...83
+    sites = PathCoverage::Manifest.sites(source, 'k.rb')
+    # the or is a site of its own too, with no commands
+    expected = [[command], [word], []]
+    assert_equal expected, sites.values.map(&:commands)
+  end
+
+  test '6asyb3', %w(
+  | Example: ids.select { |id| id.ok? }
+  | select calls its block with every item.
+  | It is a site too, just like any?.
+  ) do
+    source = <<~RUBY
+      def k(ids)
+        ids.select { |id| id.ok? }
+      end
+    RUBY
+    kept = condition('select', 13...16, 31...37, extent: 13...39)
+    expected = { 'k.rb:2:6' => kept }
     actual = PathCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end

@@ -18,6 +18,12 @@ Layout/LineLength:
 Style/FrozenStringLiteralComment:
   Enabled: false
 
+# A case's pattern stand-in must match exactly as the case
+# would, which is by ===.
+Style/CaseEquality:
+  Exclude:
+    - lib/path_coverage/recorder.rb
+
 # fee.rb is the README's example, whose ifs keep their end, as
 # a modifier if is no site and so would draw no grid.
 Style/IfUnlessModifier:

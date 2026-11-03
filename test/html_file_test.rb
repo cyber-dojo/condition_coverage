@@ -348,6 +348,150 @@ class HtmlFileTest < Id58TestBase
     assert_equal expected, actual
   end
 
+  test 'gae547', %w(
+  | Example: unless x alpha end
+  | The arm's row is labelled then, as for an if.
+  ) do
+    lines = [
+      { number: 1, text: '  unless x', status: :gaps, span: 1..1 }
+    ]
+    trees = {
+      1 => [
+        {
+          operator: 'unless', counts: [0, 1], cells: [nil, nil],
+          operands: [
+            { text: 'x', cells: [false, true] },
+            {
+              arm: :then, text: 'alpha',
+              cells: [true, false], body: nil
+            }
+          ]
+        }
+      ]
+    }
+    listing = PathCoverage::HtmlFile.listing(lines, trees)
+    html = REXML::Document.new(listing)
+    tree = html.elements["//*[@id='tree-1']"]
+
+    labels = tree.elements.to_a('.//*[@data-arm]/*[@data-label]')
+    assert_equal(['then'], labels.map { |label| text_of(label) })
+  end
+
+  test 'gae548', %w(
+  | Example: case x when 1 then :small else :other end
+  | The arms' rows are labelled when and else.
+  | The when row shows whether it matched on each path: T F.
+  | The else row shows a bullet on the path that took it.
+  | The when's pattern (1) has a row below it.
+  ) do
+    lines = [
+      { number: 1, text: '  case x', status: :gaps, span: 1..1 }
+    ]
+    small = {
+      operator: 'when', cells: [true, false],
+      operands: [{ text: '1', cells: [true, false] }]
+    }
+    trees = {
+      1 => [
+        {
+          operator: 'case', counts: [0, 1], cells: [nil, nil],
+          operands: [
+            {
+              arm: :when, text: ':small',
+              cells: [true, false], body: small
+            },
+            {
+              arm: :else, text: ':other',
+              cells: [false, true], body: nil
+            }
+          ]
+        }
+      ]
+    }
+    listing = PathCoverage::HtmlFile.listing(lines, trees)
+    html = REXML::Document.new(listing)
+    tree = html.elements["//*[@id='tree-1']"]
+
+    rows = tree.elements.to_a('.//*[@data-arm]')
+    actual = rows.map do |row|
+      cells = row.elements.to_a('*[@data-cell]').map { text_of(_1) }
+      [text_of(row.elements['*[@data-label]']), *cells]
+    end
+    bullet = [0x2022].pack('U')
+    assert_equal [%w(when T F), ['else', '', bullet]], actual
+    texts = tree.elements.to_a('.//*[@data-operand]/*[@data-text]')
+    assert_equal(['1'], texts.map { |text| text_of(text) })
+  end
+
+  test 'gae549', %w(
+  | Example: ids.any? { |id| id.ok? }
+  | The ids row shows how many items the block was called
+  | with on each path: 0, 1, or * for two or more.
+  | The id.ok? row shows its last answer: T or F.
+  | It is blank where the block was never called.
+  ) do
+    lines = [
+      { number: 1, text: '  ids.any? { |id| id.ok? }', status: :gaps,
+        span: 1..1 }
+    ]
+    trees = {
+      1 => [
+        {
+          operator: 'any?', counts: [0, 1, 2],
+          cells: [nil, true, false],
+          operands: [
+            { text: 'ids', cells: ['0 items', '1 item', '2+ items'] },
+            { text: 'id.ok?', cells: [nil, true, false] }
+          ]
+        }
+      ]
+    }
+    listing = PathCoverage::HtmlFile.listing(lines, trees)
+    html = REXML::Document.new(listing)
+    tree = html.elements["//*[@id='tree-1']"]
+
+    rows = tree.elements.to_a('.//*[@data-operand]')
+    actual = rows.map do |row|
+      row.elements.to_a('*[@data-cell]').map { text_of(_1) }
+    end
+    assert_equal [%w(0 1 *), ['', 'T', 'F']], actual
+  end
+
+  test 'gae54a', %w(
+  | Example: ids.select { |id| id.ok? }
+  | select calls its block with every item.
+  | The id.ok? row shows its answers on each path.
+  | T when all were true.
+  | F when all were false.
+  | TF when both.
+  ) do
+    lines = [
+      { number: 1, text: '  ids.select { |id| id.ok? }',
+        status: :gaps, span: 1..1 }
+    ]
+    trees = {
+      1 => [
+        {
+          operator: 'select', counts: [0, 1, 2],
+          cells: [nil, nil, nil],
+          operands: [
+            {
+              text: 'ids', cells: ['1 item', '2+ items', '2+ items']
+            },
+            {
+              text: 'id.ok?', cells: ['all true', 'all false', 'both']
+            }
+          ]
+        }
+      ]
+    }
+    listing = PathCoverage::HtmlFile.listing(lines, trees)
+    html = REXML::Document.new(listing)
+    rows = html.elements.to_a("//*[@id='tree-1']//*[@data-operand]")
+    cells = rows.last.elements.to_a('*[@data-cell]')
+    assert_equal(%w(T F TF), cells.map { |cell| text_of(cell) })
+  end
+
   test 'gae536', %w(
   | a button over two or more sites shows how many,
   | and its tree keeps each site's rows in a group of their own,
