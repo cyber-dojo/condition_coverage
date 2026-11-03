@@ -287,8 +287,8 @@ class HtmlFileTest < Id58TestBase
       cells = row.elements.to_a('*[@data-cell]').map { text_of(_1) }
       [text_of(row.elements['*[@data-label]']), *cells]
     end
-    bullet = [0x2022].pack('U')
-    expected = [['? &&', 'F', 'T', ''], [': :no', '', '', bullet]]
+    tick = [0x2713].pack('U')
+    expected = [['? &&', 'F', 'T', ''], [': :no', '', '', tick]]
     assert_equal expected, actual
 
     branches = tree.elements.to_a('.//*[@data-branch]')
@@ -340,10 +340,10 @@ class HtmlFileTest < Id58TestBase
       cells = row.elements.to_a('*[@data-cell]').map { text_of(_1) }
       [text_of(row.elements['*[@data-label]']), *cells]
     end
-    bullet = [0x2022].pack('U')
+    tick = [0x2713].pack('U')
     expected = [
-      ['then', '', bullet, ''],
-      ['else', bullet, '', bullet]
+      ['then', '', tick, ''],
+      ['else', tick, '', tick]
     ]
     assert_equal expected, actual
   end
@@ -381,7 +381,7 @@ class HtmlFileTest < Id58TestBase
   | Example: case x when 1 then :small else :other end
   | The arms' rows are labelled when and else.
   | The when row shows whether it matched on each path: T F.
-  | The else row shows a bullet on the path that took it.
+  | The else row shows a tick on the path that took it.
   | The when's pattern (1) has a row below it.
   ) do
     lines = [
@@ -417,8 +417,8 @@ class HtmlFileTest < Id58TestBase
       cells = row.elements.to_a('*[@data-cell]').map { text_of(_1) }
       [text_of(row.elements['*[@data-label]']), *cells]
     end
-    bullet = [0x2022].pack('U')
-    assert_equal [%w(when T F), ['else', '', bullet]], actual
+    tick = [0x2713].pack('U')
+    assert_equal [%w(when T F), ['else', '', tick]], actual
     texts = tree.elements.to_a('.//*[@data-operand]/*[@data-text]')
     assert_equal(['1'], texts.map { |text| text_of(text) })
   end
@@ -735,8 +735,8 @@ class HtmlFileTest < Id58TestBase
     arm = tree.elements['.//*[@data-arm]']
     label = text_of(arm.elements['*[@data-label]'])
     taken = arm.elements.to_a('*[@data-cell]').map { text_of(_1) }
-    bullet = [0x2022].pack('U')
-    assert_equal ['||= key.upcase', ['', bullet]], [label, taken]
+    tick = [0x2713].pack('U')
+    assert_equal ['||= key.upcase', ['', tick]], [label, taken]
   end
 
   private

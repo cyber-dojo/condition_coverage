@@ -698,6 +698,324 @@ class KernelTest < Id58TestBase
     assert_output('', '') { exit_report.call }
   end
 
+  test '6rTS4x', %w(
+  | Example: user&.account&.owner, called with no user, a user
+  | with no account, and a user whose account has an owner
+  | The chain is one site, named where it starts.
+  | Its leaves are its receivers, user and user&.account.
+  | Each is nil or not nil, as &. calls on anything not nil,
+  | false included.
+  | A nil receiver skips the rest of the chain, so the leaves
+  | after it are not reached.
+  | All three paths are taken, so there are no gaps.
+  ) do
+    dir = Dir.mktmpdir('6rTS4x')
+    File.write("#{dir}/safe_owner.rb", <<~RUBY)
+      module Owner6rTS4x
+        User = Struct.new(:account)
+        def self.owner(user)
+          user&.account&.owner
+        end
+        Account = Struct.new(:owner)
+      end
+    RUBY
+    exit_report = nil
+    on_exit = ->(&block) { exit_report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+    end
+    require "#{dir}/safe_owner.rb"
+    user = Owner6rTS4x::User
+    users = [nil, user.new(nil), user.new(Owner6rTS4x::Account.new('kim'))]
+    owners = users.map { |each| Owner6rTS4x.owner(each) }
+    assert_equal [nil, nil, 'kim'], owners
+    assert_output('', '') { exit_report.call }
+
+    json = JSON.parse(File.read("#{dir}/path_coverage.json"))
+    expected = [
+      { 'path' => ['not nil', 'not nil'], 'count' => 1 },
+      { 'path' => ['not nil', 'nil'], 'count' => 1 },
+      { 'path' => ['nil', nil], 'count' => 1 }
+    ]
+    assert_equal expected, json['paths']['safe_owner.rb:4:4']['taken']
+  end
+
+  test '6rTS4y', %w(
+  | Example: user&.account&.owner, called only with a user whose
+  | account has an owner
+  | Each path with a nil receiver is a gap, naming each
+  | receiver it reaches, nil or not nil.
+  ) do
+    dir = Dir.mktmpdir('6rTS4y')
+    File.write("#{dir}/safe_gaps.rb", <<~RUBY)
+      module Gaps6rTS4y
+        User = Struct.new(:account)
+        def self.owner(user)
+          user&.account&.owner
+        end
+        Account = Struct.new(:owner)
+      end
+    RUBY
+    exit_report = nil
+    on_exit = ->(&block) { exit_report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+    end
+    require "#{dir}/safe_gaps.rb"
+    account = Gaps6rTS4y::Account.new('kim')
+    assert_equal 'kim', Gaps6rTS4y.owner(Gaps6rTS4y::User.new(account))
+    never = 'safe_gaps.rb:4:4 path never taken:'
+    gaps = [
+      "#{never} `user` not nil, `user&.account` nil",
+      "#{never} `user` nil"
+    ].map { "#{_1}\n" }.join
+    assert_output(gaps, '') { exit_report.call }
+  end
+
+  test '6rTS4z', %w(
+  | Example: ok && user&.admin?, called with ok false, then ok
+  | true and no user, a user not an admin, and an admin
+  | The chain folds into the && site, as one expression.
+  | Its leaves follow ok's: user, nil or not nil, then the
+  | chain's value, true or false, when every receiver was not
+  | nil.
+  | So the four calls take the site's four paths.
+  | The popout shows the chain's rows as user then &.admin?,
+  | user's cells a disc for not nil and an empty set for nil.
+  | Each is titled not nil or nil, for its hover text.
+  ) do
+    dir = Dir.mktmpdir('6rTS4z')
+    File.write("#{dir}/safe_admin.rb", <<~RUBY)
+      module Admin6rTS4z
+        User = Struct.new(:role) do
+          def admin? = role == :admin
+        end
+        def self.admin?(ok, user)
+          ok && user&.admin?
+        end
+      end
+    RUBY
+    exit_report = nil
+    on_exit = ->(&block) { exit_report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+      report :html
+    end
+    require "#{dir}/safe_admin.rb"
+    user = Admin6rTS4z::User
+    calls = [[false, nil], [true, nil], [true, user.new(:dev)],
+             [true, user.new(:admin)]]
+    answers = calls.map { |ok, each| Admin6rTS4z.admin?(ok, each) }
+    assert_equal [false, nil, false, true], answers
+    assert_output('', '') { exit_report.call }
+
+    json = JSON.parse(File.read("#{dir}/path_coverage.json"))
+    taken = json['paths']['safe_admin.rb:6:4']['taken']
+    assert_equal([1, 1, 1, 1], taken.map { _1['count'] })
+    page = File.read("#{dir}/files/safe_admin.rb.html")
+    tree = REXML::Document.new(page).elements["//*[@id='tree-6']"]
+    rows = tree.elements.to_a('.//*[@data-operand]')
+    texts = rows.map { text_of(_1.elements['*[@data-text]']) }
+    assert_equal ['ok', 'user', '&.admin?'], texts
+    cells = rows[1].elements.to_a('*[@data-cell]').map { text_of(_1) }
+    disc, empty = [0x25CF, 0x2205].map { [_1].pack('U') }
+    assert_equal [disc, disc, empty, ''], cells
+    titles = rows[1].elements.to_a('*[@data-cell]').map do |cell|
+      cell.attributes['title']
+    end
+    assert_equal ['not nil', 'not nil', 'nil', nil], titles
+  end
+
+  test '6rTS5a', %w(
+  | Example: if user&.admin?, called with no user, a user not an
+  | admin, and an admin
+  | The chain folds into the if site as its predicate.
+  | So the three calls take its three paths: user nil, and
+  | user not nil with admin? true or false.
+  ) do
+    dir = Dir.mktmpdir('6rTS5a')
+    File.write("#{dir}/safe_label.rb", <<~RUBY)
+      module Label6rTS5a
+        User = Struct.new(:role) do
+          def admin? = role == :admin
+        end
+        def self.label(user)
+          if user&.admin?
+            :admin
+          else
+            :user
+          end
+        end
+      end
+    RUBY
+    exit_report = nil
+    on_exit = ->(&block) { exit_report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+    end
+    require "#{dir}/safe_label.rb"
+    user = Label6rTS5a::User
+    users = [nil, user.new(:dev), user.new(:admin)]
+    labels = users.map { |each| Label6rTS5a.label(each) }
+    assert_equal %i[user user admin], labels
+    assert_output('', '') { exit_report.call }
+
+    json = JSON.parse(File.read("#{dir}/path_coverage.json"))
+    taken = json['paths']['safe_label.rb:6:4']['taken']
+    assert_equal([1, 1, 1], taken.map { _1['count'] })
+  end
+
+  test '6rTS5b', %w(
+  | Example: box&.size ||= 3, called with no box, a box with no
+  | size and a box of size 5
+  | With no box, the whole write is skipped: its right side
+  | does not run, yet the target was not found set either.
+  | So the write is no site, rather than one reporting its
+  | target set when it was never looked at.
+  ) do
+    dir = Dir.mktmpdir('6rTS5b')
+    File.write("#{dir}/safe_write.rb", <<~RUBY)
+      module Fill6rTS5b
+        Box = Struct.new(:size)
+        def self.fill(box)
+          box&.size ||= 3
+        end
+      end
+    RUBY
+    exit_report = nil
+    on_exit = ->(&block) { exit_report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+    end
+    require "#{dir}/safe_write.rb"
+    box = Fill6rTS5b::Box
+    boxes = [nil, box.new(nil), box.new(5)]
+    sizes = boxes.map { Fill6rTS5b.fill(_1) }
+    assert_equal [nil, 3, 5], sizes
+    assert_output('', '') { exit_report.call }
+
+    json = JSON.parse(File.read("#{dir}/path_coverage.json"))
+    assert_equal({}, json.fetch('paths', {}))
+  end
+
+  test '6rTS5d', %w(
+  | Example: ids.any? { |id| id.odd? }, standing alone, called with
+  | no ids, one odd, one even, an even then an odd, and two even
+  | It is a site of its own, being no part of a larger expression.
+  | The five calls take its five paths, so there are no gaps.
+  ) do
+    dir = Dir.mktmpdir('6rTS5d')
+    File.write("#{dir}/found_odd.rb", <<~RUBY)
+      module Found6rTS5d
+        def self.found?(ids)
+          ids.any? { |id| id.odd? }
+        end
+      end
+    RUBY
+    exit_report = nil
+    on_exit = ->(&block) { exit_report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+    end
+    require "#{dir}/found_odd.rb"
+    calls = [[], [1], [2], [2, 3], [2, 4]]
+    found = calls.map { |ids| Found6rTS5d.found?(ids) }
+    assert_equal [false, true, false, true, false], found
+    assert_output('', '') { exit_report.call }
+  end
+
+  test '6rTS5e', %w(
+  | Example: ids.select { |id| id.odd? }.any? &&
+  | ids.all? { |id| id > 0 }
+  | Both block calls fold into the && site, as one expression.
+  | The select sits inside the leaf ids.select { ... }.any?, so
+  | the popout shows the select's rows, then the leaf's own row
+  | with the select's text an ellipsis: ....any?.
+  | The all? is the &&'s operand itself, so the popout shows it
+  | as a nested condition, its value following from its path.
+  ) do
+    dir = Dir.mktmpdir('6rTS5e')
+    File.write("#{dir}/both_html.rb", <<~RUBY)
+      module Both6rTS5e
+        def self.both?(ids)
+          ids.select { |id| id.odd? }.any? && ids.all? { |id| id > 0 }
+        end
+      end
+    RUBY
+    exit_report = nil
+    on_exit = ->(&block) { exit_report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+      report :html
+    end
+    require "#{dir}/both_html.rb"
+    answers = [[1], [2], [1, -1]].map { |ids| Both6rTS5e.both?(ids) }
+    assert_equal [true, false, false], answers
+    assert_output('', '') { exit_report.call }
+
+    page = File.read("#{dir}/files/both_html.rb.html")
+    tree = REXML::Document.new(page).elements["//*[@id='tree-3']"]
+    operators = tree.elements.to_a('.//*[@data-operator]')
+    assert_equal(%w(&& select all?), operators.map { text_of(_1) })
+    texts = tree.elements.to_a('.//*[@data-operand]/*[@data-text]')
+    ellipsis = [0x2026].pack('U')
+    expected = ['ids', 'id.odd?', "#{ellipsis}.any?", 'ids', 'id > 0']
+    assert_equal(expected, texts.map { text_of(_1) })
+  end
+
+  test '6rTS5c', %w(
+  | Example: lookup(id)&.rename 'kim', a chain whose first call
+  | has no receiver and whose last is a command call, called
+  | with an id found and one not
+  | The rewritten code still loads, the command parenthesised.
+  | Both paths are taken: lookup(id) nil, and not nil.
+  ) do
+    dir = Dir.mktmpdir('6rTS5c')
+    File.write("#{dir}/safe_rename.rb", <<~RUBY)
+      module Rename6rTS5c
+        User = Struct.new(:name) do
+          def rename(name)
+            self.name = name
+          end
+        end
+        USERS = { 1 => User.new('al') }.freeze
+        def self.lookup(id) = USERS[id]
+        def self.rename(id)
+          lookup(id)&.rename 'kim'
+        end
+      end
+    RUBY
+    exit_report = nil
+    on_exit = ->(&block) { exit_report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+    end
+    require "#{dir}/safe_rename.rb"
+    names = [2, 1].map { |id| Rename6rTS5c.rename(id) }
+    assert_equal [nil, 'kim'], names
+    assert_output('', '') { exit_report.call }
+
+    json = JSON.parse(File.read("#{dir}/path_coverage.json"))
+    taken = json['paths']['safe_rename.rb:10:4']['taken']
+    assert_equal([1, 1], taken.map { _1['count'] })
+  end
+
   test '6rTS48', %w(
   | Example: report :html, and crew? called once
   | The exit report writes index.html into coverage_dir.
@@ -996,11 +1314,12 @@ class KernelTest < Id58TestBase
 
   test '6rTS4d', %w(
   | Example: if ids.any? { |id| id.start_with?('L') && id.size > 1 }
-  | There are three sites: the if, the any?, and the &&.
+  | There are two sites: the if, with the any? folded into its
+  | predicate, and the && in the block, a new scope.
   | led? is called with [], ['Lx'], and ['ab', 'cd'].
   | It still returns :not, :led, :not.
   | The exit report prints the paths each site never took.
-  | Eg any? never had `ids` 1 item with its block false.
+  | Eg the if never had `ids` 1 item with the block false.
   ) do
     dir = Dir.mktmpdir('6rTS4d')
     File.write("#{dir}/led.rb", <<~RUBY)
@@ -1026,8 +1345,8 @@ class KernelTest < Id58TestBase
     assert_equal %i[not led not], led
     block = "`id.start_with?('L') && id.size > 1`"
     expected = [
-      "led.rb:3:11 path never taken: `ids` 1 item, #{block} false",
-      "led.rb:3:11 path never taken: `ids` 2+ items, #{block} true",
+      "led.rb:3:4 path never taken: `ids` 1 item, #{block} false",
+      "led.rb:3:4 path never taken: `ids` 2+ items, #{block} true",
       'led.rb:3:23 path never taken: ' \
       "`id.start_with?('L')` true, `id.size > 1` false"
     ].join("\n")

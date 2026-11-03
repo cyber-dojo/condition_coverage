@@ -1,3 +1,4 @@
+require_relative 'block_paths'
 require_relative 'condition'
 
 module PathCoverage
@@ -12,9 +13,30 @@ module PathCoverage
       shape = BLOCK_PATHS[site.operator]
       return shape if shape
 
-      walk(site, site.fixed).map do |outcomes, _value|
+      ways = if site.operator == SAFE
+               safe(site.operands, nil, site.fixed)
+             else
+               walk(site, site.fixed)
+             end
+      ways.map do |outcomes, _value|
         site.leaves.map { |range| outcomes[range] }
       end
+    end
+
+    # The ways a &. chain can be evaluated: each receiver not
+    # nil going on to the next, a nil one ending the chain, its
+    # value false; then, given a last leaf, the chain's value
+    # as an operand of a condition, the ways it can be.
+    def self.safe(receivers, last, fixed)
+      first, *rest = receivers
+      on = if !rest.empty? then safe(rest, last, fixed)
+           elsif last then walk(last, fixed)
+           else [[{}, true]]
+           end
+      present = on.map do |outcomes, value|
+        [outcomes.merge(first => PRESENCE[0]), value]
+      end
+      [*present, [{ first => PRESENCE[1] }, false]]
     end
 
     # The outcome of an operand on which each operator goes on
@@ -25,22 +47,70 @@ module PathCoverage
       'when' => false, 'case' => false
     }.freeze
 
+    # The operators whose operands are a predicate and arms.
+    ARMED = [*CHOICES, *WRITES].freeze
+
     # [[{ leaf range => outcome }, value], ...] for each way
     # node can be evaluated, value being the outcome of node as
     # a whole; fixed is the site's { leaf range => its one
-    # outcome }. A case is the chain of its whens' conditions.
+    # outcome }. A &. chain nested in a condition has its value
+    # as its last leaf.
     def self.walk(node, fixed)
       return leaf(node, fixed) unless node.is_a?(Condition)
-      if [*CHOICES, *WRITES].include?(node.operator)
-        return ternary(node, fixed)
-      end
 
-      if node.operator == 'case'
-        whens = node.operands.filter_map(&:body)
-        return chain(node.with(operands: whens), fixed)
-      end
+      send(walker(node.operator), node, fixed)
+    end
 
-      chain(node, fixed)
+    # The name of the method that walks a condition named operator:
+    # a choice's or a write's arms, a block method's shape, a
+    # case's whens, a leaf with sites inside it, a nested &.
+    # chain, or a chain of one operator.
+    def self.walker(operator)
+      return :ternary if ARMED.include?(operator)
+      return :block if BLOCK_PATHS.key?(operator)
+
+      WALKERS.fetch(operator, :chain)
+    end
+
+    # The walker of each other condition with one of its own.
+    WALKERS = {
+      'case' => :cases, CONTAINS => :contains, SAFE => :nested_safe
+    }.freeze
+
+    # The ways a &. chain nested in a condition can be evaluated,
+    # its value its last leaf.
+    def self.nested_safe(node, fixed)
+      safe(node.operands[0...-1], node.operands.last, fixed)
+    end
+
+    # The ways a block method's call nested in a site can be
+    # evaluated, fixed by its shape: its receiver's count of items
+    # with its block's answers, its value following from them.
+    def self.block(node, _fixed)
+      BlockPaths.ways(node)
+    end
+
+    # The ways a leaf with sites inside it can be evaluated: each
+    # way of every one of those sites, which run as it does, then
+    # each way of the leaf itself, its value the whole's.
+    def self.contains(node, fixed)
+      *inner, range = node.operands
+      before = inner.reduce([{}]) do |ways, site|
+        ways.product(walk(site, fixed)).map do |outcomes, (more, _)|
+          outcomes.merge(more)
+        end
+      end
+      ways = before.product(leaf(range, fixed))
+      ways.map do |outcomes, (more, value)|
+        [outcomes.merge(more), value]
+      end
+    end
+
+    # The ways a case can be evaluated: as the chain of its
+    # whens' conditions.
+    def self.cases(node, fixed)
+      whens = node.operands.filter_map(&:body)
+      chain(node.with(operands: whens), fixed)
     end
 
     # The ways a chain of one operator can be evaluated: each

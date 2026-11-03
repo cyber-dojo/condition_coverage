@@ -6,6 +6,19 @@ module PathCoverage
   # decided by their predicate alone.
   STATEMENT_CHOICES = %w[if unless].freeze
 
+  # The operator of a safe-navigation chain, eg user&.account.
+  SAFE = '&.'.freeze
+
+  # The operator of a leaf with sites inside it, eg
+  # ids.select { |i| i.odd? }.any? as an operand of an &&: its
+  # operands are those sites' Conditions, then the leaf's own byte
+  # range, whose outcome is the leaf's value.
+  CONTAINS = 'contains'.freeze
+
+  # A &. receiver's outcome: not nil, so the call is made, false
+  # included, or nil, so the rest of the chain is skipped.
+  PRESENCE = ['not nil', 'nil'].freeze
+
   # The writes whose target decides whether their right side
   # runs, as an unless or an if decides its arm: x ||= v runs v
   # when x is false, x &&= v when x is true.
@@ -52,6 +65,10 @@ module PathCoverage
     [ITEMS[2], ANSWERS[0]], [ITEMS[2], ANSWERS[1]],
     [ITEMS[2], ANSWERS[2]]
   ].freeze
+
+  # The block methods whose value follows from their path alone:
+  # all but find and detect, whose found item may itself be nil.
+  VALUED = [*STOP_EARLY - %w[find detect], *EVERY_ITEM].freeze
 
   # Every block method whose call is a site, by its paths.
   BLOCK_PATHS = [

@@ -3,10 +3,14 @@ AllCops:
   TargetRubyVersion: 3.2
   # shop.rb is the demo's mock of every shape of choice the
   # report draws, written to be awkward rather than tidy;
+  # demo/popouts are the README's popout examples, written to
+  # show each kind of site, eg ids.any? { |id| id.odd? } rather
+  # than ids.any?(&:odd?), which is none;
   # html_paths.rb is a SPIKE, unlinted while its design settles.
   Exclude:
     - reports/**/*
     - demo/source/shop.rb
+    - demo/popouts/**/*
     - lib/path_coverage/html_paths.rb
 
 Layout/LineLength:
@@ -23,6 +27,7 @@ Style/FrozenStringLiteralComment:
 Style/CaseEquality:
   Exclude:
     - lib/path_coverage/recorder.rb
+    - lib/path_coverage/recorder_cases.rb
 
 # fee.rb is the README's example, whose ifs keep their end, as
 # a modifier if is no site and so would draw no grid.

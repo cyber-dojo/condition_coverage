@@ -300,4 +300,38 @@ class RecorderTest < Id58TestBase
     assert_equal expected, recorder.site_paths
     assert_equal({ truthy: 0, falsy: 1 }, recorder.counts[[site, 1]])
   end
+
+  test '8TuB67', %w(
+  | Example: ok && ids.any? { |id| id.odd? }, the any? begun in
+  | another fiber than its site was entered in
+  | There is no trail to begin its items on.
+  | So it begins none, and the site's path is unchanged.
+  ) do
+    recorder = PathCoverage::Recorder.new
+    site = 'k.rb:2:4'
+    trail = recorder.enter(site, 3)
+    begun = Fiber.new { recorder.begin_items(site, 1) }.resume
+    assert_nil begun
+    recorder.leave(trail, true)
+    expected = { site => { [nil, nil, nil] => 1 } }
+    assert_equal expected, recorder.site_paths
+  end
+
+  test '8TuB66', %w(
+  | Example: user&.name entered in one fiber, its receiver user
+  | noted in another
+  | user is counted, not nil.
+  | It is returned unchanged.
+  | It is not noted on any path.
+  ) do
+    recorder = PathCoverage::Recorder.new
+    site = 'k.rb:2:4'
+    trail = recorder.enter(site, 1)
+    user = Struct.new(:name).new('kim')
+    noted = Fiber.new { recorder.present(site, 0, 0, user) }.resume
+    assert_same user, noted
+    recorder.leave(trail, 'kim')
+    assert_equal({ site => { [nil] => 1 } }, recorder.site_paths)
+    assert_equal({ truthy: 1, falsy: 0 }, recorder.counts[[site, 0]])
+  end
 end

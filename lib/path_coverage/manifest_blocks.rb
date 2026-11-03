@@ -53,14 +53,23 @@ module PathCoverage
     # among the commands when it is no bare argument.
     def block_condition(node)
       node.receiver.accept(self)
-      body = block_expression(node.block)
-      body.accept(self)
-      @notes[:commands] << extent_of(body) if bare_less?(body)
+      body = block_body(node.block)
       Condition.new(
         operator: node.name.to_s,
-        operands: [extent_of(node.receiver), extent_of(body)],
+        operands: [extent_of(node.receiver), body],
         extent: extent_of(node)
       )
+    end
+
+    # The byte range of block's one expression, any site in it
+    # visited as one of its own, as the block runs once per item;
+    # noted among the commands when it is no bare argument.
+    def block_body(block)
+      body = block_expression(block)
+      scoped { body.accept(self) }
+      range = extent_of(body)
+      @notes[:commands] << range if bare_less?(body)
+      range
     end
 
     # True for an expression that is no bare argument: a command

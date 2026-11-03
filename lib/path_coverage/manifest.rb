@@ -2,7 +2,9 @@ require 'prism'
 require_relative 'condition'
 require_relative 'manifest_blocks'
 require_relative 'manifest_case'
+require_relative 'manifest_chains'
 require_relative 'manifest_choices'
+require_relative 'manifest_folding'
 require_relative 'manifest_writes'
 require_relative 'site'
 
@@ -74,7 +76,9 @@ module PathCoverage
     class ConditionSites < Prism::Visitor
       include ManifestBlocks
       include ManifestCase
+      include ManifestChains
       include ManifestChoices
+      include ManifestFolding
       include ManifestWrites
 
       # Starts with no sites found.
@@ -82,6 +86,7 @@ module PathCoverage
         @path = path
         @sites = {}
         @notes = nil
+        @inner = nil
         super()
       end
 
@@ -120,10 +125,11 @@ module PathCoverage
         add_site(node)
       end
 
-      # Notes a block method's call as a site, when its block's
-      # every call can be seen; any other call is no site, though
-      # a condition inside it may be.
+      # Notes a &. chain as a site, or a block method's call, when
+      # its block's every call can be seen; any other call is no
+      # site, though a condition inside it may be.
       def visit_call_node(node)
+        return add_site(node) if safe_chain?(node)
         return super unless block_site?(node)
 
         add_site(node)
@@ -132,12 +138,16 @@ module PathCoverage
       # Notes node as a site, named where it starts: an if or an
       # unless at its keyword. It claims its place first, so a
       # site found inside one of its leaves or arms follows it.
+      # While a leaf is being visited, any site is collected as
+      # part of that leaf instead, as it is part of one expression.
       def add_site(node)
+        return @inner << nested_condition_of(node) if @inner
+
         site = Site.at(@path, site_loc(node))
         @sites[site] = nil
         outer = @notes
         @notes = { commands: [], fixed: {} }
-        condition = condition_of(node)
+        condition = scoped { condition_of(node) }
         @sites[site] = condition.with(**@notes)
         @notes = outer
       end
@@ -146,12 +156,13 @@ module PathCoverage
       # operator as written; a ternary is named ?:, an if if and
       # an unless unless, their operands a predicate and arms; a
       # case case, its operands its arms; a write ||= or &&=, its
-      # operands its target and its right side.
+      # operands its target and its right side; a &. chain &., its
+      # operands its receivers.
       def condition_of(node)
         return write_condition(node) if write?(node)
         return choice_of(node) if CHOICE_TYPES.include?(node.type)
         return case_condition(node) if node.type == :case_node
-        return block_condition(node) if node.type == :call_node
+        return call_condition(node) if node.type == :call_node
 
         Condition.new(
           operator: node.operator, operands: operands_of(node),
@@ -161,12 +172,16 @@ module PathCoverage
 
       # node's operands: a chain of the same operator flattened
       # into one list, the other operator nested as a Condition,
-      # anything else a leaf's byte range.
+      # as is a &. chain, its value its last leaf, anything else a
+      # leaf's byte range.
       def operands_of(node)
         [node.left, node.right].flat_map do |written|
           operand = grouped(written)
           next operands_of(operand) if operand.type == node.type
           next [condition_of(operand)] if operator?(operand)
+          if safe_chain?(operand)
+            next [chain_condition(operand, value: true)]
+          end
 
           [leaf(operand)]
         end
@@ -183,17 +198,17 @@ module PathCoverage
         OPERATOR_TYPES.include?(node.type)
       end
 
-      # The byte range of a leaf operand, once any site inside
-      # it is noted too, and the range noted among its site's
-      # commands and fixed leaves where it is one.
+      # The byte range of a leaf operand, noted among its site's
+      # commands and fixed leaves where it is one; or, when sites
+      # that fold are found inside it, the leaf with them nested.
       def leaf(operand)
-        operand.accept(self)
+        inner = collected { operand.accept(self) }
         loc = operand.location
         range = loc.start_offset...loc.end_offset
         @notes[:commands] << range if Manifest.command?(operand)
         outcome = Manifest.fixed_outcome(operand)
         @notes[:fixed][range] = outcome if outcome
-        range
+        contained(inner, range)
       end
 
       # The one statement inside a parenthesised operand, or the

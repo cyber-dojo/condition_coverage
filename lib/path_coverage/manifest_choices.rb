@@ -11,10 +11,12 @@ module PathCoverage
     # being an if_node with no if keyword.
     CHOICE_TYPES = %i[if_node unless_node].freeze
 
-    # Where node's site starts: an if's or an unless's keyword,
-    # which a modifier's statement comes before; anything
-    # else's own start.
+    # Where node's site starts: a &. chain's start; a block
+    # method's call at its method; an if's or an unless's
+    # keyword, which a modifier's statement comes before;
+    # anything else's own start.
     def site_loc(node)
+      return node.location if safe_chain?(node)
       return node.message_loc if node.type == :call_node
       return node.location unless CHOICE_TYPES.include?(node.type)
       return node.location if ternary?(node)
@@ -69,10 +71,10 @@ module PathCoverage
     end
 
     # An if's arm, statements its code, which never folds into
-    # the if's site; any site inside it is a site of its own.
-    # An arm with no statements has no extent.
+    # the if's site; as a new scope, any site inside it is a site
+    # of its own. An arm with no statements has no extent.
     def statement_arm(kind, statements)
-      statements&.accept(self)
+      scoped { statements&.accept(self) }
       extent = statements ? extent_of(statements) : nil
       Arm.new(kind:, extent:, body: nil)
     end
@@ -85,7 +87,7 @@ module PathCoverage
         return [statement_arm(:else, subsequent.statements)]
       end
 
-      subsequent.accept(self)
+      scoped { subsequent.accept(self) }
       extent = extent_of(subsequent)
       [Arm.new(kind: :else, extent:, body: nil)]
     end
@@ -100,17 +102,19 @@ module PathCoverage
     end
 
     # One arm of a ternary, statements its code: a condition
-    # folds in as its body, being part of the one expression;
-    # any site inside a plain arm is a site of its own.
+    # folds in as its body, being part of the one expression, as
+    # does a plain arm with sites inside it, its value its last
+    # leaf; a plain arm with none has no body.
     def arm_of(kind, statements)
       written = grouped(statements.body.first)
+      extent = extent_of(statements)
       body = if foldable?(written)
                condition_of(written)
              else
-               statements.accept(self)
-               nil
+               inner = collected { statements.accept(self) }
+               inner.empty? ? nil : contained(inner, extent)
              end
-      Arm.new(kind:, extent: extent_of(statements), body:)
+      Arm.new(kind:, extent:, body:)
     end
 
     # True for a condition that folds into a ternary's site:
@@ -125,10 +129,14 @@ module PathCoverage
     end
 
     # A ternary's or an if's predicate as its operand: an && or
-    # || nested as a Condition, anything else a leaf.
+    # || nested as a Condition, as is a &. chain, its value its
+    # last leaf, anything else a leaf.
     def predicate_of(node)
-      predicate = node.predicate
+      predicate = grouped(node.predicate)
       return condition_of(predicate) if operator?(predicate)
+      if safe_chain?(predicate)
+        return chain_condition(predicate, value: true)
+      end
 
       leaf(predicate)
     end

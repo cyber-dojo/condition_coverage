@@ -1,4 +1,6 @@
 require_relative 'condition'
+require_relative 'rewriter_chains'
+require_relative 'rewriter_nested'
 require_relative 'rewriter_writes'
 
 module PathCoverage
@@ -30,6 +32,7 @@ module PathCoverage
       if WRITES.include?(kind)
         return RewriterWrites.inserts(site, condition)
       end
+      return RewriterChains.inserts(site, condition) if kind == SAFE
 
       blocks = BLOCK_PATHS.key?(kind)
       return block_inserts(site, condition) if blocks
@@ -68,12 +71,20 @@ module PathCoverage
     end
 
     # The inserts that wrap each of site's leaves in a record
-    # call, innermost of all.
+    # call, innermost of all; a leaf of a nested site that needs
+    # a call of its own, eg a &. chain's, in the call
+    # RewriterNested gives it, or in none, and that site's own
+    # inserts too.
     def self.record_inserts(site, condition)
-      condition.leaves.each_with_index.flat_map do |range, index|
-        command = condition.commands.include?(range)
-        wrap(record_call(site, index), range, command, 0)
+      nested = RewriterNested.calls(site, condition)
+      leaves = condition.leaves
+      records = leaves.each_with_index.flat_map do |range, i|
+        call = nested.fetch(range) { record_call(site, i) }
+        next [] unless call
+
+        wrap(call, range, condition.commands.include?(range), 0)
       end
+      records + RewriterNested.inserts(site, condition)
     end
 
     WORD_OPERATORS = %w[and or].freeze

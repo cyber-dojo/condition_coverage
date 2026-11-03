@@ -7,58 +7,19 @@
 Path coverage for Ruby, to run alongside SimpleCov's line and branch
 coverage.
 
-Gem: https://rubygems.org/gems/path_coverage (which shows the latest
-version).
-
 Status: sites cover `&&`, `||`, `and`, `or`, the ternary `?:`,
 `if`/`elsif`/`else` and `unless` (modifiers included), `case`/`when`
 with a subject, and the block methods `any?` `all?` `none?` `find`
 `detect` `find_index` `take_while` `select` `filter` `reject`
-`partition` `count` `filter_map`. Method paths cover `if` decisions.
+`partition` `count` `filter_map`, the writes `||=` and `&&=`, and `&.`
+safe-navigation chains. Method paths cover `if` decisions.
 More decisions hidden inside calls come next (see Roadmap).
 
 Demo: https://cyber-dojo.github.io/path_coverage/ shows the HTML report
 for the mock source tree in `demo/`. `make demo` builds and opens the
 same report locally.
 
-Take this method:
-
-```ruby
-def fee(user, order)
-  total = 100
-  if user.member? && order.paid?
-    total -= 5
-  end
-  if order.big?
-    total -= 10
-  end
-  total
-end
-```
-
-Tests that run both `if`s both ways reach every line and every branch,
-so SimpleCov, which reads Ruby's built-in `Coverage`, reports 100%. Yet
-they can still miss paths, at two scopes, and path_coverage lists each
-path no test took.
-
-## Within each decision
-
-The first `if` can go three ways: member and paid, member and not
-paid, not a member. A member who has not paid may never have been
-tried.
-
-![The first if's grid: a column per way it can go, each headed by
-its count, the member who has not paid at 0](docs/decision.png)
-
-## Within each method
-
-The two `if`s can go four ways together. A paying member with a small
-order may never have been tried.
-
-![fee's grid: a column per way its two ifs can go together, each
-headed by its count, true then false at 0 and selected](docs/method.png)
-
-## Use
+## Getting started
 
 ```ruby
 # test coverage config, before any application code is required
@@ -70,24 +31,98 @@ end
 PathCoverage.start do
   root APP_DIR                 # cover globs and site names are relative to it
   cover 'source/**/*.rb'       # each matching file is instrumented as it loads
+  cover 'test/**/*.rb'         # more than one cover glob may be given
   skip 'source/vendor/**/*.rb' # except these, though a cover glob matches them
   coverage_dir '/tmp/coverage' # where path_coverage.json is written
   measure :decisions, :methods # :decisions alone unless :methods is named
   report :gaps, :html          # the reporters run at exit (default :gaps);
                                # also :summary and :post
-  group 'Models', 'source/models/**/*.rb'   # a tab of its own on index.html
+  group 'code', 'source/**/*.rb' # each group a tab of its own on index.html
+  group 'test', 'test/**/*.rb'
 end
 ```
 
-A misspelt setting or an unknown reporter is refused by name, with the list
-of the ones there are. Calling `start` again replaces the configuration.
-`cover` and `skip` can each be given more than once; a file matching any
-`skip` glob is neither instrumented nor reported. Each `group`, given a name
-and one or more globs, gets a tab of its own on the HTML index, after All
-files, with its own Total row; covered files no group matches get an
-Ungrouped tab. A file may be in more than one group.
 
-## When you cannot change the code!
+## Reading the HTML
+
+Text based reports of path coverage quickly become dense and hard to follow. 
+- so use `report :html`.
+- clicking a line number on a file's HTML page opens that line's popout.
+
+![A file's page: line 2, if user&.admin? && ids.select { |id| id.odd? }.any?, its button pressed, its popout open beside it](docs/example-overview.png)
+
+Each popout has two sections:
+- on the left is a hierarchical representation of the code fragment.
+- on the right is one column for each possible path through that fragment.
+  - at the top of the column is the count of that path. Look for zeros!
+  - the symbols in the column align with their fragment and are explained below.
+
+### Boolean: `T` `F` 
+
+![A file's page: line 2, name.size > 2 && name.ascii_only?, its button pressed, its popout open beside it](docs/example-outcome.png)
+
+- `T` the expression was true.
+- `F` the expression was false.
+
+So in this example, there was no test which exercised the path where `name.size > 2` was `true`, and 
+`name.ascii_only?` was `false`.
+
+
+### Unreachable: blank 
+
+![A file's page: line 2, @x = dee || dum, its button pressed, its popout open beside it](docs/example-unreachable.png)
+
+- "blank" the expression is never evaluated. 
+
+In the second column `dee` was `T`, so because of `||`'s short-circuiting, `dum` is never evaluated.
+
+### Taken: `✓`
+
+![A file's page: line 2, if paid, its button pressed, its popout open beside it](docs/example-taken.png)
+
+- `✓` marks the column whose path took that "arm"
+
+The `paid` row is the `if`'s predicate, `T` or `F`. Below it is one row
+per arm, named `then` and `else`.  The first column, `paid` false, took `else`; the
+second, `paid` true, took `then`.
+
+### Navigation: `∅` `●`
+
+![A file's page: line 2, user&.account&.owner, its button pressed, its popout open beside it](docs/example-nil.png)
+
+- `∅` the receiver was nil, so `&.` skipped the rest of the chain.
+- `●` the receiver was not nil, so `&.` made the call.
+
+So in this example, there was no test which exercised the path where
+`user` was nil.
+
+### Symbol: `0` `1` `*` (Count)
+
+![A file's page: line 2, ids.any? { |id| id.odd? }, its button pressed, its popout open beside it](docs/example-count.png)
+
+- `0` the block was called with no items.
+- `1` the block was called with one item.
+- `*` the block was called with two or more items.
+
+So in this example, there was no test which exercised the path where
+the block was called with two or more items and its last answer was
+`false`.
+
+### Symbol: `TF` (Both)
+
+![A file's page: line 2, ids.select { |id| id.odd? }, its button pressed, its popout open beside it](docs/example-both.png)
+
+- `T` every answer of the block was true.
+- `F` every answer of the block was false.
+- `TF` the block's answers were both true and false.
+
+So in this example, there was no test which exercised the path where
+the block was called with two or more items and every answer was
+`false`.
+
+
+
+## Use when you cannot edit the code!
 
 A run whose code cannot be changed, such as a script in a `docker build`
 step, can be covered from its environment alone:
@@ -185,41 +220,8 @@ should read the JSON, whose `paths` give each site's leaves as
 ```
 
 A site is an outermost condition. Its leaves are numbered left to right
-across the whole of it, nested conditions included. Each example below is
-a line of code, then its site's tree, as a popout draws it:
-
-```text
-ok?(id) && (new?(id) || id.size == 6)
-
-&&                            one site
-├─ ok?(id)                    leaf 0
-└─ ||                         nested by parentheses, no site of its own
-   ├─ new?(id)                leaf 1
-   └─ id.size == 6            leaf 2
-```
-
-```text
-ids.map { |k| k && k.ok? } && ok?(id)
-
-&&                            one site
-├─ ids.map { ... }            leaf 0
-└─ ok?(id)                    leaf 1
-
-&&                            a second site, inside the block
-├─ k                          leaf 0
-└─ k.ok?                      leaf 1
-```
-
-```text
-ok?(id) ? new?(id) && id.size == 6 : :no
-
-?:                            one site
-├─ ok?(id)                    leaf 0
-├─ ? &&                       an arm holding a condition, part of the site
-│  ├─ new?(id)                leaf 1
-│  └─ id.size == 6            leaf 2
-└─ : :no                      a plain arm
-```
+across the whole of it, nested conditions included. A condition inside a
+block is a site of its own.
 
 A ternary is a site even when its predicate is a single leaf. An arm
 holding a condition of `&&`, `||`, `and`, `or` or `?:` is part of the
@@ -242,16 +244,12 @@ whose `===` calls the pattern's `===` once, exactly as the `case` would,
 and notes whether it matched. A `case` with no subject, or with a splat
 among its patterns, is no site.
 
-A call to a block method, with no arguments and a block of one
-expression, is a site named at its method. Its two leaves are its
-receiver, showing how many items its block was called with (`0 items`,
-`1 item` or `2+ items`), and its block's expression: for `any?` `all?`
-`none?` `find` `detect` `find_index` and `take_while`, which stop once
-their block decides, its last answer; for `select` `filter` `reject`
-`partition` `count` and `filter_map`, which call it with every item,
-whether its answers were `all true`, `all false` or `both`. Both are
-noted from the block's own calls, so the receiver is never asked for its
-size, which could consume a sequence that can be read only once.
+A call to `any?` `all?` `none?` `find` `detect` `find_index`
+`take_while` `select` `filter` `reject` `partition` `count` or
+`filter_map`, with no arguments and a block of one expression, is a site
+named at its method. Its item count is noted from the block's own calls,
+so the receiver is never asked its size, which could consume a sequence
+that can be read only once.
 
 A `||=` or `&&=` write is a site, whatever its target: a variable of any
 kind, a constant, an attribute (`self.size ||= n`) or an index
@@ -261,6 +259,16 @@ as an `unless` or an `if` runs its arm. The target is never read again,
 since reading `store[key]` could call a method twice: its outcome follows
 from whether the right side ran. So `@clock ||= Clock.now` called only
 once, as a fresh object, leaves the path with `@clock` true a gap.
+
+A `&.` chain is a site, named where it starts. Its leaves are the
+receivers of its `&.` calls. `false` counts as not nil, as `&.` calls on
+it.
+
+A chain inside a condition, eg `ok?(id) && user&.admin?` or
+`if user&.admin?`, folds into its site, as one expression: its value is
+one more leaf, true or false, reached when every receiver is not nil. A
+write through `&.`, eg `box&.size ||= 3`, is no site, as a nil `box`
+skips it whole and its target is never looked at.
 
 A chain of one operator is flat; a change of operator, by precedence or by
 parentheses, nests. Parentheses are not part of the tree, since they decide
@@ -411,7 +419,7 @@ the run never loaded are read and parsed then.
   - `one?`, whose last answer does not decide it, and block methods
     with blocks of more than one expression
   - `fetch(k, default)`, `dig`, `Hash#[]` with a default: present vs default
-  - `x || default` in value context, `&.` safe navigation: nil vs not nil
+  - `x || default` in value context: nil vs not nil
   - `x rescue y` modifier: raised vs not raised
   - `case` with no subject, and `case`/`in` patterns
   - regex matches: nil vs MatchData
@@ -504,3 +512,21 @@ each push to `main` and publishes `site/`.
 `bin/capture_readme_images.sh` rebuilds the demo and saves this README's
 two screenshots, `docs/decision.png` and `docs/method.png`, from it with
 headless Chrome. Run it again whenever the report's look changes.
+
+
+## Within each decision
+
+The first `if` can go three ways: member and paid, member and not
+paid, not a member. A member who has not paid may never have been
+tried.
+
+![The first if's grid: a column per way it can go, each headed by
+its count, the member who has not paid at 0](docs/decision.png)
+
+## Within each method
+
+The two `if`s can go four ways together. A paying member with a small
+order may never have been tried.
+
+![fee's grid: a column per way its two ifs can go together, each
+headed by its count, true then false at 0 and selected](docs/method.png)

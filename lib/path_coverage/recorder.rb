@@ -1,9 +1,15 @@
 require_relative 'condition'
+require_relative 'recorder_blocks'
+require_relative 'recorder_cases'
+require_relative 'recorder_chains'
 require_relative 'recorder_writes'
 
 module PathCoverage
   # Records the outcome of each instrumented operand.
   class Recorder
+    include RecorderBlocks
+    include RecorderCases
+    include RecorderChains
     include RecorderWrites
 
     # One call's way through its method: the outcome of each
@@ -131,55 +137,6 @@ module PathCoverage
       last = matched || index == size - 1
       leave(trails(site).last, matched) if last
       matched
-    end
-
-    # Starts an evaluation of a stop-early block method's call
-    # at site, its block not yet called with any item.
-    def enter_items(site)
-      trail = enter(site, 2)
-      trail.outcomes[0] = ITEMS[0]
-      trail
-    end
-
-    # Notes value, the block's answer, as its last, and one more
-    # item it was called with; returns value unchanged. A block
-    # called where its call was not entered, eg in another
-    # fiber, is counted but noted on no path.
-    def item(site, value)
-      trail = trails(site).last
-      one_more(trail) if trail
-      record(site, 1, value)
-    end
-
-    # Notes value, the block's answer for one more item, among
-    # all its answers so far: all true, all false, or both;
-    # returns value unchanged. A block called where its call
-    # was not entered is counted but noted on no path.
-    def answer(site, value)
-      trail = trails(site).last
-      if trail
-        one_more(trail)
-        now = value ? ANSWERS[0] : ANSWERS[1]
-        same = [nil, now].include?(trail.outcomes[1])
-        trail.outcomes[1] = same ? now : ANSWERS[2]
-      end
-      @counts[[site, 1]][value ? :truthy : :falsy] += 1
-      value
-    end
-
-    # Notes on trail one more item its block was called with.
-    def one_more(trail)
-      called = ITEMS.index(trail.outcomes[0]) + 1
-      trail.outcomes[0] = ITEMS[[called, 2].min]
-    end
-
-    # Ends a block method's call, counting its receiver truthy
-    # when its block was called, falsy when not, and its path;
-    # returns value, the call's, unchanged.
-    def leave_items(trail, value)
-      called = trail.outcomes[0] != ITEMS[0]
-      @counts[[trail.site, 0]][called ? :truthy : :falsy] += 1
-      leave(trail, value)
     end
   end
 end

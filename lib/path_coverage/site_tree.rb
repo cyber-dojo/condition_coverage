@@ -1,4 +1,5 @@
 require_relative 'condition'
+require_relative 'site_tree_values'
 
 module PathCoverage
   # The tree shown under a site's line on its file's page: a
@@ -35,12 +36,57 @@ module PathCoverage
     # condition's operands' nodes, leaves and nested conditions
     # built in order, its arms left for arms to build after.
     def self.operands_of(source, condition, outcomes, leaves)
-      condition.operands.map do |operand|
+      nodes = condition.operands.map do |operand|
         case operand
         when Condition then node(source, operand, outcomes, leaves)
         when Arm then operand
         else leaf(source, operand, outcomes, leaves.next)
         end
+      end
+      texted(source, condition, nodes)
+    end
+
+    # nodes, the nodes of condition's operands, with any texts that
+    # repeat others cut: a &. chain's leaves after the first, and a
+    # leaf with sites inside it.
+    def self.texted(source, condition, nodes)
+      case condition.operator
+      when CONTAINS then outside(source, condition, nodes)
+      when SAFE then segments(source, condition.operands, nodes)
+      else nodes
+      end
+    end
+
+    # Stands in for a site inside a leaf's text, eg ….any?.
+    ELLIPSIS = [0x2026].pack('U').freeze
+
+    # A leaf with sites inside it, its own node texted with only
+    # what it adds to them, each site's text an ellipsis, eg
+    # ….any? for ids.select { |id| id.odd? }.any?, as those sites
+    # have rows of their own.
+    def self.outside(source, condition, nodes)
+      *inner, range = condition.operands
+      extents = inner.map(&:extent).sort_by(&:begin).reverse
+      text = extents.reduce(source.byteslice(range)) do |rest, extent|
+        elide(rest, extent.begin - range.begin, extent.size)
+      end
+      [*nodes[0...-1], nodes.last.merge(text:)]
+    end
+
+    # text with the size bytes from byte from an ellipsis.
+    def self.elide(text, from, size)
+      after = text.byteslice((from + size)..)
+      text.byteslice(0, from) + ELLIPSIS + after
+    end
+
+    # A &. chain's leaves, each after the first texted with only
+    # what it adds to the one before, eg &.account after user.
+    def self.segments(source, ranges, nodes)
+      nodes.each_with_index.map do |node, index|
+        next node if index.zero?
+
+        added = ranges[index - 1].end...ranges[index].end
+        node.merge(text: source.byteslice(added))
       end
     end
 
@@ -55,7 +101,7 @@ module PathCoverage
         decided = [predicate[:cells], THEN_ON[condition.operator]]
         arm(source, operand, decided, outcomes, leaves)
       end
-      cells = value(condition.operator, operands)
+      cells = SiteTreeValues.value(condition.operator, operands)
       { operator: condition.operator, cells:, operands: }
     end
 
@@ -100,28 +146,6 @@ module PathCoverage
         arm: arm.kind, text: text_of(source, arm),
         cells: decided.map { |outcome| outcome == picked }, body:
       }
-    end
-
-    # A condition's value in each column: a ternary's, an if's or
-    # a write's is its taken arm's body's, nil for a plain arm; a
-    # chain's is that of the last operand it reached.
-    def self.value(operator, operands)
-      if [*CHOICES, *WRITES].include?(operator)
-        _, *arms = operands
-        arms.map { |arm| arm[:body]&.fetch(:cells) }
-            .then { |bodies| ternary_value(arms, bodies) }
-      else
-        operands.map { |operand| operand[:cells] }
-                .transpose.map { |column| column.compact.last }
-      end
-    end
-
-    # Each column's value from the arm it took.
-    def self.ternary_value(arms, bodies)
-      arms.first[:cells].each_index.map do |column|
-        taken = arms.index { |arm| arm[:cells][column] }
-        taken && bodies[taken]&.fetch(column)
-      end
     end
 
     # One leaf's text and its outcome in each column.

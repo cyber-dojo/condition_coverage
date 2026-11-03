@@ -1,5 +1,6 @@
 require 'cgi/escape'
 require_relative 'condition'
+require_relative 'html_tree_nests'
 
 module PathCoverage
   # The tree of a span's sites on a file's page, from SiteTree.of
@@ -8,14 +9,16 @@ module PathCoverage
     OUTCOMES = {
       true => 'T', false => 'F', nil => '',
       ITEMS[0] => '0', ITEMS[1] => '1', ITEMS[2] => '*',
-      ANSWERS[0] => 'T', ANSWERS[1] => 'F', ANSWERS[2] => 'TF'
+      ANSWERS[0] => 'T', ANSWERS[1] => 'F', ANSWERS[2] => 'TF',
+      PRESENCE[0] => [0x25CF].pack('U'),
+      PRESENCE[1] => [0x2205].pack('U')
     }.freeze
     # The choices whose arms are named by their kind, eg then,
     # else or when, as their text is statements.
     NAMED_ARMS = [*STATEMENT_CHOICES, 'case'].freeze
 
-    # A bullet marks a path taking an arm.
-    TAKEN = { true => [0x2022].pack('U'), false => '' }.freeze
+    # A tick marks a path taking an arm.
+    TAKEN = { true => [0x2713].pack('U'), false => '' }.freeze
 
     # The tree of a span, open when its sites have gaps, else
     # hidden: each site's rows in a group of their own.
@@ -45,10 +48,13 @@ module PathCoverage
       end.join
     end
 
-    # One cell per path, naming each with names.
+    # One cell per path, naming each with names; a &. receiver's,
+    # shown as a glyph, titled not nil or nil for its hover text.
     def self.cells(values, names = OUTCOMES)
       values.map do |value|
-        %(<span class="cell" data-cell="">#{names[value]}</span>)
+        title = PRESENCE.include?(value) ? %( title="#{value}") : ''
+        attrs = %(class="cell" data-cell=""#{title})
+        %(<span #{attrs}>#{names[value]}</span>)
       end.join
     end
 
@@ -61,10 +67,16 @@ module PathCoverage
     # The rows of a condition's operands, each branching from
     # its operator after indent; a nested condition's operands,
     # and those of an arm's condition, follow its own row,
-    # indented under its branch.
+    # indented under its branch. A leaf with sites inside it
+    # branches as those sites, then the leaf, in the order they
+    # run.
     def self.operand_rows(condition, indent)
-      last = condition[:operands].size - 1
-      condition[:operands].each_with_index.flat_map do |operand, i|
+      safe = condition[:operator] == SAFE
+      return HtmlTreeNests.chain_rows(condition, indent) if safe
+
+      operands = HtmlTreeNests.unfolded(condition[:operands])
+      last = operands.size - 1
+      operands.each_with_index.flat_map do |operand, i|
         tip = i == last
         branch = indent + (tip ? '└─ ' : '├─ ')
         under = indent + (tip ? '   ' : '│  ')

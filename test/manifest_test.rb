@@ -653,6 +653,8 @@ class ManifestTest < Id58TestBase
   | its block has two expressions, eg { id.ok?; id.new? }
   | it is called with &., eg ids&.find { ... }
   | In each of these its block's calls cannot all be seen.
+  | The call with &. is a &. chain site instead, its one leaf
+  | ids, nil or not nil.
   ) do
     source = <<~RUBY
       def k(ids, x)
@@ -665,8 +667,9 @@ class ManifestTest < Id58TestBase
         ids&.find { |id| id.ok? }
       end
     RUBY
+    chain = condition('&.', 155...158, extent: 155...180)
     actual = PathCoverage::Manifest.sites(source, 'k.rb')
-    assert_equal({}, actual)
+    assert_equal({ 'k.rb:8:2' => chain }, actual)
   end
 
   test '6asyb2', %w(

@@ -18,12 +18,21 @@ module PathCoverage
     # Notes each kind of write as a site, eg
     # visit_index_or_write_node for store[key] ||= 0.
     WRITE_TYPES.each do |type|
-      define_method(:"visit_#{type}") { |node| add_site(node) }
+      define_method(:"visit_#{type}") do |node|
+        write?(node) ? add_site(node) : visit_child_nodes(node)
+      end
     end
 
-    # True for a ||= or &&= write.
+    # True for a ||= or &&= write that is a site: any but one
+    # through &., eg box&.size ||= 3, which a nil box skips whole,
+    # its target never looked at, so neither of its paths taken.
     def write?(node)
-      WRITE_TYPES.include?(node.type)
+      WRITE_TYPES.include?(node.type) && !safe_write?(node)
+    end
+
+    # True for a write through &., eg box&.size ||= 3.
+    def safe_write?(node)
+      node.respond_to?(:safe_navigation?) && node.safe_navigation?
     end
 
     # A write as a Condition, named by its operator: its one leaf
