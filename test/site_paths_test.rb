@@ -230,6 +230,29 @@ class SitePathsTest < Id58TestBase
     assert_equal expected, actual
   end
 
+  test 'Sp3x96', %w(
+  | Example: xs.find { |x| x > 1 } || 0
+  | find is nil when it was called with no items, or its last
+  | answer was false, as then nothing was found.
+  | So find truthy on those paths is not possible.
+  | With its last answer true it found an item, which may
+  | itself be nil, so it can still be true or false.
+  ) do
+    source = "def k(xs) = xs.find { |x| x > 1 } || 0\n"
+    sites = PathCoverage::Manifest.sites(source, 'k.rb')
+    expected = [
+      ['0 items', nil, false, true],
+      ['1 item', true, true, nil],
+      ['1 item', true, false, true],
+      ['1 item', false, false, true],
+      ['2+ items', true, true, nil],
+      ['2+ items', true, false, true],
+      ['2+ items', false, false, true]
+    ]
+    actual = PathCoverage::SitePaths.possible(sites.values.first)
+    assert_equal expected, actual
+  end
+
   private
 
   # [whether items? says the result of ids.name { |i| i.odd? }

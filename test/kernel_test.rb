@@ -231,8 +231,8 @@ class KernelTest < Id58TestBase
   | Example: report :html, measure :decisions, :methods, and
   | fee with two ifs called once, with true then false
   | index.html's Total row shows both totals.
-  | Within each decision: 2 / 4 (50%), one of each if's two.
-  | Within each method: 1 / 4 (25%), one of fee's four.
+  | Within each decision: 2 / 4 50%, one of each if's two.
+  | Within each method: 1 / 4 25%, one of fee's four.
   ) do
     dir = Dir.mktmpdir('6rTS4f')
     File.write("#{dir}/fee.rb", <<~RUBY)
@@ -264,7 +264,7 @@ class KernelTest < Id58TestBase
 
     index = REXML::Document.new(File.read("#{dir}/index.html"))
     total = index.elements.to_a('//tfoot/tr/td')
-    expected = ['Total', '2', '2 / 4 (50%)', '1 / 4 (25%)']
+    expected = ['Total', '2', '2', '/ 4', '50%', '1', '/ 4', '25%']
     assert_equal(expected, total.map { text_of(_1) })
   end
 
@@ -327,8 +327,8 @@ class KernelTest < Id58TestBase
     index = REXML::Document.new(File.read("#{dir}/index.html"))
     xpath = "//table[@id='files-1']/tfoot/tr/td"
     total = index.elements.to_a(xpath).map { text_of(_1) }
-    assert_equal %w(Total 0 -), total
-    none = index.elements["#{xpath}[3]"].attributes['title']
+    assert_equal ['Total', '0', '0', '/ 0', '-'], total
+    none = index.elements["#{xpath}[5]"].attributes['title']
     assert_equal 'no decisions', none
     json = JSON.parse(File.read("#{dir}/path_coverage.json"))
     groups = { 'Models' => { 'decisions' => [0, 0] } }
@@ -374,8 +374,8 @@ class KernelTest < Id58TestBase
   | run's JSON report into another dir
   | The JSON report holds the method paths taken too.
   | So the render's index has the same Total row as the run's.
-  | Within each decision: 2 / 4 (50%).
-  | Within each method: 1 / 4 (25%).
+  | Within each decision: 2 / 4 50%.
+  | Within each method: 1 / 4 25%.
   ) do
     dir = Dir.mktmpdir('6rTS4q')
     File.write("#{dir}/fee.rb", <<~RUBY)
@@ -420,7 +420,7 @@ class KernelTest < Id58TestBase
 
     index = REXML::Document.new(File.read("#{later}/index.html"))
     total = index.elements.to_a('//tfoot/tr/td')
-    expected = ['Total', '2', '2 / 4 (50%)', '1 / 4 (25%)']
+    expected = ['Total', '2', '2', '/ 4', '50%', '1', '/ 4', '25%']
     assert_equal(expected, total.map { text_of(_1) })
   end
 
@@ -430,7 +430,7 @@ class KernelTest < Id58TestBase
   | fee(false, false) too, then a render of both reports
   | The render merges the method paths of every report.
   | So fee's paths taken are true false and false false.
-  | Within each method: 2 / 4 (50%), not the first report's 1.
+  | Within each method: 2 / 4 50%, not the first report's 1.
   ) do
     dir = Dir.mktmpdir('6rTS4r')
     File.write("#{dir}/fee_runs.rb", <<~RUBY)
@@ -479,8 +479,8 @@ class KernelTest < Id58TestBase
 
     index = REXML::Document.new(File.read("#{later}/index.html"))
     total = index.elements.to_a('//tfoot/tr/td')
-    methods = total.map { text_of(_1) }.last
-    assert_equal '2 / 4 (50%)', methods
+    methods = total.map { text_of(_1) }.last(3).join(' ')
+    assert_equal '2 / 4 50%', methods
   end
 
   test '6rTS4s', %w(
@@ -488,7 +488,7 @@ class KernelTest < Id58TestBase
   | alone, then a render of its report that measures :methods too
   | The report holds no method paths, so it cannot say which
   | of fee's paths were taken.
-  | So the render claims none: within each method 0 / 4 (0%).
+  | So the render claims none: within each method 0 / 4 0%.
   ) do
     dir = Dir.mktmpdir('6rTS4s')
     File.write("#{dir}/fee_plain.rb", <<~RUBY)
@@ -532,8 +532,8 @@ class KernelTest < Id58TestBase
 
     index = REXML::Document.new(File.read("#{later}/index.html"))
     total = index.elements.to_a('//tfoot/tr/td')
-    methods = total.map { text_of(_1) }.last
-    assert_equal '0 / 4 (0%)', methods
+    methods = total.map { text_of(_1) }.last(3).join(' ')
+    assert_equal '0 / 4 0%', methods
   end
 
   test '6rTS4t', %w(
@@ -784,8 +784,9 @@ class KernelTest < Id58TestBase
   | chain's value, true or false, when every receiver was not
   | nil.
   | So the four calls take the site's four paths.
-  | The popout shows the chain's rows as user then &.admin?,
-  | user's cells a disc for not nil and an empty set for nil.
+  | The popout shows the chain's rows under its &. as user then
+  | admin?, so the &. is not shown twice.
+  | user's cells are a disc for not nil and an empty set for nil.
   | Each is titled not nil or nil, for its hover text.
   ) do
     dir = Dir.mktmpdir('6rTS4z')
@@ -822,7 +823,7 @@ class KernelTest < Id58TestBase
     tree = REXML::Document.new(page).elements["//*[@id='tree-6']"]
     rows = tree.elements.to_a('.//*[@data-operand]')
     texts = rows.map { text_of(_1.elements['*[@data-text]']) }
-    assert_equal ['ok', 'user', '&.admin?'], texts
+    assert_equal ['ok', 'user', 'admin?'], texts
     cells = rows[1].elements.to_a('*[@data-cell]').map { text_of(_1) }
     disc, empty = [0x25CF, 0x2205].map { [_1].pack('U') }
     assert_equal [disc, disc, empty, ''], cells
@@ -941,8 +942,8 @@ class KernelTest < Id58TestBase
   | ids.all? { |id| id > 0 }
   | Both block calls fold into the && site, as one expression.
   | The select sits inside the leaf ids.select { ... }.any?, so
-  | the popout shows the select's rows, then the leaf's own row
-  | with the select's text an ellipsis: ....any?.
+  | the popout shows the select's rows, headed select {, then
+  | the leaf's own row, }.any?, so they read as the code does.
   | The all? is the &&'s operand itself, so the popout shows it
   | as a nested condition, its value following from its path.
   ) do
@@ -970,10 +971,10 @@ class KernelTest < Id58TestBase
     page = File.read("#{dir}/files/both_html.rb.html")
     tree = REXML::Document.new(page).elements["//*[@id='tree-3']"]
     operators = tree.elements.to_a('.//*[@data-operator]')
-    assert_equal(%w(&& select all?), operators.map { text_of(_1) })
+    expected = ['&&', 'select {', 'all?']
+    assert_equal(expected, operators.map { text_of(_1) })
     texts = tree.elements.to_a('.//*[@data-operand]/*[@data-text]')
-    ellipsis = [0x2026].pack('U')
-    expected = ['ids', 'id.odd?', "#{ellipsis}.any?", 'ids', 'id > 0']
+    expected = ['ids', 'id.odd?', '}.any?', 'ids', 'id > 0']
     assert_equal(expected, texts.map { text_of(_1) })
   end
 
@@ -1022,8 +1023,8 @@ class KernelTest < Id58TestBase
   | It writes a page per covered file too, eg crew.rb.html.
   | Each site on the page counts the paths it took.
   | It prints no gaps, since :gaps was not chosen.
-  | index.html's Total row shows 1 / 3 (33%) within each
-  | decision, and no methods cell, as methods are not measured.
+  | index.html's Total row shows 1 / 3 33% within each
+  | decision, and no methods cells, as methods are not measured.
   ) do
     dir = Dir.mktmpdir('6rTS48')
     File.write("#{dir}/crew.rb", <<~RUBY)
@@ -1047,7 +1048,7 @@ class KernelTest < Id58TestBase
 
     index = REXML::Document.new(File.read("#{dir}/index.html"))
     total = index.elements.to_a('//tfoot/tr/td')
-    expected = ['Total', '1', '1 / 3 (33%)']
+    expected = ['Total', '1', '1', '/ 3', '33%']
     assert_equal(expected, total.map { text_of(_1) })
     page = REXML::Document.new(File.read("#{dir}/files/crew.rb.html"))
     counts = page.elements.to_a('//*[@data-count]')

@@ -54,6 +54,13 @@ module PathCoverage
         nodes
       end
 
+      # The text a site of this kind opens and closes with, as
+      # [opening, closing], eg ['{', '}'] for a block's braces.
+      # Most kinds have none, so ['', ''].
+      def brackets(_source, _site)
+        ['', '']
+      end
+
       # Its operands' rows in a site's tree on a file's page, nil
       # for most, whose operands branch from its operator.
       def rows(_condition, _indent)

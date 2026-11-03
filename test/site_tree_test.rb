@@ -1,4 +1,6 @@
 require_relative 'test_helper'
+require 'path_coverage/manifest'
+require 'path_coverage/site_paths'
 require 'path_coverage/site_tree'
 
 class SiteTreeTest < Id58TestBase
@@ -300,5 +302,22 @@ class SiteTreeTest < Id58TestBase
     }
     actual = PathCoverage::SiteTree.of(source, site, paths)
     assert_equal expected, actual
+  end
+
+  test 'EuNs84', %w(
+  | Example: (a || b).any? && c
+  | The || sits inside the leaf (a || b).any?.
+  | The leaf's text before the || heads the ||'s row: ( ||.
+  | The leaf's text after the || is the leaf's own row: ).any?.
+  | So the rows read as the code does.
+  ) do
+    source = "def k(a, b, c) = (a || b).any? && c\n"
+    site = PathCoverage::Manifest.sites(source, 'k.rb').values.first
+    paths = PathCoverage::SitePaths.possible(site).map do |path|
+      { path:, count: 0 }
+    end
+    tree = PathCoverage::SiteTree.of(source, site, paths)
+    inner, leaf = tree[:operands].first[:operands]
+    assert_equal ['( ||', ').any?'], [inner[:label], leaf[:text]]
   end
 end

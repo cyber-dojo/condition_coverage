@@ -14,13 +14,21 @@ module PathCoverage
       # A value that holds whatever the path, eg select's array.
       ALWAYS = ->(*) { true }
 
+      # nil, nothing found, when its block was called with no
+      # items or its last answer was false; else the item found,
+      # which may itself be nil, so nil, as no path can tell.
+      FOUND = ->(none, answer) { none || !answer ? false : nil }
+
       # A block method's value from whether its block was called
-      # with no items, and its block's last answer.
+      # with no items, and its block's last answer; nil when the
+      # path cannot tell.
       VALUES = {
         'any?' => ->(none, answer) { !none && answer },
-        'find_index' => ->(none, answer) { !none && answer },
         'all?' => ->(none, answer) { none || answer },
         'none?' => ->(none, answer) { none || !answer },
+        'detect' => FOUND,
+        'find' => FOUND,
+        'find_index' => ->(none, answer) { !none && answer },
         'take_while' => ALWAYS,
         **EVERY_ITEM.to_h { |name| [name, ALWAYS] }
       }.freeze
@@ -70,10 +78,10 @@ module PathCoverage
 
       # Its value on a path: its count of items and its block's
       # answer, eg false for any? called with 0 items, and always
-      # truthy for select, which gives an array; nil for find and
-      # detect, whose value no path can tell.
+      # truthy for select, which gives an array; nil for find
+      # with a last answer true, whose value no path can tell.
       def self.path_value(operator, items, answer)
-        VALUES[operator]&.call(items == ITEMS[0], answer)
+        VALUES[operator].call(items == ITEMS[0], answer)
       end
 
       # Its value in each column, from its count of items and its
@@ -83,6 +91,16 @@ module PathCoverage
         receiver[:cells].zip(body[:cells]).map do |items, answer|
           items && path_value(operator, items, answer)
         end
+      end
+
+      # Its block's opening and closing in source, ['{', '}'] or
+      # ['do', 'end']: the opening between its receiver and its
+      # block's expression, the closing after that expression.
+      def self.brackets(source, site)
+        receiver, body = site.operands
+        between = source.byteslice(receiver.end...body.begin)
+        closing = source.byteslice(body.end...site.extent.end)
+        [between[/\{|\bdo\b/], closing.strip]
       end
 
       # Its receiver needs no record call, and its block's

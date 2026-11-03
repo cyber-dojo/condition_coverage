@@ -29,19 +29,38 @@ module PathCoverage
       end
 
       # The ways the leaf of node can be evaluated after the sites
-      # inside it took outcomes: true or false, or, for a call
-      # treated as nonempty, eg any?, only whether its receiver
-      # has items on that path, when its kind can tell. Such a
-      # call has no arguments, so its receiver is the largest of
-      # those sites, any other lying within it.
+      # inside it took outcomes: the one outcome it must have then,
+      # when known, else true or false.
       def self.leaf_ways(node, outcomes, fixed)
+        range = node.operands.last
+        known = known_outcome(node, outcomes, fixed)
+        return SitePaths.leaf(range, fixed) if known.nil?
+
+        [[{ range => known }, known]]
+      end
+
+      # The outcome the leaf of node must have after the sites
+      # inside it took outcomes, nil when it can have either: for
+      # a call treated as nonempty, eg any?, whether its receiver
+      # has items; for a leaf that is wholly one site, eg a find,
+      # that site's value. Each only when the site's kind can
+      # tell. A nonempty call has no arguments, so its receiver is
+      # the largest of those sites, any other lying within it.
+      def self.known_outcome(node, outcomes, fixed)
         *inner, range = node.operands
         if node.fixed[range] == :nonempty
           receiver = inner.max_by { |site| site.extent.size }
-          has = Block.items?(receiver, outcomes)
-          return [[{ range => has }, has]] unless has.nil?
+          return Block.items?(receiver, outcomes)
         end
-        SitePaths.leaf(range, fixed)
+        whole = inner.find { |site| site.extent == range }
+        whole && value_on(whole, outcomes, fixed)
+      end
+
+      # site's value on its way that took outcomes, one of its
+      # own, nil when its kind cannot tell.
+      def self.value_on(site, outcomes, fixed)
+        ways = SitePaths.walk(site, fixed)
+        ways.find { |more, _| more <= outcomes }.last
       end
 
       # Its value in each column: the leaf's own, its last operand.
@@ -49,33 +68,43 @@ module PathCoverage
         operands.last[:cells]
       end
 
-      # Stands in for a site inside a leaf's text, eg ….any?.
-      ELLIPSIS = [0x2026].pack('U').freeze
-
-      # nodes with the leaf's own node texted with only what it
-      # adds to the sites inside it, each site's text an ellipsis,
-      # eg ….any? for ids.select { |id| id.odd? }.any?, as those
-      # sites have rows of their own.
+      # nodes, labelled and texted so their rows read as the
+      # leaf's code does.
+      # Each site inside the leaf is labelled with the leaf's text
+      # before it, its operator, and its own opening, eg select {
+      # for ids.select { |id| id.odd? }.any?, or ( || for
+      # (a || b).any?.
+      # The leaf is texted with the last site's own closing, then
+      # the leaf's text after that site, eg }.any? or ).any?.
       def self.texted(source, condition, nodes)
         *inner, range = condition.operands
-        extents = inner.map(&:extent).sort_by(&:begin).reverse
-        whole = source.byteslice(range)
-        text = extents.reduce(whole) do |rest, extent|
-          elide(rest, extent.begin - range.begin, extent.size)
+        starts = [range.begin, *inner.map { |site| site.extent.end }]
+        labelled = inner.zip(starts, nodes).map do |site, at, node|
+          node.merge(label: label(source, site, at))
         end
-        [*nodes[0...-1], nodes.last.merge(text:)]
+        text = tail(source, inner.last, range)
+        [*labelled, nodes.last.merge(text:)]
+      end
+
+      # site's label inside a leaf: the leaf's text from byte at
+      # up to site, then site's operator and its own opening.
+      def self.label(source, site, at)
+        before = source.byteslice(at...site.extent.begin).strip
+        opening, = Kinds.of(site.operator).brackets(source, site)
+        [before, site.operator, opening].reject(&:empty?).join(' ')
+      end
+
+      # The text of the leaf at range: the closing of last, the
+      # last site inside the leaf, then the leaf's text after it.
+      def self.tail(source, last, range)
+        _, closing = Kinds.of(last.operator).brackets(source, last)
+        closing + source.byteslice(last.extent.end...range.end)
       end
 
       # The sites inside it, then the leaf, as siblings, so each
-      # site's rows are drawn once, eg select then ….any?.
+      # site's rows are drawn once, eg select { then }.any?.
       def self.unfold(node)
         node[:operands]
-      end
-
-      # text with the size bytes from byte from an ellipsis.
-      def self.elide(text, from, size)
-        after = text.byteslice((from + size)..)
-        text.byteslice(0, from) + ELLIPSIS + after
       end
     end
   end

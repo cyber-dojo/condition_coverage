@@ -100,15 +100,17 @@ module PathCoverage
         "PathCoverage.present(#{site.inspect}, #{index}, #{first}, "
       end
 
-      # Its leaves' nodes, each after the first texted with only
-      # what it adds to the one before, eg &.account after user.
+      # Its leaves' nodes, each after the first showing only what
+      # it adds to the one before, eg account after user.
+      # A leading &. is left out, as the chain's own row shows it.
       def self.texted(source, condition, nodes)
         ranges = condition.operands
         nodes.each_with_index.map do |node, index|
           next node if index.zero?
 
           added = ranges[index - 1].end...ranges[index].end
-          node.merge(text: source.byteslice(added))
+          text = source.byteslice(added).delete_prefix('&.')
+          node.merge(text:)
         end
       end
 

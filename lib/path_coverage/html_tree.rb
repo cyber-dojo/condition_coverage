@@ -138,9 +138,10 @@ module PathCoverage
       %(<div class="row"#{attrs}>#{lead}#{values}</div>)
     end
 
-    # The cell naming a condition's operator.
+    # The cell naming a condition's operator, or its label when
+    # it has one, eg select { for a site inside a leaf.
     def self.operator(condition)
-      name = CGI.escapeHTML(condition[:operator])
+      name = CGI.escapeHTML(condition[:label] || condition[:operator])
       %(<span class="operator" data-operator="">#{name}</span>)
     end
 

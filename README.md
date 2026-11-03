@@ -48,11 +48,7 @@ end
 
 ## Reading the HTML
 
-Text based reports of path coverage quickly become dense and hard to follow. 
-- so use `report :html`.
-- clicking a line number on a file's HTML page opens that line's popout.
-
-![A file's page: line 2, if user&.admin? && ids.select { |id| id.odd? }.any?, its button pressed, its popout open beside it](docs/example-overview.png)
+Clicking a line number on a file's HTML page opens that line's popout.
 
 Each popout has two sections:
 - on the left is a hierarchical representation of the code fragment.
@@ -69,7 +65,6 @@ Each popout has two sections:
 
 So in this example, there was no test which exercised the path where `name.size > 2` was `true`, and 
 `name.ascii_only?` was `false`.
-
 
 ### Unreachable: blank 
 
@@ -99,7 +94,7 @@ second, `paid` true, took `then`.
 So in this example, there was no test which exercised the path where
 `user` was nil.
 
-### Symbol: `0` `1` `*` (Count)
+### Count: `0` `1` `*`
 
 ![A file's page: line 2, ids.any? { |id| id.odd? }, its button pressed, its popout open beside it](docs/example-count.png)
 
@@ -111,7 +106,7 @@ So in this example, there was no test which exercised the path where
 the block was called with two or more items and its last answer was
 `false`.
 
-### Symbol: `TF` (Both)
+### Both: `TF`
 
 ![A file's page: line 2, ids.select { |id| id.odd? }, its button pressed, its popout open beside it](docs/example-both.png)
 
@@ -123,6 +118,11 @@ So in this example, there was no test which exercised the path where
 the block was called with two or more items and every answer was
 `false`.
 
+### Lots of paths!
+
+Ruby code can be very compact so short expressions can generate lots of paths!
+
+![A file's page: line 2, if user&.admin? && ids.select { |id| id.odd? }.any?, its button pressed, its popout open beside it](docs/example-overview.png)
 
 
 ## Use when you cannot edit the code!
@@ -368,8 +368,7 @@ Path coverage within methods: 44 / 52 (84.62%)
 ```
 
   With groups, each group is a heading, its own totals indented under it,
-  and there is no total over every group; a total with no path possible
-  shows `-` for its percent:
+  and there is no total over every group.
 
 ```text
 code:
@@ -423,22 +422,25 @@ the run never loaded are read and parsed then.
 
 ## Ignoring and treating
 
-`ignore '&&=', '||='` measures no site of those operators. A site inside
-one, eg on its right side, still is. `&&` is not `and`: each is ignored
-by name. The summary and `index.html` list what is ignored.
+`ignore '&&=', '||='` stops `&&=` and `||=` writes being measured.
+A site inside such a write is still measured, eg the `a && b` in
+`@m ||= a && b`. Ignoring `&&` does not ignore `and`, nor does ignoring
+`||` ignore `or`. The summary and `index.html` list what is ignored.
 
-`treat` says what you know about a method, so paths that cannot happen
-are not listed as gaps. Add `in: 'source/models/**'` to limit it to
-some files.
+`treat` tells path_coverage what you know about a method, so paths that
+cannot happen are not listed as gaps. Add `in: 'source/models/**'` to
+limit a treatment to the files that glob matches.
 
 - `treat 'name', as: :present`: a call to `name` is never nil, so
   `user.name&.size` has no path with `user.name` nil.
 - `treat 'any?', as: :nonempty`: `x.any?` is true exactly when `x` has
-  items. When `x` is a `select`, `reject`, `filter`, `filter_map`,
-  `partition` or `take_while`, its path says whether it kept items, so
-  eg `ids.select { |i| i.odd? }.any?` true with 0 items is no path.
+  items. When `x` is a call to `select`, `reject`, `filter`,
+  `filter_map`, `partition` or `take_while`, the path that call took
+  often decides whether it kept any items. Paths where `any?` disagrees
+  with that are not listed, eg `ids.select { |i| i.odd? }.any?` true
+  with `ids` empty.
 
-A run that breaks a treatment is reported, not dropped:
+A run where a treatment turns out to be wrong is reported:
 
 ```text
 source/user.rb:4:9 path taken that a treatment rules out: `user.name` nil

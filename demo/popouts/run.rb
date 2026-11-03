@@ -15,6 +15,7 @@ PathCoverage.start do
   cover 'notify.rb'
   coverage_dir ENV.fetch('COVERAGE_DIR')
   report :html
+  treat 'any?', as: :nonempty
 end
 
 require_relative 'cells'

@@ -1,4 +1,5 @@
 require 'cgi/escape'
+require_relative 'html_index_head'
 require_relative 'html_tabs'
 require_relative 'html_template'
 
@@ -49,31 +50,14 @@ module PathCoverage
       groups.empty? ? sort : sort + HtmlTemplate.asset('tabs.js')
     end
 
-    # The headings of the columns every table has.
-    HEAD = [
-      '<th aria-sort="none"><button type="button" data-column="0" ' \
-      'data-type="text">File</button></th>',
-      '<th class="num" aria-sort="none"><button type="button" ' \
-      'data-column="1" data-type="number">Sites</button></th>',
-      '<th class="num" aria-sort="none"><button type="button" ' \
-      'data-column="2" data-type="number">Within each decision' \
-      '</button></th>'
-    ].join("\n").freeze
-
-    # The heading of the methods column, there only when methods
-    # are measured.
-    METHODS = '<th class="num" aria-sort="none"><button ' \
-              'type="button" data-column="3" data-type="number">' \
-              'Within each method</button></th>'.freeze
-
     # The index-th tab's table of rows, total as its footer; any
     # but the first starts hidden.
     def self.table(index, rows, total)
-      head = HEAD + (total[:methods] ? "\n#{METHODS}" : '')
       body = rows.map { |row| row(row) }.join("\n")
+      head = HtmlIndexHead.of(total[:methods])
       [
         open_tag(index),
-        "<thead>\n<tr>\n#{head}\n</tr>\n</thead>",
+        "<thead>\n#{head}\n</thead>",
         "<tbody>\n#{body}\n</tbody>",
         "<tfoot>\n#{total_row(total)}\n</tfoot>",
         '</table>'
@@ -107,33 +91,39 @@ module PathCoverage
     def self.counts(row)
       cells = [
         cell(row[:sites], row[:sites]),
-        paths_cell(row[:decisions], 'no decisions')
+        *paths_cells(row[:decisions], 'no decisions')
       ]
       return cells unless row[:methods]
 
       none = 'no method with two or more decisions'
-      cells + [paths_cell(row[:methods], none)]
+      cells + paths_cells(row[:methods], none)
     end
 
-    # A cell showing [taken, possible] paths, eg 3 / 6 (50%),
-    # sorted by its percent. With no paths to take, as in a group
-    # no file is in, or a file with no method of two or more
-    # decisions, it shows -, titled with none, saying why, with
-    # an empty sort value, which sort.js keeps last whichever
-    # way the column is sorted.
-    def self.paths_cell(pair, none)
+    # Three cells showing [taken, possible] paths, eg 3, / 6 and
+    # 50%, each sorted by its number, so they read 3 / 6 50%.
+    # With no paths to take, as in a group no file is in, or a
+    # file with no method of two or more decisions, the percent
+    # shows -, titled with none, saying why, with an empty sort
+    # value, which sort.js keeps last whichever way the column
+    # is sorted.
+    def self.paths_cells(pair, none)
       taken, possible = pair
-      return cell('', '-', none) if possible.zero?
+      counts = [cell(taken, taken, css: 'taken'),
+                cell(possible, "/ #{possible}", css: 'of')]
+      none_cell = cell('', '-', none, css: 'percent')
+      return [*counts, none_cell] if possible.zero?
 
       percent = (100.0 * taken / possible).round
-      cell(percent, "#{taken} / #{possible} (#{percent}%)")
+      [*counts, cell(percent, "#{percent}%", css: 'percent')]
     end
 
     # One table cell, sorted by sort_value, showing content,
-    # with title as its hover text when there is one.
-    def self.cell(sort_value, content, title = nil)
+    # with title as its hover text and css as its class, each
+    # when there is one.
+    def self.cell(sort_value, content, title = nil, css: nil)
       hover = title ? %( title="#{title}") : ''
-      %(<td data-sort="#{sort_value}"#{hover}>#{content}</td>)
+      klass = css ? %( class="#{css}") : ''
+      %(<td#{klass} data-sort="#{sort_value}"#{hover}>#{content}</td>)
     end
   end
 end
