@@ -9,25 +9,28 @@ module PathCoverage
       collector cover coverage_dir measure report root
     ].freeze
     REPORTERS = %w[gaps html post].freeze
-    MEASURES = %w[conditions paths].freeze
+    MEASURES = %w[decisions methods].freeze
 
     # Evaluates the settings block against a new configuration.
     def initialize(&)
       @globs = []
       @reporters = [:gaps]
-      @measures = [:conditions]
+      @measures = [:decisions]
       instance_eval(&)
     end
 
     # The reporters chosen with report, :gaps when none were.
     attr_reader :reporters
 
-    # What is measured, chosen with measure, :conditions when
-    # nothing was.
+    # What is measured, chosen with measure.
+    # :decisions, the paths within each decision, when nothing
+    # was chosen.
     attr_reader :measures
 
-    # Chooses what is measured, eg measure :conditions, :paths;
-    # refuses a name there is no measure for.
+    # Chooses what is measured.
+    # Eg measure :decisions, :methods also measures the paths
+    # across each method's decisions.
+    # Refuses a name there is no measure for.
     def measure(*names)
       check('measure', names, MEASURES)
       @measures = names.map(&:to_sym)

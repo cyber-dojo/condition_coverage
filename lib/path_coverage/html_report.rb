@@ -18,7 +18,7 @@ module PathCoverage
     # file, as the kernel parsed it.
     def self.write(operands, files, config, paths = nil, site_paths:)
       dir = config.output_dir
-      index = HtmlIndex.page(Summary.files(operands))
+      index = index(files, config, paths, site_paths)
       File.write("#{dir}/index.html", index)
       files.each do |full_path, parsed|
         path = config.relative(full_path)
@@ -28,6 +28,20 @@ module PathCoverage
         # simplecov:enable
         write_page(out, path, parsed, [operands, site_paths], grids)
       end
+    end
+
+    # The index page: a row per file of its totals within each
+    # decision, and, when paths are given, as they are when
+    # methods are measured, across each method's decisions too;
+    # then their Total row.
+    def self.index(files, config, paths, site_paths)
+      methods = files.map do |full_path, parsed|
+        path = config.relative(full_path)
+        PathManifest.methods(parsed[:source], path)
+      end
+      all = methods.reduce({}, :merge)
+      rows = Summary.files(site_paths, all, paths)
+      HtmlIndex.page(rows, Summary.total(rows))
     end
 
     # simplecov:disable

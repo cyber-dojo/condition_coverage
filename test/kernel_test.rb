@@ -128,10 +128,13 @@ class KernelTest < Id58TestBase
   end
 
   test '6rTS43', %w(
-  | each evaluation's path through a site is recorded as it
-  | runs, so each path a site never took is reported as a
-  | gap, and every path's count written to the JSON report
-  | beside the operands, with each leaf's span
+  | Example: user[:member] || user[:vip] ? 5 : 7, called once
+  | Each evaluation's path through the site is recorded.
+  | Each path never taken is printed as a gap.
+  | The JSON report has every path's count, and each leaf's
+  | span.
+  | Its totals give decisions as [taken, possible]: [1, 3].
+  | It has no methods total, as :methods is not measured.
   ) do
     dir = Dir.mktmpdir('6rTS43')
     File.write("#{dir}/fee.rb", <<~RUBY)
@@ -167,6 +170,7 @@ class KernelTest < Id58TestBase
       }
     }
     assert_equal expected, json['paths']
+    assert_equal({ 'decisions' => [1, 3] }, json['totals'])
   end
 
   test '6rTS45', %w(
@@ -223,12 +227,56 @@ class KernelTest < Id58TestBase
     assert_output("squad.rb:3:24 never reached\n") { report.call }
   end
 
+  test '6rTS4f', %w(
+  | Example: report :html, measure :decisions, :methods, and
+  | fee with two ifs called once, with true then false
+  | index.html's Total row shows both totals.
+  | Within each decision: 2 / 4 (50%), one of each if's two.
+  | Across a method's decisions: 1 / 4 (25%), one of fee's
+  | four.
+  ) do
+    dir = Dir.mktmpdir('6rTS4f')
+    File.write("#{dir}/fee.rb", <<~RUBY)
+      module Fee6rTS4f
+        def self.fee(member, big)
+          total = 100
+          if member
+            total -= 5
+          end
+          if big
+            total -= 10
+          end
+          total
+        end
+      end
+    RUBY
+    exit_report = nil
+    on_exit = ->(&block) { exit_report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+      report :html
+      measure :decisions, :methods
+    end
+    require "#{dir}/fee.rb"
+    Fee6rTS4f.fee(true, false)
+    exit_report.call
+
+    index = REXML::Document.new(File.read("#{dir}/index.html"))
+    total = index.elements.to_a('//tfoot/tr/td')
+    expected = ['Total', '2', '2 / 4 (50%)', '1 / 4 (25%)']
+    assert_equal(expected, total.map { text_of(_1) })
+  end
+
   test '6rTS48', %w(
   | Example: report :html, and crew? called once
   | The exit report writes index.html into coverage_dir.
   | It writes a page per covered file too, eg crew.rb.html.
   | Each site on the page counts the paths it took.
   | It prints no gaps, since :gaps was not chosen.
+  | index.html's Total row shows 1 / 3 (33%) within each
+  | decision, and no across cell, as methods are not measured.
   ) do
     dir = Dir.mktmpdir('6rTS48')
     File.write("#{dir}/crew.rb", <<~RUBY)
@@ -250,7 +298,10 @@ class KernelTest < Id58TestBase
 
     assert_output('', '') { exit_report.call }
 
-    assert File.file?("#{dir}/index.html")
+    index = REXML::Document.new(File.read("#{dir}/index.html"))
+    total = index.elements.to_a('//tfoot/tr/td')
+    expected = ['Total', '1', '1 / 3 (33%)']
+    assert_equal(expected, total.map { text_of(_1) })
     page = REXML::Document.new(File.read("#{dir}/files/crew.rb.html"))
     counts = page.elements.to_a('//*[@data-count]')
     assert_equal(%w(0 0 1), counts.map { |count| text_of(count) })
@@ -360,12 +411,15 @@ class KernelTest < Id58TestBase
 
   test '6rTS41', %w(
   | Example: fee with if member ... end and if big ... end
-  | measure :conditions, :paths is chosen.
+  | measure :decisions, :methods is chosen.
   | fee has two decisions, so each call records its path.
   | fee is called once, with member true and big false.
   | The exit report prints each path never taken.
   | First each if's own, as a site, eg `member` false.
   | Then fee's, eg line 4 true, line 7 true.
+  | The JSON report's totals are [taken, possible]:
+  | decisions [2, 4], one path of each if's two.
+  | methods [1, 4], one path of fee's four.
   ) do
     dir = Dir.mktmpdir('6rTS41')
     File.write("#{dir}/fee.rb", <<~RUBY)
@@ -388,7 +442,7 @@ class KernelTest < Id58TestBase
       root dir
       cover '*.rb'
       coverage_dir dir
-      measure :conditions, :paths
+      measure :decisions, :methods
     end
     require "#{dir}/fee.rb"
     assert_equal 95, Fee6rTS41.fee(true, false)
@@ -400,6 +454,9 @@ class KernelTest < Id58TestBase
       'fee.rb:2:2 fee path never taken: line 4 false, line 7 false'
     ].join("\n")
     assert_output("#{expected}\n") { report.call }
+    json = JSON.parse(File.read("#{dir}/path_coverage.json"))
+    totals = { 'decisions' => [2, 4], 'methods' => [1, 4] }
+    assert_equal totals, json['totals']
   end
 
   test '6rTS4c', %w(

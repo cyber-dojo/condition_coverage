@@ -4,7 +4,7 @@ PathCoverage.start do
   root __dir__
   cover 'source/**/*.rb'
   coverage_dir ENV.fetch('COVERAGE_DIR')
-  measure :conditions, :paths
+  measure :decisions, :methods
 end
 
 require_relative 'source/shop'

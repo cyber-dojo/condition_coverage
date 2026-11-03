@@ -10,6 +10,7 @@ require_relative 'recorder'
 require_relative 'render'
 require_relative 'result'
 require_relative 'rewriter'
+require_relative 'totals'
 
 # Path coverage for Ruby. This file is the kernel: it loads
 # before any covered file and is never itself instrumented, since
@@ -88,9 +89,9 @@ module PathCoverage
   end
 
   # The methods of the covered file at path whose paths are
-  # counted, none unless config measures paths.
+  # counted, none unless config measures methods.
   def self.path_methods(path, source, config)
-    return {} unless config.measures.include?(:paths)
+    return {} unless config.measures.include?(:methods)
 
     PathManifest.methods(source, config.relative(path))
   end
@@ -102,7 +103,8 @@ module PathCoverage
   def self.report(config)
     files = parsed_files(config)
     result = collect(files, config)
-    paths = config.measures.include?(:paths) ? @recorder.paths : nil
+    methods = config.measures.include?(:methods)
+    paths = methods ? @recorder.paths : nil
     Render.run(
       result.operands, files, config, paths, site_paths: result.paths
     )
@@ -129,8 +131,22 @@ module PathCoverage
     result = Result.new(sites, @recorder.counts, @recorder.site_paths)
     FileUtils.mkdir_p(config.output_dir)
     report = PathsReport.of(result.paths, files)
-    JsonWriter.write(result.operands, config.json_path, report)
+    totals = totals(result, files, config)
+    path = config.json_path
+    JsonWriter.write(result.operands, path, report, totals:)
     result
+  end
+
+  # The JSON report's totals, each [taken, possible] paths:
+  # within each decision, and, when config measures methods,
+  # across each method's decisions too.
+  def self.totals(result, files, config)
+    totals = { 'decisions' => Totals.decisions(result.paths) }
+    return totals unless config.measures.include?(:methods)
+
+    methods = path_methods_of(files, config)
+    taken = Totals.methods(methods, @recorder.paths)
+    totals.merge('methods' => taken)
   end
 
   # { full path => {source:, sites:} } for every covered file:

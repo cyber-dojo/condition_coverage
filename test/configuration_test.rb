@@ -47,17 +47,18 @@ class ConfigurationTest < Id58TestBase
   end
 
   test 'A9MJ30', %w(
-  | conditions alone are measured unless measure says
-  | otherwise, so a start block written before paths
-  | were measured is unchanged by them
+  | Example: a start block with no measure
+  | Paths within each decision are measured.
+  | Example: measure :decisions, :methods
+  | Paths across each method's decisions are measured too.
   ) do
     config = PathCoverage::Configuration.new { root '/app' }
-    assert_equal [:conditions], config.measures
+    assert_equal [:decisions], config.measures
     config = PathCoverage::Configuration.new do
       root '/app'
-      measure :conditions, :paths
+      measure :decisions, :methods
     end
-    assert_equal %i[conditions paths], config.measures
+    assert_equal %i[decisions methods], config.measures
   end
 
   test 'A9MJ31', %w(
@@ -67,12 +68,12 @@ class ConfigurationTest < Id58TestBase
     error = assert_raises(PathCoverage::ConfigurationError) do
       PathCoverage::Configuration.new do
         root '/app'
-        measure :conditions, :path
+        measure :decisions, :method
       end
     end
     expected = [
-      'unknown measure path in PathCoverage.start',
-      'the measures are: conditions, paths'
+      'unknown measure method in PathCoverage.start',
+      'the measures are: decisions, methods'
     ].join("\n")
     assert_equal expected, error.message
   end

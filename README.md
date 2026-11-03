@@ -67,7 +67,7 @@ PathCoverage.start do
   root APP_DIR                 # cover globs and site names are relative to it
   cover 'source/**/*.rb'       # each matching file is instrumented as it loads
   coverage_dir '/tmp/coverage' # where path_coverage.json is written
-  measure :conditions, :paths  # sites alone unless :paths is named too
+  measure :decisions, :methods # :decisions alone unless :methods is named
   report :gaps, :html          # the reporters run at exit (default :gaps)
 end
 ```
@@ -135,7 +135,9 @@ source/kata.rb:4:24 never reached
 source/fee.rb:2:2 fee path never taken: line 4 true, line 7 false
 ```
 
-### Sites
+### Decisions
+
+Measured always, as `:decisions`: the paths within each decision.
 
 A site is named by the `path:line:column` where it starts, the path
 relative to `root`. A site in a covered file the run never loaded is
@@ -224,7 +226,7 @@ constants, since one can hold nil or false (`VERBOSE = false`). `nil` and
 
 ### Methods
 
-With `measure :conditions, :paths`, each method with two or more
+With `measure :decisions, :methods`, each method with two or more
 decisions also counts each call's path through them: the outcome of each
 decision it reached, in order. A method is named by the `path:line:column`
 of its `def`, then its name. Each decision is one outcome on the path,
@@ -236,8 +238,11 @@ leaves the method ends the path there.
 ### Reporters
 
 - `:html` writes `index.html` to `coverage_dir`: the covered files with
-  their sites, outcomes seen (with a percent) and outcomes missing, each
-  column sortable. Each file name opens `files/<path>.html`, the file's
+  their sites and their paths taken of all possible, within each decision
+  and, when `:methods` is measured, across a method's decisions (eg
+  `9 / 28 (32%)`, or `-` for a file with no method of two or more
+  decisions), each column sortable, and a Total row for every file
+  together. Each file name opens `files/<path>.html`, the file's
   source. On a line holding a site the line number is a button (blue
   and outlined when every outcome was seen, solid orange when any is
   missing) that opens a grid of the site's paths, on the left. Its rows

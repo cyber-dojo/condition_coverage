@@ -1,55 +1,91 @@
 require_relative 'test_helper'
-require 'path_coverage/result'
+require 'path_coverage/path_manifest'
 require 'path_coverage/summary'
 
 class SummaryTest < Id58TestBase
   test 'SEye10', %w(
-  | each covered file gets one summary row for the index page:
-  | its sites, the outcomes seen out of all possible,
-  | as a percent too, and the outcomes missing
+  | Example: kata.rb with two && sites, team.rb with one
+  | Each covered file gets one row for the index page.
+  | Its sites, eg 2 for kata.rb.
+  | Its decisions total as [taken, possible] paths, eg [3, 6].
+  | Its methods total is nil, as :methods is not measured.
   ) do
-    sites = {
-      'source/kata.rb:3:23' => condition('&&', 72...79, 83...102),
-      'source/kata.rb:4:24' => condition('&&', 127...134, 138...150),
-      'source/team.rb:2:20' => condition('&&', 30...37, 41...52)
+    site_paths = {
+      'source/kata.rb:3:23' => [
+        { path: [true, true], count: 2 },
+        { path: [true, false], count: 0 },
+        { path: [false, nil], count: 1 }
+      ],
+      'source/kata.rb:4:24' => [
+        { path: [true, true], count: 1 },
+        { path: [true, false], count: 0 },
+        { path: [false, nil], count: 0 }
+      ],
+      'source/team.rb:2:20' => [
+        { path: [true, true], count: 1 },
+        { path: [true, false], count: 1 },
+        { path: [false, nil], count: 4 }
+      ]
     }
-    counts = {
-      ['source/kata.rb:3:23', 0] => { truthy: 1, falsy: 1 },
-      ['source/kata.rb:3:23', 1] => { truthy: 1, falsy: 0 },
-      ['source/team.rb:2:20', 0] => { truthy: 2, falsy: 1 },
-      ['source/team.rb:2:20', 1] => { truthy: 1, falsy: 1 }
-    }
-    operands = PathCoverage::Result.new(sites, counts).operands
     expected = [
-      { path: 'source/kata.rb', sites: 2, seen: 3, outcomes: 8,
-        percent: 38, missing: 5 },
-      { path: 'source/team.rb', sites: 1, seen: 4, outcomes: 4,
-        percent: 100, missing: 0 }
+      { path: 'source/kata.rb', sites: 2, decisions: [3, 6],
+        methods: nil },
+      { path: 'source/team.rb', sites: 1, decisions: [3, 3],
+        methods: nil }
     ]
-    actual = PathCoverage::Summary.files(operands)
-    assert_equal expected, actual
+    assert_equal expected, PathCoverage::Summary.files(site_paths)
   end
 
   test 'SEye20', %w(
-  | a leaf that can have one outcome only adds one possible
-  | outcome, not two, so a site seen every way it can be
-  | is at 100 percent
+  | Example: fee.rb's fee with two ifs, called with true then
+  | false only, and kata.rb with no method of two decisions
+  | :methods is measured, so each row has a methods total.
+  | fee.rb's is [1, 4], one of fee's four paths.
+  | kata.rb's is [0, 0], as it has no method's paths.
   ) do
-    fixed = { 54...72 => :truthy }
-    sites = {
-      'source/clock.rb:2:11' =>
-        condition('||', 35...50, 54...72, fixed:)
+    site_paths = {
+      'source/fee.rb:4:4' => [
+        { path: [true], count: 1 }, { path: [false], count: 0 }
+      ],
+      'source/fee.rb:7:4' => [
+        { path: [true], count: 0 }, { path: [false], count: 1 }
+      ],
+      'source/kata.rb:3:23' => [
+        { path: [true], count: 1 }, { path: [false], count: 1 }
+      ]
     }
-    counts = {
-      ['source/clock.rb:2:11', 0] => { truthy: 1, falsy: 1 },
-      ['source/clock.rb:2:11', 1] => { truthy: 1, falsy: 0 }
+    decisions = [4, 7].map do |line|
+      PathCoverage::Decision.new(
+        line:, range: 0...1, command: false, exits: nil
+      )
+    end
+    fee = PathCoverage::PathMethod.new(
+      name: :fee, entry: 0, decisions:
+    )
+    methods = { 'source/fee.rb:2:2' => fee }
+    paths = { 'source/fee.rb:2:2' => { [true, false] => 1 } }
+    rows = PathCoverage::Summary.files(site_paths, methods, paths)
+    actual = rows.to_h { |row| [row[:path], row[:methods]] }
+    expected = {
+      'source/fee.rb' => [1, 4], 'source/kata.rb' => [0, 0]
     }
-    operands = PathCoverage::Result.new(sites, counts).operands
-    expected = [
-      { path: 'source/clock.rb', sites: 1, seen: 3, outcomes: 3,
-        percent: 100, missing: 0 }
-    ]
-    actual = PathCoverage::Summary.files(operands)
     assert_equal expected, actual
+  end
+
+  test 'SEye30', %w(
+  | Example: rows for kata.rb and fee.rb
+  | The total row adds up each column over every file.
+  | Sites 2 + 3 = 5.
+  | Decisions [3, 6] + [2, 4] = [5, 10].
+  | Methods [0, 0] + [1, 4] = [1, 4].
+  ) do
+    rows = [
+      { path: 'source/kata.rb', sites: 2, decisions: [3, 6],
+        methods: [0, 0] },
+      { path: 'source/fee.rb', sites: 3, decisions: [2, 4],
+        methods: [1, 4] }
+    ]
+    expected = { sites: 5, decisions: [5, 10], methods: [1, 4] }
+    assert_equal expected, PathCoverage::Summary.total(rows)
   end
 end
