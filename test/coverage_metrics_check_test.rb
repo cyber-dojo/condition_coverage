@@ -29,6 +29,106 @@ class CoverageMetricsCheckTest < Id58TestBase
     assert_equal expected, actual
   end
 
+  test 'p0Kj70', %w(
+  | Example: SimpleCov's report of groups code and test, and
+  | path_coverage's totals of the same groups
+  | Each group is a heading, its four figures indented under it:
+  | lines and branches covered of all, as SimpleCov prints them,
+  | then paths within decisions and within methods.
+  | Each percent is to two places; none possible shows -.
+  ) do
+    report = {
+      'code' => {
+        'lines' => { 'total' => 1221, 'missed' => 0 },
+        'branches' => { 'total' => 309, 'missed' => 0 }
+      },
+      'test' => {
+        'lines' => { 'total' => 2220, 'missed' => 2 },
+        'branches' => { 'total' => 41, 'missed' => 1 }
+      }
+    }
+    paths = {
+      'code' => { 'decisions' => [475, 561], 'methods' => [41, 49] },
+      'test' => { 'decisions' => [63, 86], 'methods' => [0, 0] }
+    }
+    expected = [
+      'code:',
+      '  Line coverage: 1221 / 1221 (100.00%)',
+      '  Branch coverage: 309 / 309 (100.00%)',
+      '  Path coverage within decisions: 475 / 561 (84.67%)',
+      '  Path coverage within methods: 41 / 49 (83.67%)',
+      'test:',
+      '  Line coverage: 2218 / 2220 (99.91%)',
+      '  Branch coverage: 40 / 41 (97.56%)',
+      '  Path coverage within decisions: 63 / 86 (73.26%)',
+      '  Path coverage within methods: 0 / 0 (-)'
+    ]
+    actual = CoverageMetricsCheck.groups(report, paths)
+    assert_equal expected, actual
+  end
+
+  test 'p0Kj80', %w(
+  | Example: SimpleCov's report of group test, and path_coverage's
+  | test totals of decisions [65, 84] and methods [3, 3]
+  | Each total joins the group's metrics under paths, in the
+  | shape SimpleCov's metrics have: its total, and how many were
+  | missed.
+  | So a bound such as test.paths.methods.missed 0..0 can gate it.
+  ) do
+    lines = { 'total' => 2250, 'missed' => 0 }
+    report = { 'test' => { 'lines' => lines } }
+    totals = { 'decisions' => [65, 84], 'methods' => [3, 3] }
+    paths = { 'test' => totals }
+    expected = {
+      'test' => {
+        'lines' => lines,
+        'paths' => {
+          'decisions' => { 'total' => 84, 'missed' => 19 },
+          'methods' => { 'total' => 3, 'missed' => 0 }
+        }
+      }
+    }
+    actual = CoverageMetricsCheck.with_paths(report, paths)
+    assert_equal expected, actual
+  end
+
+  test 'p0Kj81', %w(
+  | Example: a bound test.paths.methods.missed 0..0, and a test
+  | method path never taken
+  | The breach names it, as any other bound's does.
+  ) do
+    lines = { 'total' => 9, 'missed' => 0 }
+    report = { 'test' => { 'lines' => lines } }
+    paths = { 'test' => { 'methods' => [2, 3] } }
+    none = { 'missed' => { 'min' => 0, 'max' => 0 } }
+    bounds = { 'test' => { 'paths' => { 'methods' => none } } }
+    merged = CoverageMetricsCheck.with_paths(report, paths)
+    expected = ['test.paths.methods.missed: 1 is outside 0..0']
+    actual = CoverageMetricsCheck.breaches(merged, bounds)
+    assert_equal expected, actual
+  end
+
+  test 'p0Kj82', %w(
+  | Example: a group code with no path totals
+  | Its metrics are left as they are, with no paths.
+  ) do
+    lines = { 'total' => 9, 'missed' => 0 }
+    report = { 'code' => { 'lines' => lines } }
+    actual = CoverageMetricsCheck.with_paths(report, {})
+    assert_equal({ 'code' => { 'lines' => lines } }, actual)
+  end
+
+  test 'p0Kj71', %w(
+  | Example: a report whose group code has lines but no branches,
+  | and no path totals
+  | The group shows only the figures it has.
+  ) do
+    lines = { 'total' => 33, 'missed' => 0 }
+    report = { 'code' => { 'lines' => lines } }
+    expected = ['code:', '  Line coverage: 33 / 33 (100.00%)']
+    assert_equal expected, CoverageMetricsCheck.groups(report)
+  end
+
   test 'p0Kj60', %w(
   | Example: code.lines.missed 1 and code.branches.missed 1, the
   | report naming where each was missed

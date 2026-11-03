@@ -175,6 +175,7 @@ class RecorderTest < Id58TestBase
   | The first pattern (1) enters the site.
   | A match, or the last pattern (String), leaves it.
   | So each evaluation's path is counted.
+  | Eg 1 matches the first pattern, so no later one is tried.
   | The case still picks the same arm, eg :small for 2.
   ) do
     recorder = PathCoverage::Recorder.new
@@ -189,10 +190,11 @@ class RecorderTest < Id58TestBase
       else :other
       end
     end
-    kinds = [kind.call(2), kind.call('Kp'), kind.call(:k)]
-    assert_equal %i[small text other], kinds
+    kinds = [1, 2, 'Kp', :k].map { |x| kind.call(x) }
+    assert_equal %i[small small text other], kinds
     expected = {
       site => {
+        [true, nil, nil] => 1,
         [false, true, nil] => 1, [false, false, true] => 1,
         [false, false, false] => 1
       }

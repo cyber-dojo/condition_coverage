@@ -1,4 +1,5 @@
 require 'json'
+require_relative 'console_summary'
 require_relative 'gaps'
 require_relative 'html_report'
 require_relative 'manifest'
@@ -18,13 +19,36 @@ module PathCoverage
       site_paths = every_site(site_paths, files)
       reporters = config.reporters
       gaps(operands, files, site_paths) if reporters.include?(:gaps)
-      if reporters.include?(:html)
-        HtmlReport.write(operands, files, config, paths, site_paths:)
-      end
+      html_and_summary(operands, files, config, [paths, site_paths])
       return unless reporters.include?(:post)
 
       report = PathsReport.of(site_paths, files)
       Post.deliver(operands, config.collector_url, report)
+    end
+
+    # Runs the :html and :summary reporters, each when chosen.
+    def self.html_and_summary(operands, files, config, paths_pair)
+      paths, site_paths = paths_pair
+      reporters = config.reporters
+      if reporters.include?(:html)
+        HtmlReport.write(operands, files, config, paths, site_paths:)
+      end
+      return unless reporters.include?(:summary)
+
+      summary(files, config, paths, site_paths)
+    end
+
+    # Prints the summary lines: the paths taken of all possible
+    # within decisions, and, when paths are given, as they are
+    # when methods are measured, within methods.
+    def self.summary(files, config, paths, site_paths)
+      methods = files.map do |full_path, parsed|
+        path = config.relative(full_path)
+        PathManifest.methods(parsed[:source], path)
+      end
+      all = methods.reduce({}, :merge)
+      groups = config.groups
+      puts ConsoleSummary.lines(site_paths, all, paths, groups)
     end
 
     # site_paths with every site in files that it lacks, eg

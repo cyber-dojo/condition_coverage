@@ -648,4 +648,65 @@ class HtmlFileTest < Id58TestBase
     actual = codes.map { |element| text_of(element) }
     assert_equal ['module Kata', 'end'], actual
   end
+
+  test 'gae550', %w(
+  | Example: an empty file
+  | Its page has no lines.
+  | Its covered and gaps lists have no links.
+  ) do
+    page = PathCoverage::HtmlFile.page('source/empty.rb', [], {})
+    html = REXML::Document.new(page)
+    assert_equal [], html.elements.to_a('//*[@data-line]')
+    assert_equal({ 'covered' => [], 'gaps' => [] }, jumps_of(html))
+  end
+
+  test 'gae551', %w(
+  | Example: a file holding require 'json' only
+  | Its one line has no site.
+  | So its covered and gaps lists have no links.
+  ) do
+    lines = [
+      { number: 1, text: "require 'json'", status: nil, span: nil }
+    ]
+    page = PathCoverage::HtmlFile.page('source/json.rb', lines, {})
+    html = REXML::Document.new(page)
+    assert_equal({ 'covered' => [], 'gaps' => [] }, jumps_of(html))
+  end
+
+  test 'gae552', %w(
+  | Example: a file of two lines, ok?(a) && new?(a) and
+  | ok?(b) && new?(b), each with gaps
+  | Each line starts a span of its own.
+  | So the gaps list links to both.
+  | Each one's arrows point to the other, wrapping round.
+  ) do
+    lines = [
+      { number: 1, text: 'ok?(a) && new?(a)', status: :gaps,
+        span: 1..1 },
+      { number: 2, text: 'ok?(b) && new?(b)', status: :gaps,
+        span: 2..2 }
+    ]
+    page = PathCoverage::HtmlFile.page('source/kata.rb', lines, {})
+    html = REXML::Document.new(page)
+    expected = { 'covered' => [], 'gaps' => %w(#L1 #L2) }
+    assert_equal expected, jumps_of(html)
+
+    cells = html.elements.to_a('//*[@data-nav]')
+    actual = cells.map do |cell|
+      %w(prev next).map do |way|
+        cell.elements["a[@data-#{way}]"].attributes['href']
+      end
+    end
+    assert_equal [%w(#L2 #L2), %w(#L1 #L1)], actual
+  end
+
+  private
+
+  # { status => hrefs } of the header's covered and gaps lists.
+  def jumps_of(html)
+    %w(covered gaps).to_h do |status|
+      links = html.elements.to_a("//*[@data-jumps='#{status}']/a")
+      [status, links.map { |link| link.attributes['href'] }]
+    end
+  end
 end

@@ -3,15 +3,18 @@ require 'json'
 require_relative '../test/coverage_metrics_check'
 
 HELP = <<~TEXT.freeze
-  Usage: bin/check_coverage_metrics.rb [OPTIONS] [REPORT] [PARAMS]
+  Usage: bin/check_coverage_metrics.rb [OPTIONS] [REPORT] [PARAMS] [PATHS]
 
-  Checks a coverage report against the min..max bounds in a
-  params file, printing each breached bound, and exits non-zero
-  if any bound is breached.
+  Prints each group's line, branch and path coverage, then checks
+  a coverage report against the min..max bounds in a params file,
+  printing each breached bound, and exits non-zero if any bound
+  is breached.
 
   REPORT defaults to reports/coverage_metrics.json, which
   bin/run_tests.sh writes; PARAMS to
-  test/coverage_metrics_params.json.
+  test/coverage_metrics_params.json; PATHS, path_coverage's
+  report, to reports/paths/path_coverage.json when REPORT is not
+  given, and is skipped when absent.
 
   Options:
     -h    Show this help
@@ -41,7 +44,30 @@ params = ARGV[1] || "#{ROOT}/test/coverage_metrics_params.json"
 bounds = read_json(params).fetch('bounds') do
   abort("#{params}: no \"bounds\" key, so nothing would be checked")
 end
-breaches = CoverageMetricsCheck.breaches(read_json(report), bounds)
+metrics = read_json(report)
+# path_coverage's own per-group totals, when its report is there,
+# so each group shows all four of its figures together. Given a
+# REPORT, only a PATHS given too is read.
+default_paths = "#{ROOT}/reports/paths/path_coverage.json"
+path_report = ARGV[2] || (ARGV[0] ? nil : default_paths)
+paths = {}
+if path_report && File.exist?(path_report)
+  paths = read_json(path_report).dig('totals', 'groups') || {}
+end
+puts CoverageMetricsCheck.groups(metrics, paths)
+# The path totals join the metrics, so bounds gate them too, eg
+# test.paths.methods.missed; a bound on a path total with no path
+# report is a breach, missing from the report.
+merged = CoverageMetricsCheck.with_paths(metrics, paths)
+breaches = CoverageMetricsCheck.breaches(merged, bounds)
 breaches.each { |line| puts line }
+# Where to look, each report with a code and a test tab, just
+# before the verdict on them; only when run for a host, whose
+# paths HOST_ROOT names.
+host = ENV.fetch('HOST_ROOT', '')
+unless host.empty?
+  puts "Coverage report: #{host}/reports/index.html"
+  puts "Path coverage report: #{host}/reports/paths/index.html"
+end
 puts breaches.empty? ? 'coverage: ALLOWED' : 'coverage: DENIED'
 exit breaches.empty?

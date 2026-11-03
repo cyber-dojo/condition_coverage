@@ -120,7 +120,7 @@ module PathCoverage
           tail = decision.exits.nil? ? '' : ", #{decision.exits}"
           wrap(call, decision.range, decision.command, 2, tail)
         end
-        [[method.entry, start, 3]] + decides
+        [[method.entry, start, [Float::INFINITY, 3]]] + decides
       end
     end
 
@@ -131,31 +131,36 @@ module PathCoverage
       "#{PATH_NAME} = #{call}; "
     end
 
-    # The two inserts that wrap the code at range in call, of
-    # rank among inserts at the same offset, with tail as the
-    # call's further arguments. A command call is parenthesised,
-    # as it is no bare argument; nothing else is, since
-    # parentheses make a statement, which gives its line a
-    # line-coverage count of its own.
+    # The two inserts that wrap the code at range in call, with
+    # tail as the call's further arguments. Their order, [size,
+    # rank], nests them among inserts at the same offset: the
+    # longer range outside, rank breaking a tie. A command call
+    # is parenthesised, as it is no bare argument; nothing else
+    # is, since parentheses make a statement, which gives its
+    # line a line-coverage count of its own.
     def self.wrap(call, range, command, rank, tail = '')
       open, close = command ? ['(', ")#{tail})"] : ['', "#{tail})"]
+      order = [range.size, rank]
       [
-        [range.begin, call + open, rank],
-        [range.end, close, rank, :close]
+        [range.begin, call + open, order],
+        [range.end, close, order, :close]
       ]
     end
 
-    # Splices each [offset, text, rank] insert into source, last
-    # offset first so earlier offsets stay valid; a closing
+    # Splices each [offset, text, order] insert into source,
+    # last offset first so earlier offsets stay valid; a closing
     # insert is marked :close. Text spliced in later at an
     # offset lands before text already there, so at one offset
-    # opening inserts go in lowest rank first, leaving the
-    # highest outermost, then closing ones highest rank first,
+    # opening inserts go in lowest order first, leaving the
+    # highest outermost, then closing ones highest order first,
     # so the innermost call closes first and each tail stays
-    # with its own call.
+    # with its own call. Eg a ternary that is a method's
+    # decision is a site too: its leave, wrapping the whole
+    # ternary, opens outside the decide wrapping its predicate.
     def self.apply(source, inserts)
-      sorted = inserts.sort_by do |offset, _, rank, close|
-        close ? [-offset, 1, -rank] : [-offset, 0, rank]
+      sorted = inserts.sort_by do |offset, _, order, close|
+        size, rank = order
+        close ? [-offset, 1, -size, -rank] : [-offset, 0, size, rank]
       end
       sorted.each do |offset, text, _|
         source.bytesplice(offset, 0, text)

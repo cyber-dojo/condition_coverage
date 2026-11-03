@@ -50,7 +50,7 @@ tried.
 ![The first if's grid: a column per way it can go, each headed by
 its count, the member who has not paid at 0](docs/decision.png)
 
-## Across a method's decisions
+## Within each method
 
 The two `if`s can go four ways together. A paying member with a small
 order may never have been tried.
@@ -73,7 +73,8 @@ PathCoverage.start do
   skip 'source/vendor/**/*.rb' # except these, though a cover glob matches them
   coverage_dir '/tmp/coverage' # where path_coverage.json is written
   measure :decisions, :methods # :decisions alone unless :methods is named
-  report :gaps, :html          # the reporters run at exit (default :gaps)
+  report :gaps, :html          # the reporters run at exit (default :gaps);
+                               # also :summary and :post
   group 'Models', 'source/models/**/*.rb'   # a tab of its own on index.html
 end
 ```
@@ -130,7 +131,11 @@ As the process exits:
 
 - `path_coverage.json` is always written to `coverage_dir`: every site
   of every covered file, with each operand's true and false counts under
-  `sites`, and each site's paths under `paths`. It is the base the other
+  `sites`, each site's paths under `paths`, and the paths taken of all
+  possible under `totals`, as [taken, possible]: `decisions`, `methods`
+  when `:methods` is measured, and, with groups, each group's own under
+  `groups`, eg `"groups": {"code": {"decisions": [481, 567]}}`. It is the
+  base the other
   reporters read, so they can also be run later, in another process, from
   it alone: `PathCoverage::Render.from_json(config)`, where `config` is a
   `PathCoverage::Configuration` built from the same settings block.
@@ -236,6 +241,18 @@ constants, since one can hold nil or false (`VERBOSE = false`). `nil` and
 @clock = options[:clock] || MonotonicClock.new  # leaf 1: never evaluated, or no gap
 ```
 
+Any other leaf, a call among them, is taken to have either outcome, as its
+form alone cannot say which it returns. So a call that never returns nil
+or false still leaves a path needing it falsy, which no test can take:
+
+```ruby
+methods: paths && methods_of(path, methods, paths)  # [true, false] impossible
+methods: paths ? methods_of(path, methods, paths) : nil  # the same, no such path
+```
+
+Written as a choice, the same code has no such path. Reporting a gap that
+cannot be closed is the lesser error than hiding one that can.
+
 ### Methods
 
 With `measure :decisions, :methods`, each method with two or more
@@ -251,7 +268,7 @@ leaves the method ends the path there.
 
 - `:html` writes `index.html` to `coverage_dir`: the covered files with
   their sites and their paths taken of all possible, within each decision
-  and, when `:methods` is measured, across a method's decisions (eg
+  and, when `:methods` is measured, within each method (eg
   `9 / 28 (32%)`, or `-` for a file with no method of two or more
   decisions), each column sortable, and a Total row for every file
   together. Each file name opens `files/<path>.html`, the file's
@@ -276,6 +293,26 @@ leaves the method ends the path there.
   goes through an `http_proxy`, and gives up in silence on a collector
   that cannot be reached or does not answer within a second, so the
   run's output and exit status are unchanged.
+- `:summary` prints each total as SimpleCov prints its line and branch
+  coverage, the methods line only when `:methods` is measured:
+
+```text
+Path coverage within decisions: 527 / 631 (83.52%)
+Path coverage within methods: 44 / 52 (84.62%)
+```
+
+  With groups, each group is a heading, its own totals indented under it,
+  and there is no total over every group; a total with no path possible
+  shows `-` for its percent:
+
+```text
+code:
+  Path coverage within decisions: 481 / 567 (84.83%)
+  Path coverage within methods: 41 / 49 (83.67%)
+test:
+  Path coverage within decisions: 65 / 84 (77.38%)
+  Path coverage within methods: 3 / 3 (100.00%)
+```
 
 ## How it works
 
@@ -331,6 +368,13 @@ the run never loaded are read and parsed then.
   - `x rescue y` modifier: raised vs not raised
   - `case` with no subject, and `case`/`in` patterns
   - regex matches: nil vs MatchData
+- a method that never returns nil or false, declared once at its
+  definition, eg `# path_coverage: returns an Array` above
+  `def self.methods_of`, so each call to it counts as a leaf that is only
+  truthy, as `Foo.new` is. A run where it returns nil or false reports
+  the declaration as wrong, and the report lists the methods so declared.
+  Later, a method's non-nil return type could come from the project's RBS
+  signatures (`sig/*.rbs`) instead.
 
 ## Constraints
 
@@ -344,12 +388,47 @@ the run never loaded are read and parsed then.
 `make all` runs, in a Docker image built from the repo's `Dockerfile`:
 
 - `make lint`: rubocop over `lib/`, `test/` and `bin/` alike
-- `make test`: the tests, then a check that the coverage report has zero
-  missed lines and branches in both the code and the tests, within the
-  bounds in `test/coverage_metrics_params.json`
+- `make test`: the tests, with path_coverage measuring its own `lib/` and
+  `test/`, then a check that SimpleCov's report has zero missed lines and
+  branches in both the code and the tests, and that every path within the
+  tests' methods was taken, within the bounds in
+  `test/coverage_metrics_params.json` (a path bound is eg
+  `test.paths.methods.missed`, and a missing path report denies it)
   (`make test tids='6D1K'` runs only matching tests, and skips the check)
 - `make test_check`: shunit2 tests showing that a breached bound fails the
   check with a non-zero exit
+
+Each run prints its seed; `SEED=n make test` replays that run's order of
+files and tests. When the coverage check fails, it names each line and
+branch missed.
+
+A run ends with each group, code and test, as a heading over its four
+figures, SimpleCov's and path_coverage's together, then where each report
+is, each with a code and a test tab, then the check's verdict:
+
+```text
+code:
+  Line coverage: 1270 / 1270 (100.00%)
+  Branch coverage: 321 / 321 (100.00%)
+  Path coverage within decisions: 481 / 567 (84.83%)
+  Path coverage within methods: 41 / 49 (83.67%)
+test:
+  Line coverage: 2250 / 2250 (100.00%)
+  Branch coverage: 43 / 43 (100.00%)
+  Path coverage within decisions: 65 / 84 (77.38%)
+  Path coverage within methods: 3 / 3 (100.00%)
+Coverage report: .../reports/index.html
+Path coverage report: .../reports/paths/index.html
+coverage: ALLOWED
+```
+
+`bin/check_coverage_metrics.rb` prints the groups, reading SimpleCov's
+figures from `reports/coverage_metrics.json` and path_coverage's from the
+`totals` in `reports/paths/path_coverage.json`; SimpleCov's own console
+lines, totals over every group, are silenced. The tool measuring paths is
+a copy of `lib/` renamed `PathCoverageSelf` (`test/self_coverage.rb`), so
+the tests start and restart `PathCoverage` as always. SimpleCov's figures
+for `lib/` are the same with it as without.
 
 `make demo` (not part of `make all`) runs `demo/run.rb` through
 `bin/build_demo.sh`, writing the report to `site/` and opening it. The

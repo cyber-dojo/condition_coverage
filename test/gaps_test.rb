@@ -101,4 +101,20 @@ class GapsTest < Id58TestBase
     )
     assert_equal expected, actual
   end
+
+  test 'ngWa60', %w(
+  | Example: if ready?(id) then ship(id) end, never reached
+  | Its predicate is its one leaf, which never ran.
+  | So the site gets one line, saying it was never reached.
+  ) do
+    sites = {
+      'k.rb:4:4' => condition('if', 47...56, arm(:then, 62...70))
+    }
+    result = PathCoverage::Result.new(sites, {}, {})
+    texts = { 'k.rb:4:4' => ['ready?(id)'] }
+    actual = PathCoverage::Gaps.lines(
+      result.operands, paths: result.paths, texts:
+    )
+    assert_equal ['k.rb:4:4 never reached'], actual
+  end
 end

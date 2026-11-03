@@ -10,9 +10,12 @@ show_help()
 Usage: bin/run_tests.sh [OPTIONS] [ID58...]
 
 Runs the tests in a Docker image built from the repo's Dockerfile,
-then checks the coverage report against the bounds in
+with path_coverage measuring its own lib/ and test/ (a renamed
+copy of lib/, test/self_coverage.rb, does the measuring), then
+checks SimpleCov's report against the bounds in
 test/coverage_metrics_params.json, exiting non-zero if a test
-fails or a bound is breached.
+fails or a bound is breached. reports/index.html is SimpleCov's
+report and reports/paths/index.html path_coverage's.
 
 With ID58 arguments, runs only the tests whose id contains one of
 them, and skips the coverage check: a partial run covers only
@@ -52,9 +55,11 @@ readonly LOADER='
 $stdout.sync = true
 report = "/reports/coverage_metrics.json"
 File.delete(report) if File.exist?(report)
+require "/gem/test/self_coverage"
 require "/gem/test/simplecov_config"
 order = Random.new(Integer(ENV.fetch("SEED")))
 Dir["test/**/*_test.rb"].sort.shuffle(random: order).each { |file| require File.expand_path(file) }
+SelfCoverage.unhook
 '
 
 mkdir -p "${ROOT_DIR}/reports"
@@ -66,6 +71,7 @@ run_in_image()
     --volume "${ROOT_DIR}/reports:/reports" \
     --env RUBYOPT='-W2 --enable-frozen-string-literal' \
     --env SEED="${SEED}" \
+    --env HOST_ROOT="${ROOT_DIR}" \
     "${IMAGE}" \
     "$@"
 }

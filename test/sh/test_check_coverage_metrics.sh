@@ -56,7 +56,8 @@ test_met_bounds_exit_0_saying_allowed()
 {
   check "${REPORT}" "${MET_PARAMS}"
   assert_status_0
-  assert_stdout_equals 'coverage: ALLOWED'
+  assert_stdout_equals "$(printf '%s\n%s\n%s' \
+    'code:' '  Line coverage: 33 / 33 (100.00%)' 'coverage: ALLOWED')"
   assert_stderr_empty
 }
 
@@ -65,7 +66,8 @@ test_a_breached_bound_exits_1_naming_the_breach()
   local -r params="${MET_PARAMS/\"max\": 33/\"max\": 32}"
   check "${REPORT}" "${params}"
   assert_status_equals 1
-  assert_stdout_equals "$(printf '%s\n%s' \
+  assert_stdout_equals "$(printf '%s\n%s\n%s\n%s' \
+    'code:' '  Line coverage: 33 / 33 (100.00%)' \
     'code.lines.total: 33 is outside 1..32' 'coverage: DENIED')"
   assert_stderr_empty
 }

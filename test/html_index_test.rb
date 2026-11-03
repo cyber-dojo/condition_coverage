@@ -67,8 +67,7 @@ class HtmlIndexTest < Id58TestBase
 
     buttons = html.elements.to_a('//thead//th/button')
     expected = [
-      'File', 'Sites', 'Within each decision',
-      "Across a method's decisions"
+      'File', 'Sites', 'Within each decision', 'Within each method'
     ]
     assert_equal(expected, buttons.map { |button| text_of(button) })
 
@@ -141,7 +140,7 @@ class HtmlIndexTest < Id58TestBase
   test 'zr0H50', %w(
   | Example: rows whose methods totals are nil
   | :methods is not measured.
-  | So the page has no across column at all.
+  | So the page has no methods column at all.
   | Its headings, rows and Total row have three cells each.
   ) do
     rows = [

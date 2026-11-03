@@ -43,4 +43,28 @@ class TotalsTest < Id58TestBase
     paths = { 'source/fee.rb:2:2' => { [true, false] => 1 } }
     assert_equal [1, 4], PathCoverage::Totals.methods(methods, paths)
   end
+
+  test 'Tq7m30', %w(
+  | Example: fee with two ifs, called with true true, true false,
+  | false true and false false
+  | Every one of its 4 paths was taken.
+  | So the methods total is [4, 4].
+  ) do
+    decisions = [4, 7].map do |line|
+      PathCoverage::Decision.new(
+        line:, range: 0...1, command: false, exits: nil
+      )
+    end
+    fee = PathCoverage::PathMethod.new(
+      name: :fee, entry: 0, decisions:
+    )
+    methods = { 'source/fee.rb:2:2' => fee }
+    paths = {
+      'source/fee.rb:2:2' => {
+        [true, true] => 1, [true, false] => 2,
+        [false, true] => 1, [false, false] => 3
+      }
+    }
+    assert_equal [4, 4], PathCoverage::Totals.methods(methods, paths)
+  end
 end

@@ -171,6 +171,37 @@ class PathManifestTest < Id58TestBase
     assert_equal expected, lines
   end
 
+  test 'Pm7c08', %w(
+  | Example: a class with an empty initialize, a close holding
+  | only a rescue, and fee with two ifs
+  | initialize has no statements, so no decisions.
+  | close has no statements before its rescue, so none either.
+  | So fee, at line 9, is the one method with paths.
+  ) do
+    source = <<~RUBY
+      class Feed
+        def initialize; end
+
+        def close
+        rescue IOError
+          nil
+        end
+
+        def fee(member, big)
+          total = 100
+          if member
+            total -= 5
+          end
+          if big
+            total -= 10
+          end
+          total
+        end
+      end
+    RUBY
+    assert_equal ['k.rb:9:2'], methods(source).keys
+  end
+
   private
 
   # The path manifest of source, as if it were k.rb.

@@ -17,7 +17,7 @@ module PathCoverage
         {
           path:, sites: sites.size,
           decisions: Totals.decisions(sites.to_h),
-          methods: paths && methods_of(path, methods, paths)
+          methods: paths ? methods_of(path, methods, paths) : nil
         }
       end
     end
@@ -36,7 +36,7 @@ module PathCoverage
       {
         sites: rows.sum { |row| row[:sites] },
         decisions: add(rows.map { |row| row[:decisions] }),
-        methods: methods.first && add(methods)
+        methods: methods.first ? add(methods) : nil
       }
     end
 
@@ -63,9 +63,13 @@ module PathCoverage
       end
     end
 
-    # [taken, possible] pairs added together.
+    # [taken, possible] pairs added together, eg [[1, 3], [2, 4]]
+    # gives [3, 7]; no pairs, as for a group no file is in, gives
+    # [0, 0].
     def self.add(pairs)
-      pairs.transpose.map(&:sum)
+      pairs.reduce([0, 0]) do |(taken, possible), (more, of)|
+        [taken + more, possible + of]
+      end
     end
 
     # The file a site is in: its name minus :line:column.

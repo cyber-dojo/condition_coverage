@@ -12,12 +12,30 @@ module PathCoverage
     # True for a call whose block's every call can be seen: to a
     # block method, on a receiver, with no arguments, which can
     # make it ignore its block, not by &., which skips it for
-    # nil, and with a block of one expression.
+    # nil, and with a block of one expression that is a value,
+    # so can be wrapped: not break, next or return.
     def block_site?(node)
-      BLOCK_PATHS.key?(node.name.to_s) && !node.receiver.nil? &&
-        node.arguments.nil? && !node.safe_navigation? &&
-        !block_expression(node.block).nil?
+      return false unless BLOCK_PATHS.key?(node.name.to_s)
+
+      plain_call?(node) && value?(block_expression(node.block))
     end
+
+    # True for a call on a receiver, with no arguments, and not
+    # by &.
+    def plain_call?(node)
+      !node.receiver.nil? && node.arguments.nil? &&
+        !node.safe_navigation?
+    end
+
+    # True for a block's one expression that is a value, so can
+    # be wrapped: nil, for no one expression, is not, nor is a
+    # jump.
+    def value?(body)
+      !body.nil? && !JUMPS.include?(body.type)
+    end
+
+    # The expressions that leave a block, so are no value.
+    JUMPS = %i[break_node next_node return_node].freeze
 
     # The one expression of block, nil for no block, a block
     # passed as an argument, or one of other than one expression.
@@ -46,12 +64,24 @@ module PathCoverage
     end
 
     # True for an expression that is no bare argument: a command
-    # call, or an and or an or.
+    # call, an and or an or, or a modifier, eg x unless y.
     def bare_less?(node)
-      return true if Manifest.command?(node)
+      return true if Manifest.command?(node) || modifier?(node)
 
       %i[and_node or_node].include?(node.type) &&
         %w[and or].include?(node.operator)
+    end
+
+    # True for a modifier if, unless or rescue, eg x if y: one
+    # with no end keyword, a ternary being no modifier.
+    def modifier?(node)
+      case node.type
+      when :rescue_modifier_node then true
+      when :unless_node then node.end_keyword_loc.nil?
+      when :if_node
+        !node.if_keyword_loc.nil? && node.end_keyword_loc.nil?
+      else false
+      end
     end
   end
 end

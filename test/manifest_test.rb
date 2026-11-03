@@ -166,6 +166,28 @@ class ManifestTest < Id58TestBase
     assert_equal expected, actual
   end
 
+  test '6asy7c', %w(
+  | Example: options[:clock] or MonotonicClock.new 'UTC'
+  | MonotonicClock.new 'UTC' is a command call.
+  | So it is named among the condition's commands.
+  | It is a call to new, so it can only be truthy.
+  | So it is named among the condition's fixed leaves too.
+  ) do
+    source = <<~RUBY
+      def clock(options)
+        options[:clock] or MonotonicClock.new 'UTC'
+      end
+    RUBY
+    site = condition(
+      'or', 21...36, 40...64,
+      commands: [40...64], fixed: { 40...64 => :truthy },
+      extent: 21...64
+    )
+    expected = { 'k.rb:2:2' => site }
+    actual = PathCoverage::Manifest.sites(source, 'k.rb')
+    assert_equal expected, actual
+  end
+
   test '6asy79', %w(
   | literals and lambdas can only be truthy, and nil and false
   | only falsy, so each is a fixed leaf with that outcome
@@ -684,5 +706,45 @@ class ManifestTest < Id58TestBase
     expected = { 'k.rb:2:6' => kept }
     actual = PathCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
+  end
+
+  test '6asyb4', %w(
+  | Example: a block whose one expression is a modifier unless,
+  | a modifier if, or a rescue modifier
+  | None of these can be a bare argument.
+  | So each is noted among its site's commands, to be
+  | parenthesised when it is wrapped.
+  ) do
+    source = <<~RUBY
+      def k(ids)
+        ids.filter_map { |id| id.name unless id.nil? }
+        ids.select { |id| id if id.ok? }
+        ids.count { |id| id.ok? rescue false }
+      end
+    RUBY
+    sites = PathCoverage::Manifest.sites(source, 'k.rb')
+    commands = sites.values.flat_map(&:commands)
+    texts = commands.map { |range| source.byteslice(range) }
+    expected = [
+      'id.name unless id.nil?', 'id if id.ok?', 'id.ok? rescue false'
+    ]
+    assert_equal expected, texts
+  end
+
+  test '6asyb5', %w(
+  | Example: a block whose one expression is break, next or
+  | return
+  | Such an expression is no value, so it cannot be wrapped,
+  | even in parentheses.
+  | So such a block method's call is no site.
+  ) do
+    source = <<~RUBY
+      def k(ids)
+        ids.find { |id| break id }
+        ids.select { |id| next true }
+        ids.any? { |id| return true }
+      end
+    RUBY
+    assert_equal({}, PathCoverage::Manifest.sites(source, 'k.rb'))
   end
 end

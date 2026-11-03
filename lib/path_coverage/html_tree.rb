@@ -91,7 +91,7 @@ module PathCoverage
     # plain arm marks the paths taking it.
     def self.arm_rows(arm, branch, under, choice)
       body = arm[:body]
-      values = cells((body || arm)[:cells], body ? OUTCOMES : TAKEN)
+      values = body ? cells(body[:cells]) : cells(arm[:cells], TAKEN)
       text = CGI.escapeHTML(arm_label(arm, choice))
       lead = branch_cell(branch) +
              %(<span class="arm" data-label="">#{text}</span>)

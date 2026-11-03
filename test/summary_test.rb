@@ -133,4 +133,65 @@ class SummaryTest < Id58TestBase
     expected = { sites: 5, decisions: [5, 10], methods: [1, 4] }
     assert_equal expected, PathCoverage::Summary.total(rows)
   end
+
+  test 'SEye50', %w(
+  | Example: methods of no file, of fee.rb only, and of fee.rb and
+  | kata.rb
+  | A file's methods total adds its own methods' paths alone.
+  | No methods at all gives [0, 0].
+  | fee.rb's two methods of 4 paths each give [0, 8], whether or
+  | not kata.rb has a method too; kata.rb's alone give [0, 4].
+  ) do
+    decisions = [4, 7].map do |line|
+      PathCoverage::Decision.new(line:, range: 0...1, command: false)
+    end
+    fee = PathCoverage::PathMethod.new(
+      name: :fee, entry: 0, decisions:
+    )
+    two = { 'src/fee.rb:2:2' => fee, 'src/fee.rb:9:2' => fee }
+    three = two.merge('src/kata.rb:5:2' => fee)
+    summary = PathCoverage::Summary
+    actual = [
+      summary.methods_of('src/kata.rb', {}, {}),
+      summary.methods_of('src/fee.rb', two, {}),
+      summary.methods_of('src/kata.rb', two, {}),
+      summary.methods_of('src/fee.rb', three, {}),
+      summary.methods_of('src/kata.rb', three, {})
+    ]
+    assert_equal [[0, 0], [0, 8], [0, 0], [0, 8], [0, 4]], actual
+  end
+
+  test 'SEye60', %w(
+  | Example: a group Models of m/*.rb over no rows, one row in or
+  | out of it, two rows in or out of it, and a group with no globs
+  | A group lists the rows its globs match, none for no rows.
+  | Rows no group matches go to Ungrouped, when there are any.
+  | A group with no globs matches no row.
+  ) do
+    row = lambda do |path|
+      { path:, sites: 1, decisions: [1, 2], methods: nil }
+    end
+    models = { 'Models' => ['m/*.rb'] }
+    cases = [
+      [[], models],
+      [['m/a.rb'], models],
+      [['lib/z.rb'], models],
+      [%w(m/a.rb m/b.rb), models],
+      [%w(lib/y.rb lib/z.rb), models],
+      [['m/a.rb'], { 'Empty' => [] }]
+    ]
+    actual = cases.map do |paths, groups|
+      found = PathCoverage::Summary.groups(paths.map(&row), groups)
+      found.map { |name, rows, _| [name, rows.map { _1[:path] }] }
+    end
+    expected = [
+      [['Models', []]],
+      [['Models', ['m/a.rb']]],
+      [['Models', []], ['Ungrouped', ['lib/z.rb']]],
+      [['Models', %w(m/a.rb m/b.rb)]],
+      [['Models', []], ['Ungrouped', %w(lib/y.rb lib/z.rb)]],
+      [['Empty', []], ['Ungrouped', ['m/a.rb']]]
+    ]
+    assert_equal expected, actual
+  end
 end

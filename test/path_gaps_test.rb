@@ -67,4 +67,28 @@ class PathGapsTest < Id58TestBase
     gaps = PathCoverage::PathGaps.lines(methods, paths)
     assert_equal expected, gaps
   end
+
+  test 'Pg4w03', %w(
+  | Example: fee with ifs on lines 3 and 6, never called
+  | None of its 4 paths was taken.
+  | So each one is a gap line, true before false.
+  ) do
+    decisions = [3, 6].map do |line|
+      PathCoverage::Decision.new(line:, range: 0...1, command: false)
+    end
+    methods = {
+      'k.rb:1:0' => PathCoverage::PathMethod.new(
+        name: :fee, entry: 45, decisions:
+      )
+    }
+    never = 'k.rb:1:0 fee path never taken'
+    expected = [
+      "#{never}: line 3 true, line 6 true",
+      "#{never}: line 3 true, line 6 false",
+      "#{never}: line 3 false, line 6 true",
+      "#{never}: line 3 false, line 6 false"
+    ]
+    gaps = PathCoverage::PathGaps.lines(methods, {})
+    assert_equal expected, gaps
+  end
 end

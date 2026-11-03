@@ -15,9 +15,11 @@ module PathCoverage
     # Writes every page. operands and site_paths are as Result
     # gives them, site_paths holding every site in files; files
     # is { full path => {source:, sites:} } for each covered
-    # file, as the kernel parsed it.
+    # file, as the kernel parsed it. The files dir is emptied
+    # first, so it holds no page for a file no longer covered.
     def self.write(operands, files, config, paths = nil, site_paths:)
       dir = config.output_dir
+      FileUtils.rm_rf("#{dir}/files")
       index = index(files, config, paths, site_paths)
       File.write("#{dir}/index.html", index)
       files.each do |full_path, parsed|
@@ -32,7 +34,7 @@ module PathCoverage
 
     # The index page: a row per file of its totals within each
     # decision, and, when paths are given, as they are when
-    # methods are measured, across each method's decisions too;
+    # methods are measured, within each method too;
     # then their Total row. With groups configured, each group,
     # and the files in none, get a tab of their own too.
     def self.index(files, config, paths, site_paths)
@@ -100,8 +102,9 @@ module PathCoverage
     # An arm's node with its at:, nil for an arm with no
     # statements, and its body's tree located.
     def self.located_arm(source, arm, node)
-      body = arm.body && located(source, arm.body, node[:body])
-      node.merge(at: arm.extent && at(source, arm.extent), body:)
+      body = arm.body ? located(source, arm.body, node[:body]) : nil
+      at = arm.extent ? at(source, arm.extent) : nil
+      node.merge(at:, body:)
     end
 
     # [line, column, line, column] of the byte range in source.

@@ -67,7 +67,8 @@ module PathCoverage
     def self.case_arms(source, arms, outcomes, leaves)
       matched = []
       operands = arms.map do |arm|
-        body = arm.body && node(source, arm.body, outcomes, leaves)
+        body =
+          arm.body ? node(source, arm.body, outcomes, leaves) : nil
         matched << body[:cells].map { |cell| cell == true } if body
         cells = body ? matched.last : unmatched(matched, outcomes)
         { arm: arm.kind, text: text_of(source, arm), cells:, body: }
@@ -77,7 +78,7 @@ module PathCoverage
 
     # An arm's text, nil for one with no statements.
     def self.text_of(source, arm)
-      arm.extent && source.byteslice(arm.extent)
+      arm.extent ? source.byteslice(arm.extent) : nil
     end
 
     # Whether each column matched none of its whens' patterns.
@@ -94,7 +95,7 @@ module PathCoverage
     # condition.
     def self.arm(source, arm, (decided, then_on), outcomes, leaves)
       picked = arm.kind == :then ? then_on : !then_on
-      body = arm.body && node(source, arm.body, outcomes, leaves)
+      body = arm.body ? node(source, arm.body, outcomes, leaves) : nil
       {
         arm: arm.kind, text: text_of(source, arm),
         cells: decided.map { |outcome| outcome == picked }, body:

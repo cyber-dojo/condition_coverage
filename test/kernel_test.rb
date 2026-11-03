@@ -232,8 +232,7 @@ class KernelTest < Id58TestBase
   | fee with two ifs called once, with true then false
   | index.html's Total row shows both totals.
   | Within each decision: 2 / 4 (50%), one of each if's two.
-  | Across a method's decisions: 1 / 4 (25%), one of fee's
-  | four.
+  | Within each method: 1 / 4 (25%), one of fee's four.
   ) do
     dir = Dir.mktmpdir('6rTS4f')
     File.write("#{dir}/fee.rb", <<~RUBY)
@@ -274,6 +273,8 @@ class KernelTest < Id58TestBase
   | covered files models/crew.rb and lib/zip.rb
   | index.html has a tab for All files, Models, and Ungrouped.
   | The Models tab's table lists models/crew.rb alone.
+  | The JSON report's totals have each group's own too: Models
+  | took none of crew?'s 3 paths.
   ) do
     dir = Dir.mktmpdir('6rTS4h')
     FileUtils.mkdir_p(%W[#{dir}/models #{dir}/lib])
@@ -296,6 +297,75 @@ class KernelTest < Id58TestBase
     xpath = "//table[@id='files-1']/tbody/tr/td[1]"
     models = index.elements.to_a(xpath)
     assert_equal(['models/crew.rb'], models.map { text_of(_1) })
+    json = JSON.parse(File.read("#{dir}/path_coverage.json"))
+    groups = { 'Models' => { 'decisions' => [0, 3] } }
+    assert_equal groups, json['totals']['groups']
+  end
+
+  test '6rTS4n', %w(
+  | Example: report :html with group 'Models', 'models/*.rb',
+  | and lib/zip.rb the only covered file
+  | No covered file is in the Models group.
+  | So the Models tab's Total row shows 0 sites and - paths.
+  | The - is titled no decisions, saying why.
+  | The JSON report's Models totals are [0, 0].
+  ) do
+    dir = Dir.mktmpdir('6rTS4n')
+    FileUtils.mkdir_p("#{dir}/lib")
+    File.write("#{dir}/lib/zip.rb", "def zip?(a, b) = a || b\n")
+    exit_report = nil
+    on_exit = ->(&block) { exit_report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '**/*.rb'
+      coverage_dir dir
+      report :html
+      group 'Models', 'models/*.rb'
+    end
+    exit_report.call
+
+    index = REXML::Document.new(File.read("#{dir}/index.html"))
+    xpath = "//table[@id='files-1']/tfoot/tr/td"
+    total = index.elements.to_a(xpath).map { text_of(_1) }
+    assert_equal %w(Total 0 -), total
+    none = index.elements["#{xpath}[3]"].attributes['title']
+    assert_equal 'no decisions', none
+    json = JSON.parse(File.read("#{dir}/path_coverage.json"))
+    groups = { 'Models' => { 'decisions' => [0, 0] } }
+    assert_equal groups, json['totals']['groups']
+  end
+
+  test '6rTS4p', %w(
+  | Example: items_of, an if then a ternary, called with nil,
+  | { basket: [1] }, [2] and { basket: 'x' }
+  | The ternary's predicate is its decision, not its value.
+  | So the four calls take all four paths: [F,F], [T,T],
+  | [F,T] and [T,F].
+  | And each site took every path too.
+  | So there are no gaps to print.
+  ) do
+    dir = Dir.mktmpdir('6rTS4p')
+    File.write("#{dir}/items.rb", <<~RUBY)
+      module Items6rTS4p
+        def self.items_of(order)
+          order = order[:basket] if order.is_a?(Hash)
+          order.is_a?(Array) ? order : []
+        end
+      end
+    RUBY
+    exit_report = nil
+    on_exit = ->(&block) { exit_report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+      measure :decisions, :methods
+    end
+    require "#{dir}/items.rb"
+    orders = [nil, { basket: [1] }, [2], { basket: 'x' }]
+    items = orders.map { |order| Items6rTS4p.items_of(order) }
+    assert_equal [[], [1], [2], []], items
+    assert_output('', '') { exit_report.call }
   end
 
   test '6rTS48', %w(
@@ -305,7 +375,7 @@ class KernelTest < Id58TestBase
   | Each site on the page counts the paths it took.
   | It prints no gaps, since :gaps was not chosen.
   | index.html's Total row shows 1 / 3 (33%) within each
-  | decision, and no across cell, as methods are not measured.
+  | decision, and no methods cell, as methods are not measured.
   ) do
     dir = Dir.mktmpdir('6rTS48')
     File.write("#{dir}/crew.rb", <<~RUBY)
@@ -461,6 +531,52 @@ class KernelTest < Id58TestBase
     end
   end
 
+  test '6rTS4m', %w(
+  | Example: a run covering crew.rb and gen.rb, then a render of
+  | its JSON report, into the same dir, with skip 'gen.rb'
+  | The render writes crew.rb's page only.
+  | gen.rb's page, from the run before, is removed.
+  | So the files dir holds a page for each covered file alone.
+  ) do
+    dir = Dir.mktmpdir('6rTS4m')
+    File.write("#{dir}/crew.rb", <<~RUBY)
+      module Crew6rTS4m
+        def self.crew?(id) = !id.empty? && id.size == 6
+      end
+    RUBY
+    File.write("#{dir}/gen.rb", <<~RUBY)
+      module Gen6rTS4m
+        def self.gen?(id) = id.nil? || id.empty?
+      end
+    RUBY
+    out = "#{dir}/reports"
+    exit_report = nil
+    on_exit = ->(&block) { exit_report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir out
+      report :html
+    end
+    require "#{dir}/crew.rb"
+    require "#{dir}/gen.rb"
+    Crew6rTS4m.crew?('Kp9sA2')
+    Gen6rTS4m.gen?('Kp9sA2')
+    exit_report.call
+
+    config = PathCoverage::Configuration.new do
+      root dir
+      cover '*.rb'
+      skip 'gen.rb'
+      coverage_dir out
+      report :html
+    end
+    PathCoverage::Render.from_json(config)
+
+    pages = Dir.glob('**/*.html', base: "#{out}/files")
+    assert_equal ['crew.rb.html'], pages
+  end
+
   test '6rTS41', %w(
   | Example: fee with if member ... end and if big ... end
   | measure :decisions, :methods is chosen.
@@ -586,6 +702,78 @@ class KernelTest < Id58TestBase
       "`id.start_with?('L')` true, `id.size > 1` false"
     ].join("\n")
     assert_output("#{expected}\n") { report.call }
+  end
+
+  test '6rTS4j', %w(
+  | Example: ns.filter_map do |n| "n#{n}" unless n.nil? end
+  | The block's one expression is a modifier unless.
+  | The covered file still loads, and filter_map still keeps
+  | ["n1", "n2"] of [1, nil, 2].
+  ) do
+    dir = Dir.mktmpdir('6rTS4j')
+    File.write("#{dir}/names.rb", <<~'RUBY')
+      module Names6rTS4j
+        def self.names(ns)
+          ns.filter_map do |n|
+            "n#{n}" unless n.nil?
+          end
+        end
+      end
+    RUBY
+    on_exit = ->(&_report) {}
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+    end
+    require "#{dir}/names.rb"
+    assert_equal %w(n1 n2), Names6rTS4j.names([1, nil, 2])
+  end
+
+  test '6rTS4k', %w(
+  | Example: report :summary, fee with two ifs called once with
+  | true then false, measuring decisions, then decisions and
+  | methods
+  | At exit it prints a line per total, as SimpleCov prints its
+  | line and branch coverage.
+  | Within decisions: 2 / 4, one of each if's two paths.
+  | Within methods, only when methods are measured: 1 / 4.
+  ) do
+    # Each measure covers a file and module of its own, so neither
+    # run redefines the other's fee.
+    measures = { 'D' => %i[decisions], 'M' => %i[decisions methods] }
+    printed = measures.map do |tag, names|
+      dir = Dir.mktmpdir("6rTS4k#{tag}")
+      File.write("#{dir}/fee.rb", <<~RUBY)
+        module Fee6rTS4k#{tag}
+          def self.fee(member, big)
+            total = 100
+            if member
+              total -= 5
+            end
+            if big
+              total -= 10
+            end
+            total
+          end
+        end
+      RUBY
+      exit_report = nil
+      on_exit = ->(&block) { exit_report = block }
+      PathCoverage.start(on_exit:) do
+        root dir
+        cover '*.rb'
+        coverage_dir dir
+        report :summary
+        measure(*names)
+      end
+      require "#{dir}/fee.rb"
+      Object.const_get("Fee6rTS4k#{tag}").fee(true, false)
+      capture_io { exit_report.call }.first
+    end
+    decisions = "Path coverage within decisions: 2 / 4 (50.00%)\n"
+    methods = "Path coverage within methods: 1 / 4 (25.00%)\n"
+    assert_equal [decisions, decisions + methods], printed
   end
 
   test '6rTS4e', %w(

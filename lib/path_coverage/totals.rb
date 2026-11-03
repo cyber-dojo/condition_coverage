@@ -13,7 +13,7 @@ module PathCoverage
       [every.count { |each| each[:count].positive? }, every.size]
     end
 
-    # Paths across each method's decisions: methods, as
+    # Paths within each method, through its decisions: methods, as
     # PathManifest.methods gives them, each with every path
     # through its decisions; paths, as the recorder counts
     # them, holds the ones taken.

@@ -73,7 +73,7 @@ module PathCoverage
     # An arm with no statements has no extent.
     def statement_arm(kind, statements)
       statements&.accept(self)
-      extent = statements && extent_of(statements)
+      extent = statements ? extent_of(statements) : nil
       Arm.new(kind:, extent:, body: nil)
     end
 
@@ -104,8 +104,12 @@ module PathCoverage
     # any site inside a plain arm is a site of its own.
     def arm_of(kind, statements)
       written = grouped(statements.body.first)
-      body = condition_of(written) if foldable?(written)
-      statements.accept(self) if body.nil?
+      body = if foldable?(written)
+               condition_of(written)
+             else
+               statements.accept(self)
+               nil
+             end
       Arm.new(kind:, extent: extent_of(statements), body:)
     end
 

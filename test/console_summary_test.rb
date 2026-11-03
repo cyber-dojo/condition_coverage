@@ -1,0 +1,85 @@
+require_relative 'test_helper'
+require 'path_coverage/console_summary'
+require 'path_coverage/path_manifest'
+
+class ConsoleSummaryTest < Id58TestBase
+  test 'Cs4m10', %w(
+  | Example: lib/kata.rb's site taking 2 of its 3 paths, and
+  | test/kata_test.rb's taking 1 of its 2, with groups code and
+  | test
+  | Each group is a heading, its own totals indented under it.
+  | There is no total over every group.
+  | With no paths given, as methods are not measured, there is no
+  | methods line.
+  ) do
+    site_paths = {
+      'lib/kata.rb:3:4' => [
+        { path: [true, true], count: 2 },
+        { path: [true, false], count: 1 },
+        { path: [false, nil], count: 0 }
+      ],
+      'test/kata_test.rb:9:6' => [
+        { path: [true], count: 4 },
+        { path: [false], count: 0 }
+      ]
+    }
+    groups = { 'code' => ['lib/**/*.rb'], 'test' => ['test/**/*.rb'] }
+    expected = [
+      'code:',
+      '  Path coverage within decisions: 2 / 3 (66.67%)',
+      'test:',
+      '  Path coverage within decisions: 1 / 2 (50.00%)'
+    ]
+    summary = PathCoverage::ConsoleSummary
+    actual = summary.lines(site_paths, {}, nil, groups)
+    assert_equal expected, actual
+  end
+
+  test 'Cs4m20', %w(
+  | Example: fee in lib/fee.rb with two decisions, called with
+  | true then false only, and groups code and test
+  | Each group has a methods line too: code has fee's 1 / 4.
+  | test, with no method of two decisions, has 0 / 0, shown as -.
+  ) do
+    decisions = [4, 7].map do |line|
+      PathCoverage::Decision.new(
+        line:, range: 0...1, command: false
+      )
+    end
+    fee = PathCoverage::PathMethod.new(
+      name: :fee, entry: 0, decisions:
+    )
+    methods = { 'lib/fee.rb:1:0' => fee }
+    paths = { 'lib/fee.rb:1:0' => { [true, false] => 1 } }
+    groups = { 'code' => ['lib/**/*.rb'], 'test' => ['test/**/*.rb'] }
+    summary = PathCoverage::ConsoleSummary
+    lines = summary.lines({}, methods, paths, groups)
+    expected = [
+      'code:',
+      '  Path coverage within decisions: 0 / 0 (-)',
+      '  Path coverage within methods: 1 / 4 (25.00%)',
+      'test:',
+      '  Path coverage within decisions: 0 / 0 (-)',
+      '  Path coverage within methods: 0 / 0 (-)'
+    ]
+    assert_equal expected, lines
+  end
+
+  test 'Cs4m30', %w(
+  | Example: two sites, both in lib/, with groups code and test
+  | code totals both sites' paths; test totals none.
+  ) do
+    two = { path: [true], count: 1 }
+    site_paths = {
+      'lib/a.rb:1:0' => [two], 'lib/b.rb:1:0' => [two]
+    }
+    groups = { 'code' => ['lib/**/*.rb'], 'test' => ['test/**/*.rb'] }
+    summary = PathCoverage::ConsoleSummary
+    actual = summary.group_totals(site_paths, {}, nil, groups)
+    expected = {
+      'code' => { 'decisions' => [2, 2] },
+      'test' => { 'decisions' => [0, 0] }
+    }
+    assert_equal expected, actual
+  end
+end

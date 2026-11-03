@@ -1,6 +1,7 @@
 require 'fileutils'
 require_relative 'calls'
 require_relative 'configuration'
+require_relative 'console_summary'
 require_relative 'json_writer'
 require_relative 'manifest'
 require_relative 'path_gaps'
@@ -10,7 +11,6 @@ require_relative 'recorder'
 require_relative 'render'
 require_relative 'result'
 require_relative 'rewriter'
-require_relative 'totals'
 
 # Path coverage for Ruby. This file is the kernel: it loads
 # before any covered file and is never itself instrumented, since
@@ -147,14 +147,19 @@ module PathCoverage
 
   # The JSON report's totals, each [taken, possible] paths:
   # within each decision, and, when config measures methods,
-  # across each method's decisions too.
+  # within each method too; with groups configured, each group's
+  # own too, under groups.
   def self.totals(result, files, config)
-    totals = { 'decisions' => Totals.decisions(result.paths) }
-    return totals unless config.measures.include?(:methods)
+    measured = config.measures.include?(:methods)
+    methods = measured ? path_methods_of(files, config) : {}
+    paths = measured ? @recorder.paths : nil
+    totals = ConsoleSummary.totals(result.paths, methods, paths)
+    groups = config.groups
+    return totals if groups.empty?
 
-    methods = path_methods_of(files, config)
-    taken = Totals.methods(methods, @recorder.paths)
-    totals.merge('methods' => taken)
+    summary = ConsoleSummary
+    own = summary.group_totals(result.paths, methods, paths, groups)
+    totals.merge('groups' => own)
   end
 
   # { full path => {source:, sites:} } for every covered file:

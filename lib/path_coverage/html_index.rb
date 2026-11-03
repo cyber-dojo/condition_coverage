@@ -49,16 +49,16 @@ module PathCoverage
       '</button></th>'
     ].join("\n").freeze
 
-    # The heading of the across column, there only when methods
+    # The heading of the methods column, there only when methods
     # are measured.
-    ACROSS = '<th class="num" aria-sort="none"><button ' \
-             'type="button" data-column="3" data-type="number">' \
-             "Across a method's decisions</button></th>".freeze
+    METHODS = '<th class="num" aria-sort="none"><button ' \
+              'type="button" data-column="3" data-type="number">' \
+              'Within each method</button></th>'.freeze
 
     # The index-th tab's table of rows, total as its footer; any
     # but the first starts hidden.
     def self.table(index, rows, total)
-      head = HEAD + (total[:methods] ? "\n#{ACROSS}" : '')
+      head = HEAD + (total[:methods] ? "\n#{METHODS}" : '')
       body = rows.map { |row| row(row) }.join("\n")
       [
         open_tag(index),
@@ -92,25 +92,27 @@ module PathCoverage
 
     # The cells after the file's: its sites, then its total
     # within each decision, then, when methods are measured, its
-    # total across a method's decisions.
+    # total within each method.
     def self.counts(row)
       cells = [
         cell(row[:sites], row[:sites]),
-        paths_cell(row[:decisions])
+        paths_cell(row[:decisions], 'no decisions')
       ]
-      row[:methods] ? cells + [paths_cell(row[:methods])] : cells
+      return cells unless row[:methods]
+
+      none = 'no method with two or more decisions'
+      cells + [paths_cell(row[:methods], none)]
     end
 
     # A cell showing [taken, possible] paths, eg 3 / 6 (50%),
-    # sorted by its percent. With no paths to take, as in a file
-    # with no method of two or more decisions, it shows -,
-    # titled with why, with an empty sort value, which sort.js
-    # keeps last whichever way the column is sorted.
-    def self.paths_cell(pair)
+    # sorted by its percent. With no paths to take, as in a group
+    # no file is in, or a file with no method of two or more
+    # decisions, it shows -, titled with none, saying why, with
+    # an empty sort value, which sort.js keeps last whichever
+    # way the column is sorted.
+    def self.paths_cell(pair, none)
       taken, possible = pair
-      if possible.zero?
-        return cell('', '-', 'no method with two or more decisions')
-      end
+      return cell('', '-', none) if possible.zero?
 
       percent = (100.0 * taken / possible).round
       cell(percent, "#{taken} / #{possible} (#{percent}%)")

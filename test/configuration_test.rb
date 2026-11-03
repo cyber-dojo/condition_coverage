@@ -65,6 +65,51 @@ class ConfigurationTest < Id58TestBase
     assert_equal [true, false], covered
   end
 
+  test 'A9MJ60', %w(
+  | Example: cover 'source/**/*.rb', skip 'source/**'
+  | With no files under source, there are no files.
+  | With kata.rb, it is skipped, so there are none.
+  | With kata.rb and team.rb, both are skipped, so there are none.
+  ) do
+    actual = [[], %w(kata.rb), %w(kata.rb team.rb)].map do |names|
+      dir = Dir.mktmpdir('A9MJ60')
+      FileUtils.mkdir_p("#{dir}/source")
+      names.each do |name|
+        File.write("#{dir}/source/#{name}", "ok = 1\n")
+      end
+      config = PathCoverage::Configuration.new do
+        root dir
+        cover 'source/**/*.rb'
+        skip 'source/**'
+      end
+      config.files
+    end
+    assert_equal [[], [], []], actual
+  end
+
+  test 'A9MJ70', %w(
+  | Example: no cover, cover 'source/*.rb', and cover 'lib/*.rb'
+  | with cover 'source/*.rb'
+  | With no cover glob, no file is covered.
+  | source/kata.rb is covered when any glob matches it.
+  | test/kata_test.rb is covered by none of them.
+  ) do
+    covers = [[], %w(source/*.rb), %w(lib/*.rb source/*.rb)]
+    configs = covers.map do |globs|
+      PathCoverage::Configuration.new do
+        root '/app'
+        globs.each { |glob| cover glob }
+      end
+    end
+    actual = configs.map do |config|
+      %w(source/kata.rb test/kata_test.rb).map do |path|
+        config.covers?("/app/#{path}")
+      end
+    end
+    expected = [[false, false], [true, false], [true, false]]
+    assert_equal expected, actual
+  end
+
   test 'A9MJ15', %w(
   | an unknown reporter in the start block is refused,
   | naming it and listing the reporters there are
@@ -77,7 +122,7 @@ class ConfigurationTest < Id58TestBase
     end
     expected = [
       'unknown reporter htm in PathCoverage.start',
-      'the reporters are: gaps, html, post'
+      'the reporters are: gaps, html, post, summary'
     ].join("\n")
     assert_equal expected, error.message
   end
@@ -94,7 +139,7 @@ class ConfigurationTest < Id58TestBase
   | Example: a start block with no measure
   | Paths within each decision are measured.
   | Example: measure :decisions, :methods
-  | Paths across each method's decisions are measured too.
+  | Paths within each method are measured too.
   ) do
     config = PathCoverage::Configuration.new { root '/app' }
     assert_equal [:decisions], config.measures

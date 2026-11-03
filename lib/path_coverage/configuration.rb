@@ -8,7 +8,7 @@ module PathCoverage
     SETTINGS = %w[
       collector cover coverage_dir group measure report root skip
     ].freeze
-    REPORTERS = %w[gaps html post].freeze
+    REPORTERS = %w[gaps html post summary].freeze
     MEASURES = %w[decisions methods].freeze
 
     # Evaluates the settings block against a new configuration.
@@ -31,7 +31,7 @@ module PathCoverage
 
     # Chooses what is measured.
     # Eg measure :decisions, :methods also measures the paths
-    # across each method's decisions.
+    # within each method, through its decisions.
     # Refuses a name there is no measure for.
     def measure(*names)
       check('measure', names, MEASURES)
