@@ -3,6 +3,7 @@ require_relative 'condition'
 require_relative 'manifest_blocks'
 require_relative 'manifest_case'
 require_relative 'manifest_choices'
+require_relative 'manifest_writes'
 require_relative 'site'
 
 module PathCoverage
@@ -74,6 +75,7 @@ module PathCoverage
       include ManifestBlocks
       include ManifestCase
       include ManifestChoices
+      include ManifestWrites
 
       # Starts with no sites found.
       def initialize(path)
@@ -143,8 +145,10 @@ module PathCoverage
       # node as a Condition, operands and all, named by its
       # operator as written; a ternary is named ?:, an if if and
       # an unless unless, their operands a predicate and arms; a
-      # case case, its operands its arms.
+      # case case, its operands its arms; a write ||= or &&=, its
+      # operands its target and its right side.
       def condition_of(node)
+        return write_condition(node) if write?(node)
         return choice_of(node) if CHOICE_TYPES.include?(node.type)
         return case_condition(node) if node.type == :case_node
         return block_condition(node) if node.type == :call_node

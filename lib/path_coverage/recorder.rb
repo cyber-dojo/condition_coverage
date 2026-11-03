@@ -1,8 +1,11 @@
 require_relative 'condition'
+require_relative 'recorder_writes'
 
 module PathCoverage
   # Records the outcome of each instrumented operand.
   class Recorder
+    include RecorderWrites
+
     # One call's way through its method: the outcome of each
     # decision made so far, of the number of decisions its
     # method has.

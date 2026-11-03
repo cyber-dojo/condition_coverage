@@ -1,4 +1,5 @@
 require_relative 'condition'
+require_relative 'rewriter_writes'
 
 module PathCoverage
   # Instruments source text so that each leaf operand records its
@@ -26,6 +27,9 @@ module PathCoverage
     def self.site_inserts(site, condition)
       kind = condition.operator
       return case_inserts(site, condition) if kind == 'case'
+      if WRITES.include?(kind)
+        return RewriterWrites.inserts(site, condition)
+      end
 
       blocks = BLOCK_PATHS.key?(kind)
       return block_inserts(site, condition) if blocks

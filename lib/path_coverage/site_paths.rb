@@ -31,7 +31,9 @@ module PathCoverage
     # outcome }. A case is the chain of its whens' conditions.
     def self.walk(node, fixed)
       return leaf(node, fixed) unless node.is_a?(Condition)
-      return ternary(node, fixed) if CHOICES.include?(node.operator)
+      if [*CHOICES, *WRITES].include?(node.operator)
+        return ternary(node, fixed)
+      end
 
       if node.operator == 'case'
         whens = node.operands.filter_map(&:body)

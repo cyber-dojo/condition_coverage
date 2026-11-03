@@ -700,6 +700,45 @@ class HtmlFileTest < Id58TestBase
     assert_equal [%w(#L2 #L2), %w(#L1 #L1)], actual
   end
 
+  test 'gae553', %w(
+  | Example: store[key] ||= key.upcase, its target true on one
+  | path and false on the other
+  | The target, store[key], has a row showing T then F.
+  | The right side's row is labelled ||= key.upcase.
+  | It marks the path that ran it, the target false.
+  ) do
+    lines = [
+      { number: 1, text: '  store[key] ||= key.upcase',
+        status: :covered, span: 1..1 }
+    ]
+    trees = {
+      1 => [
+        {
+          operator: '||=', counts: [1, 1], cells: [nil, nil],
+          operands: [
+            { text: 'store[key]', cells: [true, false] },
+            {
+              arm: :then, text: 'key.upcase',
+              cells: [false, true], body: nil
+            }
+          ]
+        }
+      ]
+    }
+    listing = PathCoverage::HtmlFile.listing(lines, trees)
+    html = REXML::Document.new(listing)
+    tree = html.elements["//*[@id='tree-1']"]
+
+    target = tree.elements['.//*[@data-operand]']
+    cells = target.elements.to_a('*[@data-cell]').map { text_of(_1) }
+    assert_equal %w(T F), cells
+    arm = tree.elements['.//*[@data-arm]']
+    label = text_of(arm.elements['*[@data-label]'])
+    taken = arm.elements.to_a('*[@data-cell]').map { text_of(_1) }
+    bullet = [0x2022].pack('U')
+    assert_equal ['||= key.upcase', ['', bullet]], [label, taken]
+  end
+
   private
 
   # { status => hrefs } of the header's covered and gaps lists.

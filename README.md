@@ -253,6 +253,15 @@ whether its answers were `all true`, `all false` or `both`. Both are
 noted from the block's own calls, so the receiver is never asked for its
 size, which could consume a sequence that can be read only once.
 
+A `||=` or `&&=` write is a site, whatever its target: a variable of any
+kind, a constant, an attribute (`self.size ||= n`) or an index
+(`store[key] ||= key.upcase`). Its one leaf is its target, and its right
+side is an arm, run when the target is false for `||=`, true for `&&=`,
+as an `unless` or an `if` runs its arm. The target is never read again,
+since reading `store[key]` could call a method twice: its outcome follows
+from whether the right side ran. So `@clock ||= Clock.now` called only
+once, as a fresh object, leaves the path with `@clock` true a gap.
+
 A chain of one operator is flat; a change of operator, by precedence or by
 parentheses, nests. Parentheses are not part of the tree, since they decide
 nothing.
@@ -403,9 +412,6 @@ the run never loaded are read and parsed then.
     with blocks of more than one expression
   - `fetch(k, default)`, `dig`, `Hash#[]` with a default: present vs default
   - `x || default` in value context, `&.` safe navigation: nil vs not nil
-  - `||=` and `&&=`, on variables, attributes and index targets: the
-    right side evaluated vs skipped, counted without evaluating the
-    target twice
   - `x rescue y` modifier: raised vs not raised
   - `case` with no subject, and `case`/`in` patterns
   - regex matches: nil vs MatchData
@@ -425,6 +431,16 @@ the run never loaded are read and parsed then.
 - an evaluation that raised part way through a site, eg
   `ok?(id) && fetch(id)` where `fetch` raises, reported as a path that
   raised rather than dropped as unfinished.
+- complexity maximums, reported and gated, since the possible paths
+  count how much there is to test, not only how much was tested. A
+  file's total measures its size, so each is a maximum over smaller
+  parts:
+  - paths in one decision, eg 6 for a `select` block
+  - paths through one method's decisions, eg 2 top-level ifs give 4
+  - paths within each decision, summed over every decision in one
+    method, nested ones included, eg decisions of 2, 3 and 15 paths
+    sum to 20. Every method has one, and it grows as the method gains
+    conditions, where the paths through a method multiply.
 
 ## Constraints
 

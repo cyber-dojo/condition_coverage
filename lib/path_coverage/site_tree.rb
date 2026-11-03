@@ -102,11 +102,11 @@ module PathCoverage
       }
     end
 
-    # A condition's value in each column: a ternary's or an
-    # if's is its taken arm's body's, nil for a plain arm; a
+    # A condition's value in each column: a ternary's, an if's or
+    # a write's is its taken arm's body's, nil for a plain arm; a
     # chain's is that of the last operand it reached.
     def self.value(operator, operands)
-      if CHOICES.include?(operator)
+      if [*CHOICES, *WRITES].include?(operator)
         _, *arms = operands
         arms.map { |arm| arm[:body]&.fetch(:cells) }
             .then { |bodies| ternary_value(arms, bodies) }

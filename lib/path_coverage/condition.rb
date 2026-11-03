@@ -6,9 +6,15 @@ module PathCoverage
   # decided by their predicate alone.
   STATEMENT_CHOICES = %w[if unless].freeze
 
+  # The writes whose target decides whether their right side
+  # runs, as an unless or an if decides its arm: x ||= v runs v
+  # when x is false, x &&= v when x is true.
+  WRITES = %w[||= &&=].freeze
+
   # The predicate outcome on which each choice takes its then
-  # arm: an unless's is false.
-  THEN_ON = Hash.new(true).merge('unless' => false).freeze
+  # arm: an unless's is false, as is a ||= write's.
+  THEN_ON = Hash.new(true).merge('unless' => false, '||=' => false)
+                .freeze
 
   # The methods that call their block an item at a time until
   # it decides, its last answer deciding the result.

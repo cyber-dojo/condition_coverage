@@ -52,6 +52,21 @@ module PathCoverage
     @recorder.leave_items(trail, value)
   end
 
+  # The call rewritten code makes around a ||= or &&= write's
+  # right side, outcome being its target's when it runs;
+  # returns value unchanged.
+  def self.written(site, outcome, value)
+    @recorder.written(site, outcome, value)
+  end
+
+  # The call rewritten code makes around a ||= or &&= write as a
+  # whole, with the trail enter gave it, skipped being its
+  # target's outcome when its right side never ran; returns
+  # value unchanged.
+  def self.leave_write(trail, skipped, value)
+    @recorder.leave_write(trail, skipped, value)
+  end
+
   # The call rewritten code makes as a call reaches its
   # method's first decision; returns the call's new path.
   def self.path(site, size)

@@ -536,6 +536,168 @@ class KernelTest < Id58TestBase
     assert_equal '0 / 4 (0%)', methods
   end
 
+  test '6rTS4t', %w(
+  | Example: store[key] ||= key.upcase and name &&= name.strip,
+  | each called once skipping its right side and once not
+  | Each is a site, its one leaf its target.
+  | The target is never read again: its outcome follows from
+  | whether the right side ran.
+  | ||= runs it when the target is false, &&= when true.
+  | Both paths of each were taken, so there are no gaps.
+  | The values are those of the uninstrumented code.
+  ) do
+    dir = Dir.mktmpdir('6rTS4t')
+    File.write("#{dir}/cache_writes.rb", <<~RUBY)
+      module Cache6rTS4t
+        def self.fetch(store, key)
+          store[key] ||= key.upcase
+        end
+        def self.trim(name)
+          name &&= name.strip
+          name
+        end
+      end
+    RUBY
+    exit_report = nil
+    on_exit = ->(&block) { exit_report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+    end
+    require "#{dir}/cache_writes.rb"
+    fetched = [{}, { 'a' => 'B' }].map do |store|
+      Cache6rTS4t.fetch(store, 'a')
+    end
+    trimmed = [' x ', nil].map { |name| Cache6rTS4t.trim(name) }
+    assert_equal [%w(A B), ['x', nil]], [fetched, trimmed]
+    assert_output('', '') { exit_report.call }
+
+    json = JSON.parse(File.read("#{dir}/path_coverage.json"))
+    taken = %w(cache_writes.rb:3:4 cache_writes.rb:6:4).to_h do |site|
+      [site, json['paths'][site]['taken']]
+    end
+    both = [{ 'path' => [true], 'count' => 1 },
+            { 'path' => [false], 'count' => 1 }]
+    expected = {
+      'cache_writes.rb:3:4' => both, 'cache_writes.rb:6:4' => both
+    }
+    assert_equal expected, taken
+  end
+
+  test '6rTS4u', %w(
+  | Example: store[:size] ||= 0, called only with an empty store
+  | Its target was false each time, so its right side ran.
+  | So the path with its target true is a gap.
+  ) do
+    dir = Dir.mktmpdir('6rTS4u')
+    File.write("#{dir}/fill_writes.rb", <<~RUBY)
+      module Fill6rTS4u
+        def self.fill(store)
+          store[:size] ||= 0
+        end
+      end
+    RUBY
+    exit_report = nil
+    on_exit = ->(&block) { exit_report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+    end
+    require "#{dir}/fill_writes.rb"
+    assert_equal 0, Fill6rTS4u.fill({})
+    gap = "fill_writes.rb:3:4 path never taken: `store[:size]` true\n"
+    assert_output(gap, '') { exit_report.call }
+  end
+
+  test '6rTS4v', %w(
+  | Example: ||= on a constant, an instance variable with a command
+  | call on its right, an attribute, a class variable and a global
+  | Each is a site, and the rewritten code still loads and runs.
+  | clock and grow, called twice, take both paths of each.
+  | LIMIT ||= 6 runs once, as the module loads, so its target
+  | true is the one gap.
+  ) do
+    dir = Dir.mktmpdir('6rTS4v')
+    File.write("#{dir}/memo_writes.rb", <<~RUBY)
+      module Memo6rTS4v
+        LIMIT ||= 6
+        @@count = nil
+        class << self
+          attr_accessor :size
+        end
+        def self.clock
+          @clock ||= Time.at 0
+        end
+        def self.grow(n)
+          self.size ||= n
+          @@count ||= 0
+          $memo6rTS4v ||= n
+          [size, @@count, $memo6rTS4v]
+        end
+      end
+    RUBY
+    exit_report = nil
+    on_exit = ->(&block) { exit_report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+    end
+    require "#{dir}/memo_writes.rb"
+    clocks = 2.times.map { Memo6rTS4v.clock }
+    grown = [3, 5].map { |n| Memo6rTS4v.grow(n) }
+    assert_equal [[Time.at(0)] * 2, [[3, 0, 3]] * 2], [clocks, grown]
+    gap = "memo_writes.rb:2:2 path never taken: `LIMIT` true\n"
+    assert_output(gap, '') { exit_report.call }
+
+    json = JSON.parse(File.read("#{dir}/path_coverage.json"))
+    sites = %w(2:2 8:4 11:4 12:4 13:4).map { "memo_writes.rb:#{_1}" }
+    counts = sites.to_h do |site|
+      [site, json['paths'][site]['taken'].map { _1['count'] }]
+    end
+    expected = sites.to_h { |site| [site, [1, 1]] }
+    expected['memo_writes.rb:2:2'] = [0, 1]
+    assert_equal expected, counts
+  end
+
+  test '6rTS4w', %w(
+  | Example: @port ||= Integer(text) rescue 80, a rescue modifier
+  | on the right of ||=, called with 'x' then '8080'
+  | The rewritten code still loads, the modifier needing
+  | parentheses to be an argument.
+  | It returns what the same code, uninstrumented, returns.
+  | 'x' runs the right side, which rescues to 80; '8080' finds
+  | @port set and skips it. So both paths are taken: no gaps.
+  ) do
+    dir = Dir.mktmpdir('6rTS4w')
+    source = lambda do |name|
+      <<~RUBY
+        module #{name}
+          def self.port(text)
+            @port ||= Integer(text) rescue 80
+          end
+        end
+      RUBY
+    end
+    File.write("#{dir}/port_writes.rb", source.call('Port6rTS4w'))
+    exit_report = nil
+    on_exit = ->(&block) { exit_report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+    end
+    require "#{dir}/port_writes.rb"
+    eval(source.call('Plain6rTS4w')) # rubocop:disable Security/Eval
+    texts = %w(x 8080)
+    plain = texts.map { |text| Plain6rTS4w.port(text) }
+    actual = texts.map { |text| Port6rTS4w.port(text) }
+    assert_equal [[80, 80], plain], [actual, actual]
+    assert_output('', '') { exit_report.call }
+  end
+
   test '6rTS48', %w(
   | Example: report :html, and crew? called once
   | The exit report writes index.html into coverage_dir.

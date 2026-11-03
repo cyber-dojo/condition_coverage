@@ -99,9 +99,13 @@ module PathCoverage
       body ? [row, *operand_rows(body, under)] : [row]
     end
 
-    # The name of an arm of a condition whose operator is choice.
+    # The name of an arm of a condition whose operator is choice:
+    # then or else for an if, ? or : and its text for a ternary,
+    # and the operator and its right side for a write, eg
+    # ||= key.upcase.
     def self.arm_label(arm, choice)
       return arm[:arm].to_s if NAMED_ARMS.include?(choice)
+      return "#{choice} #{arm[:text]}" if WRITES.include?(choice)
 
       mark = arm[:arm] == :then ? '?' : ':'
       body = arm[:body]
