@@ -63,17 +63,24 @@ class CollectorTest < Id58TestBase
   | A report it cannot save is not acknowledged.
   | So the reply to its POST is 500, not 200.
   | A 200 means the report is already saved.
+  | The collector says it saved nothing.
   ) do
     dir = "#{Dir.mktmpdir('Cl4k16')}/missing"
     server = TCPServer.new('127.0.0.1', 0)
     url = "http://127.0.0.1:#{server.addr[1]}/runs"
     collector = PathCoverage::Collector
-    serving = Thread.new { collector.serve(server, dir) }
+    # One request, answered as serve answers it, then joined, so
+    # the collector has finished before anything is asserted.
+    receiving = Thread.new do
+      collector.receive(server.accept, dir) do |body|
+        collector.save(dir, 'run-0001.json', body)
+      end
+    end
     operands = { 'source/kata.rb:3:23' => [{ truthy: 2, falsy: 0 }] }
     reply = PathCoverage::Post.deliver(operands, url)
-    serving.kill
+    saved = receiving.value
     server.close
-    assert_equal '500', reply.code
+    assert_equal ['500', false], [reply.code, saved]
   end
 
   test 'Cl4k17', %w(
