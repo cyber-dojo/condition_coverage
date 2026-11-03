@@ -138,11 +138,18 @@ module PathCoverage
     sites = merged_sites(files)
     result = Result.new(sites, @recorder.counts, @recorder.site_paths)
     FileUtils.mkdir_p(config.output_dir)
+    write_json(result, files, config)
+    result
+  end
+
+  # Writes result as the JSON report at config's json_path: its
+  # operands, site paths and totals, and the method paths the
+  # recorder counted, so a render from the JSON alone has them.
+  def self.write_json(result, files, config)
     report = PathsReport.of(result.paths, files)
     totals = totals(result, files, config)
-    path = config.json_path
-    JsonWriter.write(result.operands, path, report, totals:)
-    result
+    JsonWriter.write(result.operands, config.json_path, report,
+                     totals:, method_paths: @recorder.paths)
   end
 
   # The JSON report's totals, each [taken, possible] paths:

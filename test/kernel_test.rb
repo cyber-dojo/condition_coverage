@@ -368,6 +368,174 @@ class KernelTest < Id58TestBase
     assert_output('', '') { exit_report.call }
   end
 
+  test '6rTS4q', %w(
+  | Example: measure :decisions, :methods, fee with two ifs
+  | called once, with true then false, then a render of the
+  | run's JSON report into another dir
+  | The JSON report holds the method paths taken too.
+  | So the render's index has the same Total row as the run's.
+  | Within each decision: 2 / 4 (50%).
+  | Within each method: 1 / 4 (25%).
+  ) do
+    dir = Dir.mktmpdir('6rTS4q')
+    File.write("#{dir}/fee.rb", <<~RUBY)
+      module Fee6rTS4q
+        def self.fee(member, big)
+          total = 100
+          if member
+            total -= 5
+          end
+          if big
+            total -= 10
+          end
+          total
+        end
+      end
+    RUBY
+    live = "#{dir}/live"
+    exit_report = nil
+    on_exit = ->(&block) { exit_report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir live
+      report :html
+      measure :decisions, :methods
+    end
+    require "#{dir}/fee.rb"
+    Fee6rTS4q.fee(true, false)
+    exit_report.call
+
+    later = "#{dir}/later"
+    FileUtils.mkdir_p(later)
+    FileUtils.cp("#{live}/path_coverage.json", later)
+    config = PathCoverage::Configuration.new do
+      root dir
+      cover '*.rb'
+      coverage_dir later
+      report :html
+      measure :decisions, :methods
+    end
+    PathCoverage::Render.from_json(config)
+
+    index = REXML::Document.new(File.read("#{later}/index.html"))
+    total = index.elements.to_a('//tfoot/tr/td')
+    expected = ['Total', '2', '2 / 4 (50%)', '1 / 4 (25%)']
+    assert_equal(expected, total.map { text_of(_1) })
+  end
+
+  test '6rTS4r', %w(
+  | Example: measure :decisions, :methods, fee with two ifs,
+  | a report after fee(true, false), another after
+  | fee(false, false) too, then a render of both reports
+  | The render merges the method paths of every report.
+  | So fee's paths taken are true false and false false.
+  | Within each method: 2 / 4 (50%), not the first report's 1.
+  ) do
+    dir = Dir.mktmpdir('6rTS4r')
+    File.write("#{dir}/fee_runs.rb", <<~RUBY)
+      module Fee6rTS4r
+        def self.fee(member, big)
+          total = 100
+          if member
+            total -= 5
+          end
+          if big
+            total -= 10
+          end
+          total
+        end
+      end
+    RUBY
+    reports = %w(first second).map { |run| "#{dir}/#{run}" }
+    exit_reports = reports.map do |out|
+      exit_report = nil
+      on_exit = ->(&block) { exit_report = block }
+      PathCoverage.start(on_exit:) do
+        root dir
+        cover '*.rb'
+        coverage_dir out
+        measure :decisions, :methods
+      end
+      exit_report
+    end
+    require "#{dir}/fee_runs.rb"
+    Fee6rTS4r.fee(true, false)
+    assert_output(/fee path never taken/, '') { exit_reports[0].call }
+    Fee6rTS4r.fee(false, false)
+    assert_output(/fee path never taken/, '') { exit_reports[1].call }
+
+    later = "#{dir}/later"
+    FileUtils.mkdir_p(later)
+    config = PathCoverage::Configuration.new do
+      root dir
+      cover '*.rb'
+      coverage_dir later
+      report :html
+      measure :decisions, :methods
+    end
+    jsons = reports.map { |out| "#{out}/path_coverage.json" }
+    PathCoverage::Render.from_json(config, jsons)
+
+    index = REXML::Document.new(File.read("#{later}/index.html"))
+    total = index.elements.to_a('//tfoot/tr/td')
+    methods = total.map { text_of(_1) }.last
+    assert_equal '2 / 4 (50%)', methods
+  end
+
+  test '6rTS4s', %w(
+  | Example: a run of fee with two ifs that measures :decisions
+  | alone, then a render of its report that measures :methods too
+  | The report holds no method paths, so it cannot say which
+  | of fee's paths were taken.
+  | So the render claims none: within each method 0 / 4 (0%).
+  ) do
+    dir = Dir.mktmpdir('6rTS4s')
+    File.write("#{dir}/fee_plain.rb", <<~RUBY)
+      module Fee6rTS4s
+        def self.fee(member, big)
+          total = 100
+          if member
+            total -= 5
+          end
+          if big
+            total -= 10
+          end
+          total
+        end
+      end
+    RUBY
+    live = "#{dir}/live"
+    exit_report = nil
+    on_exit = ->(&block) { exit_report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir live
+      report :html
+    end
+    require "#{dir}/fee_plain.rb"
+    Fee6rTS4s.fee(true, false)
+    exit_report.call
+
+    later = "#{dir}/later"
+    FileUtils.mkdir_p(later)
+    FileUtils.cp("#{live}/path_coverage.json", later)
+    config = PathCoverage::Configuration.new do
+      root dir
+      cover '*.rb'
+      coverage_dir later
+      report :html
+      measure :decisions, :methods
+    end
+    PathCoverage::Render.from_json(config)
+
+    index = REXML::Document.new(File.read("#{later}/index.html"))
+    total = index.elements.to_a('//tfoot/tr/td')
+    methods = total.map { text_of(_1) }.last
+    assert_equal '0 / 4 (0%)', methods
+  end
+
   test '6rTS48', %w(
   | Example: report :html, and crew? called once
   | The exit report writes index.html into coverage_dir.

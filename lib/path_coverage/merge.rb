@@ -24,6 +24,18 @@ module PathCoverage
       end
     end
 
+    # One method paths hash, { site => { path => count } }, as
+    # the recorder counts them, each path's count the sum of
+    # every run's, eg [true, false] taken once in each of two
+    # runs is taken twice.
+    def self.method_paths(runs)
+      runs.reduce do |total, run|
+        total.merge(run) do |_site, mine, theirs|
+          mine.merge(theirs) { |_path, a, b| a + b }
+        end
+      end
+    end
+
     # One operand's counts from two runs, added; a fixed leaf's
     # only comes from the source, so either run's will do.
     def self.sum(mine, theirs)

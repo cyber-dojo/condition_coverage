@@ -76,14 +76,33 @@ module PathCoverage
 
     # Runs the reporters chosen in config from the JSON reports
     # at paths, their counts merged, parsing each covered file
-    # afresh. paths is config.json_path alone by default.
+    # afresh; with methods measured, the method paths they hold
+    # too. paths is config.json_path alone by default.
     def self.from_json(config, paths = [config.json_path])
       operands = Merge.operands(paths.map { |path| read(path) })
       site_paths = Merge.paths(paths.map { |path| paths_of(path) })
       files = config.files.to_h do |path|
         [path, Manifest.parse(path, config)]
       end
-      run(operands, files, config, site_paths:)
+      methods = config.measures.include?(:methods)
+      taken = methods ? method_paths(paths) : nil
+      run(operands, files, config, taken, site_paths:)
+    end
+
+    # The method paths of the JSON reports at paths, merged.
+    def self.method_paths(paths)
+      Merge.method_paths(paths.map { |path| method_paths_of(path) })
+    end
+
+    # The method paths of the JSON report at path, as the
+    # recorder counts them, { site => { path => count } }; none
+    # for a report that has none, eg from a run that did not
+    # measure methods, so the render claims no path taken.
+    def self.method_paths_of(path)
+      json = JSON.parse(File.read(path))
+      json.fetch('method_paths', {}).transform_values do |taken|
+        taken.to_h { |each| [each['path'], each['count']] }
+      end
     end
 
     # The site paths of the JSON report at path, as

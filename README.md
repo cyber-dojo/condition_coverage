@@ -133,12 +133,13 @@ As the process exits:
 
 - `path_coverage.json` is always written to `coverage_dir`: every site
   of every covered file, with each operand's true and false counts under
-  `sites`, each site's paths under `paths`, and the paths taken of all
-  possible under `totals`, as [taken, possible]: `decisions`, `methods`
-  when `:methods` is measured, and, with groups, each group's own under
-  `groups`, eg `"groups": {"code": {"decisions": [481, 567]}}`. It is the
-  base the other
-  reporters read, so they can also be run later, in another process, from
+  `sites`, each site's paths under `paths`, each method's paths taken
+  under `method_paths` when `:methods` is measured, and the paths taken
+  of all possible under `totals`, as [taken, possible]: `decisions`,
+  `methods` when `:methods` is measured, and, with groups, each group's
+  own under `groups`, eg `"groups": {"code": {"decisions": [481, 567]}}`.
+  It is the base the other reporters read, so they can also be run
+  later, in another process, from
   it alone: `PathCoverage::Render.from_json(config)`, where `config` is a
   `PathCoverage::Configuration` built from the same settings block.
   Given several runs' reports, `Render.from_json(config, paths)` adds
@@ -291,6 +292,19 @@ site's columns stay its own leaves' combinations, and a method's its own
 decisions', rather than multiplying together. A decision whose arm always
 leaves the method ends the path there.
 
+The JSON report's `method_paths` lists each method's paths taken, with
+their counts, so a later render, or several runs' reports merged, still
+shows them. A report with none, eg from a run that did not measure
+`:methods`, renders as no method path taken:
+
+```json
+"method_paths": {
+  "source/fee.rb:2:2": [
+    { "path": [true, false], "count": 1 }
+  ]
+}
+```
+
 ### Reporters
 
 - `:html` writes `index.html` to `coverage_dir`: the covered files with
@@ -402,6 +416,15 @@ the run never loaded are read and parsed then.
   the declaration as wrong, and the report lists the methods so declared.
   Later, a method's non-nil return type could come from the project's RBS
   signatures (`sig/*.rbs`) instead.
+- exceptions the code itself names: a `begin` or `def` with `rescue`
+  clauses as a site, like a `case`, whose paths are no raise and each
+  clause that rescued, eg `rescue IOError` never taken. Branch coverage
+  ignores `rescue`, and tests reach these paths with real input. A raise
+  that nothing names, from any call, stays out, as every leaf would gain
+  a third outcome that only fault injection could take.
+- an evaluation that raised part way through a site, eg
+  `ok?(id) && fetch(id)` where `fetch` raises, reported as a path that
+  raised rather than dropped as unfinished.
 
 ## Constraints
 
