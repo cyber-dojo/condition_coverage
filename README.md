@@ -1,5 +1,9 @@
 # path_coverage
 
+[![Gem Version](https://img.shields.io/gem/v/path_coverage)](https://rubygems.org/gems/path_coverage)
+[![Downloads](https://img.shields.io/gem/dt/path_coverage)](https://rubygems.org/gems/path_coverage)
+[![License](https://img.shields.io/github/license/cyber-dojo/path_coverage)](LICENSE.md)
+
 Path coverage for Ruby, to run alongside SimpleCov's line and branch
 coverage.
 
