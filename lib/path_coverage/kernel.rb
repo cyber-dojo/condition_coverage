@@ -48,18 +48,26 @@ module PathCoverage
   # Starts from settings in env alone, for a run whose code
   # cannot be changed, eg one started by RUBYOPT=-r: covers
   # the comma-separated PATH_COVERAGE_COVER globs under
-  # PATH_COVERAGE_ROOT, writing the JSON report into
-  # PATH_COVERAGE_DIR and POSTing it to
+  # PATH_COVERAGE_ROOT, skipping any matching the
+  # comma-separated PATH_COVERAGE_SKIP globs, writing the JSON
+  # report into PATH_COVERAGE_DIR and POSTing it to
   # PATH_COVERAGE_COLLECTOR. Without a collector it
   # starts nothing, so RUBYOPT can be set for every run.
   def self.start_from_env(env, on_exit: method(:at_exit))
     return unless env.key?('PATH_COVERAGE_COLLECTOR')
 
-    start(on_exit:) do
+    start(on_exit:, &env_settings(env))
+  end
+
+  # The start block of the settings in env, as start_from_env
+  # reads them.
+  def self.env_settings(env)
+    covers = env.fetch('PATH_COVERAGE_COVER').split(',')
+    skips = env.fetch('PATH_COVERAGE_SKIP', '').split(',')
+    proc do
       root env.fetch('PATH_COVERAGE_ROOT')
-      env.fetch('PATH_COVERAGE_COVER').split(',').each do |glob|
-        cover glob
-      end
+      covers.each { |glob| cover glob }
+      skips.each { |glob| skip glob }
       coverage_dir env.fetch('PATH_COVERAGE_DIR')
       collector env.fetch('PATH_COVERAGE_COLLECTOR')
       report :post

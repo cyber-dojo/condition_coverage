@@ -364,6 +364,29 @@ class KernelTest < Id58TestBase
     assert_equal expected, actual
   end
 
+  test '6rTS4g', %w(
+  | Example: PATH_COVERAGE_SKIP=source/vendor/**/*.rb,lib/gen.rb
+  | Starting from the environment skips each of its
+  | comma-separated skip globs.
+  | So only source/kata.rb is covered of the three files.
+  ) do
+    dir = Dir.mktmpdir('6rTS4g')
+    FileUtils.mkdir_p(%W[#{dir}/source/vendor #{dir}/lib])
+    File.write("#{dir}/source/kata.rb", "def kata?(id) = id\n")
+    File.write("#{dir}/source/vendor/zip.rb", "def zip?(id) = id\n")
+    File.write("#{dir}/lib/gen.rb", "def gen?(id) = id\n")
+    env = {
+      'PATH_COVERAGE_ROOT' => dir,
+      'PATH_COVERAGE_COVER' => 'source/**/*.rb,lib/*.rb',
+      'PATH_COVERAGE_SKIP' => 'source/vendor/**/*.rb,lib/gen.rb',
+      'PATH_COVERAGE_DIR' => "#{dir}/condition",
+      'PATH_COVERAGE_COLLECTOR' => 'http://10.0.0.7:4570/runs'
+    }
+    on_exit = ->(&_report) {} # this test checks the settings only
+    PathCoverage.start_from_env(env, on_exit:)
+    assert_equal ["#{dir}/source/kata.rb"], PathCoverage.config.files
+  end
+
   test '6rTS4a', %w(
   | the pages rendered later from the JSON report alone,
   | by a render that recorded nothing, are the very pages

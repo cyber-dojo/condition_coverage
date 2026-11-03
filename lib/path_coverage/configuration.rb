@@ -6,7 +6,7 @@ module PathCoverage
   class Configuration
     GLOB_FLAGS = File::FNM_PATHNAME | File::FNM_EXTGLOB
     SETTINGS = %w[
-      collector cover coverage_dir measure report root
+      collector cover coverage_dir measure report root skip
     ].freeze
     REPORTERS = %w[gaps html post].freeze
     MEASURES = %w[decisions methods].freeze
@@ -14,6 +14,7 @@ module PathCoverage
     # Evaluates the settings block against a new configuration.
     def initialize(&)
       @globs = []
+      @skips = []
       @reporters = [:gaps]
       @measures = [:decisions]
       instance_eval(&)
@@ -60,6 +61,12 @@ module PathCoverage
       @globs << glob
     end
 
+    # Adds a glob, relative to root, of files not to instrument,
+    # though a cover glob matches them, eg skip 'source/vendor/**'.
+    def skip(glob)
+      @skips << glob
+    end
+
     # Chooses the reporters run at exit, eg report :gaps;
     # refuses a name there is no reporter for.
     def report(*names)
@@ -86,10 +93,11 @@ module PathCoverage
       @coverage_dir = dir
     end
 
-    # Every file the cover globs match under root, as full
-    # paths, whether or not the run loads it.
+    # Every file the cover globs match under root, and no skip
+    # glob does, as full paths, whether or not the run loads it.
     def files
-      Dir.glob(@globs, base: @root).sort.map { |f| "#{@root}/#{f}" }
+      found = Dir.glob(@globs, base: @root).sort
+      found.reject { |f| skipped?(f) }.map { |f| "#{@root}/#{f}" }
     end
 
     # Where the JSON report goes.
@@ -102,9 +110,19 @@ module PathCoverage
       path.start_with?("#{@root}/") && matches?(relative(path))
     end
 
-    # True when the root-relative path matches a cover glob.
+    # True when the root-relative path matches a cover glob and
+    # no skip glob.
     def matches?(relative_path)
+      return false if skipped?(relative_path)
+
       @globs.any? do |glob|
+        File.fnmatch?(glob, relative_path, GLOB_FLAGS)
+      end
+    end
+
+    # True when the root-relative path matches a skip glob.
+    def skipped?(relative_path)
+      @skips.any? do |glob|
         File.fnmatch?(glob, relative_path, GLOB_FLAGS)
       end
     end

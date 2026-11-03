@@ -70,6 +70,7 @@ end
 PathCoverage.start do
   root APP_DIR                 # cover globs and site names are relative to it
   cover 'source/**/*.rb'       # each matching file is instrumented as it loads
+  skip 'source/vendor/**/*.rb' # except these, though a cover glob matches them
   coverage_dir '/tmp/coverage' # where path_coverage.json is written
   measure :decisions, :methods # :decisions alone unless :methods is named
   report :gaps, :html          # the reporters run at exit (default :gaps)
@@ -78,6 +79,8 @@ end
 
 A misspelt setting or an unknown reporter is refused by name, with the list
 of the ones there are. Calling `start` again replaces the configuration.
+`cover` and `skip` can each be given more than once; a file matching any
+`skip` glob is neither instrumented nor reported.
 
 A run whose code cannot be changed, such as a script in a `docker build`
 step, can be covered from its environment alone:
@@ -86,6 +89,7 @@ step, can be covered from its environment alone:
 RUBYOPT=-rpath_coverage/auto
 PATH_COVERAGE_ROOT=/app                   # root
 PATH_COVERAGE_COVER=src/**/*.rb,lib/*.rb  # cover, comma-separated
+PATH_COVERAGE_SKIP=src/vendor/**/*.rb     # skip, comma-separated, optional
 PATH_COVERAGE_DIR=/tmp/paths              # coverage_dir
 PATH_COVERAGE_COLLECTOR=http://host.docker.internal:4570/runs
 ```
