@@ -168,6 +168,22 @@ class HtmlIndexTest < Id58TestBase
     assert_equal [nil], ids.call('files-1')
   end
 
+  test 'zr0H84', %w(
+  | Example: the index page of a run not measuring methods
+  | Its title bar ends with the light and dark theme button.
+  | Its script switches the theme as that button is pressed.
+  ) do
+    row = { path: 'source/fee.rb', sites: 3, decisions: [2, 4],
+            methods: nil }
+    total = row.merge(path: 'Total')
+    page = PathCoverage::HtmlIndex.page([row], total)
+    top = REXML::Document.new(page).elements['//div[@class="top"]']
+    assert_equal 'button', top.elements.to_a.last.name
+    assert_equal 'theme', top.elements.to_a.last.attributes['class']
+    script = '// Switches the page between light and dark'
+    assert_includes page, script
+  end
+
   test 'zr0H40', %w(
   | Example: a methods total of [0, 0]
   | The file has no method of two or more decisions.

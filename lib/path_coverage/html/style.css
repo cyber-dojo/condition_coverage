@@ -23,16 +23,36 @@
   --font-body: "Helvetica Neue", Arial, sans-serif;
   --font-code: Menlo, Consolas, "DejaVu Sans Mono", monospace;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #12151C; --surface: #181C25; --panel: #212633; --fg: #E4E8EF;
-    --muted: #9AA4B5; --rule: #323949; --ok: #7FB0FF; --ok-tint: #1A2740;
-    --warn: #F0A35E; --bad: #F08A3C; --on-status: #12151C; --link: #7FB0FF;
-    --tree-bg: #E6EAF2; --tree-fg: #1C2230; --tree-muted: #4E5869;
-    --tree-rule: #BCC4D2; --tree-gap: #A8480A;
-    color-scheme: dark;
-  }
+/* Dark, unless the page's html element names light, as the theme
+   button does when pressed; so a page draws dark before any script
+   runs. */
+:root:not([data-theme="light"]) {
+  --bg: #12151C; --surface: #181C25; --panel: #212633; --fg: #E4E8EF;
+  --muted: #9AA4B5; --rule: #323949; --ok: #7FB0FF; --ok-tint: #1A2740;
+  --warn: #F0A35E; --bad: #F08A3C; --on-status: #12151C; --link: #7FB0FF;
+  --tree-bg: #E6EAF2; --tree-fg: #1C2230; --tree-muted: #4E5869;
+  --tree-rule: #BCC4D2; --tree-gap: #A8480A;
+  --syn-k: #C79BEA; --syn-s: #9CCB9E; --syn-c: #7F8A99;
+  --syn-n: #E9A3C9; --syn-t: #AEB5F5; --syn-v: #7FCFC4; --syn-o: #E6D27A;
+  color-scheme: dark;
 }
+/* Code's syntax colours, each muted so the orange, blue and green
+   of coverage still stand out: keywords, strings, comments,
+   numbers, constants, instance variables, and, in bold gold, the
+   operators that decide a path, eg && and &. */
+:root {
+  --syn-k: #7E3BA0; --syn-s: #3B7550; --syn-c: #77808F;
+  --syn-n: #9E4A78; --syn-t: #4B52A0; --syn-v: #2A7570; --syn-o: #7A6600;
+}
+/* The same colours in the code and in a site's tree, which quotes
+   the code. */
+:is(.src, .tree) .k { color: var(--syn-k); }
+:is(.src, .tree) .s { color: var(--syn-s); }
+:is(.src, .tree) .c { color: var(--syn-c); font-style: italic; }
+:is(.src, .tree) .n { color: var(--syn-n); }
+:is(.src, .tree) .t { color: var(--syn-t); }
+:is(.src, .tree) .v { color: var(--syn-v); }
+:is(.src, .tree) .o { color: var(--syn-o); font-weight: 700; }
 body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 14px; }
 a { color: var(--link); }
 .page {
@@ -104,6 +124,15 @@ h1.path { font-family: var(--font-code); font-size: 18px; }
 .modes button { font: inherit; font-size: 13px; padding: 6px 12px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); color: var(--muted); cursor: pointer; }
 .modes button[aria-pressed="true"] { background: var(--panel); color: var(--fg); border-color: var(--fg); font-weight: 600; }
 .modes button:focus-visible { outline: 3px solid var(--link); outline-offset: 2px; }
+/* The theme button, small, at the title bar's right end, showing
+   the theme it switches to: a moon for dark, a sun for light. */
+.theme {
+  margin-left: auto; width: 30px; height: 30px; padding: 0; font-size: 16px; line-height: 1;
+  border: 1px solid var(--rule); border-radius: 6px; background: var(--surface);
+  color: var(--fg); cursor: pointer;
+}
+.theme:hover { background: var(--panel); }
+.theme:focus-visible { outline: 3px solid var(--link); outline-offset: 2px; }
 .jumps { display: flex; flex-direction: column; gap: 8px; }
 .jump-list { display: flex; gap: 6px; align-items: center; overflow-x: auto; white-space: nowrap; min-width: 0; }
 .jump-label { width: 64px; flex-shrink: 0; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
@@ -142,8 +171,11 @@ button.lnum:has(.lineno:target) { outline: 3px solid var(--link); outline-offset
   display: block; width: 52px; padding-right: 20px; text-align: right;
   color: var(--muted); font-variant-numeric: tabular-nums; flex-shrink: 0;
 }
+/* A site's button, its 9px right margin included, takes the 72px a
+   plain number takes, so its lines' code starts where every other
+   line's does. */
 button.lnum {
-  display: flex; flex-direction: column; flex-shrink: 0; margin: 4px 8px 4px 0; padding: 0;
+  display: flex; flex-direction: column; flex-shrink: 0; margin: 4px 9px 4px 0; padding: 0;
   border: 1px solid transparent; border-radius: 6px; cursor: pointer;
   font: 600 13px/24px var(--font-code); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
 }
@@ -163,9 +195,10 @@ button.lnum:has(.lineno + .lineno)::before { top: auto; bottom: 2px; line-height
   position: absolute; left: 7px; top: 1px;
   font-size: 9px; line-height: 11px; font-weight: 700;
 }
-/* The rule between sites spans the tree's full width, through
-   its 16px side padding. */
-.site + .site {
+/* The rule between a tree's sites spans its full width, through
+   its 16px side padding. It names the tree, so the tinted sites
+   side by side on a line of code are never matched. */
+.tree .site + .site {
   border-top: 1px solid var(--tree-rule); margin: 6px -16px 0; padding: 6px 16px 0;
 }
 button.lnum .lineno { width: 50px; padding-right: 11px; color: inherit; line-height: 32px; margin: -4px 0; }
@@ -191,6 +224,8 @@ button.lnum:focus-visible { outline: 3px solid var(--link); outline-offset: 1px;
 .operator { grid-column: span 2; font-weight: 600; }
 .row[data-subtree] .operator { grid-column: auto; }
 .row .arm { white-space: pre; font-weight: 600; }
+/* An if's then names its arm, quoting no code, so is italic. */
+.row .arm[data-named] { font-style: italic; }
 .branch { white-space: pre; color: var(--tree-muted); margin-right: -16px; }
 .row .text { white-space: pre; }
 /* A branch glyph drawn as a cell a whole row tall: v a vertical
@@ -217,19 +252,25 @@ button.lnum:focus-visible { outline: 3px solid var(--link); outline-offset: 1px;
 body[data-layout="beside"] .page { max-width: 1800px; }
 /* The code sits right of two rails sharing one column, condition
    trees in one and path grids in the other, as a page shows one
-   mode's only. The column is as wide as --cc-rail or --pc-rail,
-   whichever is wider. Both are 0 until a tree or grid opens;
-   registered, so they animate, sliding the code and its frame
-   aside together. */
-@property --cc-rail { syntax: "<length>"; inherits: true; initial-value: 0px; }
-@property --pc-rail { syntax: "<length>"; inherits: true; initial-value: 0px; }
-body[data-layout="beside"] { transition: --cc-rail 250ms ease, --pc-rail 250ms ease; }
-body[data-open="cc"] { --cc-rail: 560px; }
-body[data-open="pc"] { --pc-rail: 560px; }
+   mode's only. The column is always there, --rail wide, and the
+   divider in the gap after it drags to change that. */
+body[data-layout="beside"] { --rail: 560px; }
 body[data-layout="beside"] .box:has(> .code) {
   display: grid; column-gap: 12px;
-  grid-template-columns: max(var(--cc-rail), var(--pc-rail)) minmax(0, 1fr);
+  grid-template-columns: var(--rail) minmax(0, 1fr);
 }
+/* The divider: the gap between the rail and the code, a line down
+   its middle that darkens as it is hovered or dragged. */
+.divider {
+  position: absolute; top: 0; bottom: 0; left: var(--rail); width: 12px;
+  cursor: col-resize; z-index: 4; touch-action: none;
+}
+.divider::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: 5px; width: 2px;
+  background: var(--rule);
+}
+.divider:hover::after, .divider.dragging::after { background: var(--link); }
+body.dragging { cursor: col-resize; user-select: none; }
 body[data-layout="beside"] .box > .rail { grid-column: 1; grid-row: 1; }
 body[data-layout="beside"] .box > .code { grid-column: 2; grid-row: 1; }
 /* Every row is as wide as the longest line (or the pane, if
@@ -242,7 +283,7 @@ body[data-layout="beside"] .code {
   align-content: start;
 }
 body[data-layout="beside"] .box:has(> .code)::before {
-  left: calc(max(var(--cc-rail), var(--pc-rail)) + 38px); right: 0;
+  left: calc(var(--rail) + 38px); right: 0;
 }
 .rail { position: relative; min-width: 0; }
 /* The rail's tree sits on the condition tint, in the page's own
@@ -262,25 +303,24 @@ body[data-layout="beside"] .box:has(> .code)::before {
 /* An explicit width, not just a flex basis, so a row's natural
    width counts each cell as 26px, not as its one letter. */
 .rail .row > :is(.cell, .count) { flex: none; width: 26px; }
-/* The tree is as wide as its widest row, and at least the rail,
-   its padding and border included, so it never reaches past the
-   rail over the code's gutter of gap arrows; side.js widens the
-   rail to a wider tree. */
-.rail .tree { width: max-content; min-width: 100%; box-sizing: border-box; }
+/* The tree is as wide as the rail, its padding and border included,
+   so it never reaches over the code's gutter of gap arrows; a tree
+   with more paths than fit scrolls sideways within itself. */
+.rail .tree { width: 100%; box-sizing: border-box; overflow-x: auto; }
 .rail .site > .row:first-child {
   border-bottom: 1px solid var(--tree-rule); margin: 0 -16px 6px; padding: 0 16px 4px;
 }
-.rail .tree { position: absolute; left: auto; right: 0; margin: 0; z-index: 2; font-family: var(--font-code); font-size: 13px; }
+.rail .tree { position: absolute; left: 0; right: 0; margin: 0; z-index: 2; font-family: var(--font-code); font-size: 13px; }
 /* Beside, a site's whole block, its lines' code included, is
    tinted by status and opens its tree, so each tree lines up
    with a band the eye can follow across. */
 :root { --bad-tint: #FBE6D6; }
-@media (prefers-color-scheme: dark) { :root { --bad-tint: #3A2416; } }
+:root:not([data-theme="light"]) { --bad-tint: #3A2416; }
 /* Everything a site's tree or a method's grid draws has this one
    tint, in either mode; status is only ever the orange or blue
    of an edge. */
 :root { --cond-tint: #E2F2D3; }
-@media (prefers-color-scheme: dark) { :root { --cond-tint: #26361A; } }
+:root:not([data-theme="light"]) { --cond-tint: #26361A; }
 body[data-layout="beside"] .block { cursor: pointer; border-radius: 6px; }
 /* A site's own characters are tinted, not its whole lines: the
    expression is what its grid is about. */
@@ -304,35 +344,43 @@ body[data-layout="beside"] button.lnum:has(.lineno:target) { outline: none; }
 body[data-open="pc"] button.lnum:focus-visible { outline: none; }
 body[data-layout="beside"] .block .srcs { flex: 1; }
 body[data-layout="beside"] .block:hover { filter: brightness(0.97); }
-/* Beside, an open site's triangle points left, showing that a
-   click closes its tree, rather than down. */
 /* A site's tree opens in the left rail: a closed button points
-   left, where its tree will open, an open one right, the way it
-   will close. */
+   left, where its tree will open; an open one has no arrow, as a
+   click leaves it open. */
 body[data-layout="beside"] button.lnum::before { content: "\25C2"; transform: none; }
-body[data-layout="beside"] button.lnum[aria-expanded="true"]::before { content: "\25B8"; transform: none; }
+body[data-layout="beside"] button.lnum[aria-expanded="true"]::before { content: none; }
 
-/* A method's def line is lit from its def to the end of its text,
-   under the code's text; the code is its own stacking context so
-   the band can sit beneath its rows. */
 body[data-layout="beside"] .code { position: relative; isolation: isolate; }
-.methodband { position: absolute; z-index: -1; border-radius: 4px; pointer-events: none; }
-.methodband { background: var(--cond-tint); }
 .line:has(.lineno) { cursor: default; }
-/* A method's bar: a line in its status colour down its left edge,
-   from its def line, under the def's d, to its last line. It is
-   the button that opens the method's grid, so it is wider than
-   the line it draws, to be easy to click. */
-.pathbar {
-  position: absolute; width: 10px; padding: 0; z-index: 3;
-  border: 0; background: none; cursor: pointer;
+/* Within each method, each line of a method has a stripe in the
+   method's status colour, just left of its def's d, from its def
+   line to its last; its def line also has a band of the one tint,
+   from its def to the end of its text. Both are backgrounds of the
+   lines' code, placed in characters (side.js gives each line its
+   def's column), so the code's own layout keeps them aligned. Open,
+   a method's stripe thickens. */
+/* Each line's code is as tall as its row, even an empty line's, so
+   a method's stripe runs unbroken from row to row. */
+body[data-layout="beside"] .line > .src,
+body[data-layout="beside"] .block > .srcs { align-self: stretch; }
+body[data-layout="beside"] .srcs > .src:last-child { flex-grow: 1; }
+html[data-mode="methods"] .src.in-method {
+  --method-colour: var(--bad); --stripe: 2px;
+  --at: calc(var(--def-col) * 1ch - 4px);
+  background-image: linear-gradient(var(--method-colour), var(--method-colour));
+  background-size: var(--stripe) 100%;
+  background-position: var(--at) 0;
+  background-repeat: no-repeat;
 }
-.pathbar[data-status="gaps"] { box-shadow: inset 2px 0 0 var(--bad); }
-.pathbar[data-status="covered"] { box-shadow: inset 2px 0 0 var(--ok); }
-/* Open, a method's line thickens. */
-.pathbar[aria-expanded="true"][data-status="gaps"] { box-shadow: inset 3px 0 0 var(--bad); }
-.pathbar[aria-expanded="true"][data-status="covered"] { box-shadow: inset 3px 0 0 var(--ok); }
-.pathbar:hover { filter: brightness(1.15); }
+html[data-mode="methods"] .src.in-method[data-method-status="covered"] { --method-colour: var(--ok); }
+html[data-mode="methods"] .src.in-method.method-open { --stripe: 3px; }
+html[data-mode="methods"] .src.def-line {
+  background-image:
+    linear-gradient(var(--method-colour), var(--method-colour)),
+    linear-gradient(var(--cond-tint), var(--cond-tint));
+  background-size: var(--stripe) 100%, calc((var(--def-end) - var(--def-col)) * 1ch + 8px) 100%;
+  background-position: var(--at) 0, var(--at) 0;
+}
 /* A grid is framed as a tree is: the same border, corners and
    shadow, its rows 16px in from its sides; side.js keeps 10px
    above its first row and below its last. */
@@ -342,7 +390,9 @@ body[data-layout="beside"] .code { position: relative; isolation: isolate; }
   border: 1px solid var(--rule); border-radius: 8px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
 }
 .prow { position: absolute; left: 16px; display: flex; gap: 2px; white-space: nowrap; }
-.plabel { width: 48px; flex-shrink: 0; text-align: right; padding-right: 8px; color: var(--muted); line-height: 24px; }
+/* A grid's line labels sit at its left padding, as a tree's labels
+   do, their fixed width keeping the cells in columns. */
+.plabel { width: 48px; flex-shrink: 0; text-align: left; padding-right: 8px; color: var(--muted); line-height: 24px; }
 .pcell { width: 24px; flex-shrink: 0; text-align: center; line-height: 24px; border-radius: 3px; }
 .pcell.ended { background: transparent; }
 .pcell.true, .pcell.false { background: var(--surface); color: var(--fg); }
@@ -357,14 +407,17 @@ body[data-layout="beside"] .code { position: relative; isolation: isolate; }
 .pcell.hot { outline: 2px solid var(--fg); outline-offset: -1px; }
 .pcell.pinned { outline: 3px solid var(--link); outline-offset: -2px; }
 :root { --lit: #FFE98A; }
-@media (prefers-color-scheme: dark) { :root { --lit: #5A4A12; } }
+:root:not([data-theme="light"]) { --lit: #5A4A12; }
 /* A lit line's background spans the code pane's full width. */
 .line .src { flex: 1; }
 .src.lit { background: var(--cond-tint); }
 mark.chars { background: var(--lit); color: inherit; border-radius: 3px; box-shadow: 0 0 0 2px var(--lit); }
 .tree .row[data-at] { cursor: default; }
 .tree .row[data-at]:hover { background: rgba(255, 255, 255, 0.08); }
-.nav[data-chip] { flex-direction: row; align-items: center; justify-content: flex-end; padding-right: 2px; box-sizing: border-box; }
+/* A chip shows on a decision's line, beside its button, so it sits
+   7px down: the button starts 4px down and is 26px tall, its middle
+   17px down, as the 20px chip's is then. */
+.nav[data-chip] { flex-direction: row; align-items: center; justify-content: flex-end; padding-right: 2px; box-sizing: border-box; margin-top: 7px; }
 .nav[data-chip] a { display: none; }
 .nav[data-chip]::after {
   content: attr(data-chip); padding: 0 7px; border-radius: 4px;
@@ -376,8 +429,6 @@ mark.chars { background: var(--lit); color: inherit; border-radius: 3px; box-sha
    paths within each decision show. These rules come last, so they
    win over the rules above. */
 html:not([data-mode="methods"]) table.files [data-mode="methods"],
-html:not([data-mode="methods"]) .pathbar,
-html:not([data-mode="methods"]) .methodband,
 html[data-mode="methods"] table.files [data-mode="decisions"] { display: none; }
 /* Each mode shows its own row of jumps. A row with none keeps its
    height, though hidden, so the sticky header, and the code below
@@ -385,11 +436,7 @@ html[data-mode="methods"] table.files [data-mode="decisions"] { display: none; }
 html:not([data-mode="methods"]) .jump-list[data-jumps="methods"],
 html[data-mode="methods"] .jump-list[data-jumps="decisions"] { display: none; }
 .jump-list[data-empty] { visibility: hidden; }
-/* The other mode's rail keeps its grid column, so the code stays
-   in the middle one, but has no width and shows nothing, even if
-   one of its panels was open when the mode changed. */
-html:not([data-mode="methods"]) body { --pc-rail: 0px; }
-html[data-mode="methods"] body { --cc-rail: 0px; }
+/* The other mode's rail shares the column but shows nothing. */
 html:not([data-mode="methods"]) .rail.pc,
 html[data-mode="methods"] .rail.cc { visibility: hidden; }
 /* Within each method, a line holding a decision is a plain line:
@@ -407,11 +454,13 @@ html[data-mode="methods"] button.lnum::before { content: none; }
 /* Within each method, the number of each method's def line wears a
    site's button's look within each decision: the one tint, edged
    on the top and left in its status colour, orange for gaps and
-   blue for covered, with the arrow that says whether its grid is
-   open. */
+   blue for covered, with an arrow pointing left while its grid is
+   closed, and none while it is open. */
+/* Its 50px and its 22px right margin take the 72px a plain number
+   takes, so its line's code starts where every other line's does. */
 html[data-mode="methods"] .lineno.mdef {
   position: relative; box-sizing: border-box; width: 50px; padding-right: 11px;
-  margin: 4px 8px 4px 0; line-height: 24px; cursor: pointer; pointer-events: auto;
+  margin: 4px 22px 4px 0; line-height: 24px; cursor: pointer; pointer-events: auto;
   font: 600 13px/24px var(--font-code); border: 1px solid transparent;
   border-radius: 6px; background: var(--cond-tint);
   --mdef-status: var(--bad); color: var(--mdef-status);
@@ -421,7 +470,7 @@ html[data-mode="methods"] .lineno.mdef[data-status="covered"] { --mdef-status: v
 html[data-mode="methods"] .lineno.mdef::before {
   content: "\25C2"; position: absolute; left: 7px; top: 0; font-size: 11px;
 }
-html[data-mode="methods"] .lineno.mdef[aria-expanded="true"]::before { content: "\25B8"; }
+html[data-mode="methods"] .lineno.mdef[aria-expanded="true"]::before { content: none; }
 html[data-mode="methods"] .lineno.mdef[aria-expanded="true"] { box-shadow: inset 1px 1px 0 var(--mdef-status); }
 html[data-mode="methods"] .lineno.mdef:hover { filter: brightness(1.1); }
 html[data-mode="methods"] button.lnum .lineno { font-weight: inherit; }

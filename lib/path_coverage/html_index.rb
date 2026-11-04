@@ -45,11 +45,11 @@ module PathCoverage
     end
 
     # The page's script: its column sorting, with groups its tab
-    # switching, then its mode toggle.
+    # switching, then its mode toggle and its theme button.
     def self.script(groups)
-      sort = HtmlTemplate.asset('sort.js')
-      tabs = groups.empty? ? '' : HtmlTemplate.asset('tabs.js')
-      sort + tabs + HtmlTemplate.asset('mode.js')
+      names = ['sort.js', *('tabs.js' unless groups.empty?),
+               'mode.js', 'theme.js']
+      names.map { |name| HtmlTemplate.asset(name) }.join
     end
 
     # The index-th tab's table of rows, total as its footer; any

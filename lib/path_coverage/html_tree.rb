@@ -1,5 +1,7 @@
 require 'cgi/escape'
 require_relative 'condition'
+require_relative 'html_labels'
+require_relative 'html_syntax'
 require_relative 'kinds'
 
 module PathCoverage
@@ -96,22 +98,19 @@ module PathCoverage
     # An arm's row: a ternary's, ? for then and : for else, an
     # arm holding a condition showing the condition's operator
     # and value, its operands below, a plain arm its text; an
-    # if's named then or else, as its text is statements. A
-    # plain arm marks the paths taking it.
+    # if's named then or else, as its text is statements; its then
+    # label marked as a name, as no then is written in its code,
+    # where its else is. A plain arm marks the paths taking it.
     def self.arm_rows(arm, branch, under, choice)
       body = arm[:body]
       values = body ? cells(body[:cells]) : cells(arm[:cells], TAKEN)
-      text = CGI.escapeHTML(arm_label(arm, choice))
+      named = STATEMENT_CHOICES.include?(choice) && arm[:arm] == :then
+      text = HtmlLabels.arm(arm, choice, named)
+      flag = named ? ' data-named=""' : ''
       lead = branch_cell(branch) +
-             %(<span class="arm" data-label="">#{text}</span>)
+             %(<span class="arm" data-label=""#{flag}>#{text}</span>)
       row = row(%( data-arm=""#{at(arm)}), lead, values)
       body ? [row, *operand_rows(body, under)] : [row]
-    end
-
-    # The name of an arm of a condition whose operator is choice,
-    # as its kind names it, eg then for an if's.
-    def self.arm_label(arm, choice)
-      Kinds.of(choice).arm_label(arm, choice)
     end
 
     # operands with each node standing for the nodes its kind
@@ -139,19 +138,21 @@ module PathCoverage
     end
 
     # The cell naming a condition's operator, or its label when
-    # it has one, eg select { for a site inside a leaf.
+    # it has one, eg select { for a site inside a leaf, coloured
+    # as the code it is part of.
     def self.operator(condition)
-      name = CGI.escapeHTML(condition[:label] || condition[:operator])
+      label = condition[:label] || condition[:operator]
+      name = HtmlSyntax.fragment(label)
       %(<span class="operator" data-operator="">#{name}</span>)
     end
 
-    # One operand's row: its branch, text, and its outcome on
-    # each path.
+    # One operand's row: its branch, text, coloured as the code it
+    # is, and its outcome on each path.
     # An operand that is only called, eg owner at the end of
     # user&.account&.owner, has a tick on each path that called
     # it instead.
     def self.operand_row(operand, branch)
-      text = CGI.escapeHTML(operand[:text].to_s)
+      text = HtmlSyntax.fragment(operand[:text].to_s)
       lead = branch_cell(branch) +
              %(<span class="text" data-text="">#{text}</span>)
       attrs = %( data-operand=""#{at(operand)})

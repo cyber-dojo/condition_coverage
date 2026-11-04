@@ -2,6 +2,7 @@ require 'fileutils'
 require_relative 'html_file'
 require_relative 'html_index'
 require_relative 'html_paths'
+require_relative 'html_syntax'
 require_relative 'path_manifest'
 require_relative 'site_tree'
 require_relative 'source_lines'
@@ -66,12 +67,22 @@ module PathCoverage
     def self.write_page(out, path, parsed,
                         (operands, site_paths), grids)
       source, sites = parsed.values_at(:source, :sites)
-      lines = SourceLines.of(source, sites, operands)
+      plain = SourceLines.of(source, sites, operands)
+      lines = coloured(source, plain)
       trees = trees(source, sites, lines, site_paths)
       page = HtmlFile.page(path, lines, trees, grids.to_s,
                            methods: !grids.nil?)
       FileUtils.mkdir_p(File.dirname(out))
       File.write(out, page)
+    end
+
+    # lines, as SourceLines.of gives them for source, each with
+    # its coloured tokens, as HtmlSyntax.of gives them.
+    def self.coloured(source, lines)
+      tokens = HtmlSyntax.of(source)
+      lines.map do |line|
+        line.merge(tokens: tokens.fetch(line[:number], []))
+      end
     end
 
     # { first line of a span => [SiteTree.of, ...] } for the

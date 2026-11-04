@@ -377,6 +377,65 @@ class HtmlFileTest < Id58TestBase
     assert_equal(['then'], labels.map { |label| text_of(label) })
   end
 
+  test 'gae566', %w(
+  | Example: if x alpha else beta end, then x ? :a : :b
+  | The if's then names its first arm, quoting no code.
+  | So its label is marked as a name, to be told apart.
+  | Its else, and the ternary's arm labels, quote code, so are not.
+  ) do
+    lines = [
+      { number: 1, text: 'if x', status: :gaps, span: 1..1 },
+      { number: 2, text: 'x ? :a : :b', status: :gaps, span: 2..2 }
+    ]
+    arms = lambda do |texts|
+      %i[then else].zip(texts, [[true, false], [false, true]])
+                   .map do |arm, text, cells|
+        { arm:, text:, cells:, body: nil }
+      end
+    end
+    tree = lambda do |operator, texts|
+      [{ operator:, counts: [0, 1], cells: [nil, nil],
+         operands: [{ text: 'x', cells: [true, false] },
+                    *arms.call(texts)] }]
+    end
+    trees = { 1 => tree.call('if', %w(alpha beta)),
+              2 => tree.call('?:', %w(:a :b)) }
+    listing = PathCoverage::HtmlFile.listing(lines, trees)
+    html = REXML::Document.new(listing)
+    named = lambda do |line|
+      html.elements.to_a("//*[@id='tree-#{line}']//*[@data-label]")
+          .map { |label| label.attributes['data-named'] }
+    end
+    actual = [named.call(1), named.call(2)]
+    assert_equal [['', nil], [nil, nil]], actual
+  end
+
+  test 'gae567', %w(
+  | Example: the tree of ok?(id) && id.size == 6
+  | Its operator && is coloured as it is in the code.
+  | So is each operand, eg the 6 of id.size == 6.
+  ) do
+    lines = [
+      { number: 1, text: 'ok?(id) && id.size == 6', status: :gaps,
+        span: 1..1 }
+    ]
+    operands = [
+      { text: 'ok?(id)', cells: [true, false] },
+      { text: 'id.size == 6', cells: [true, nil] }
+    ]
+    trees = {
+      1 => [{ operator: '&&', counts: [0, 1], cells: [true, false],
+              operands: }]
+    }
+    listing = PathCoverage::HtmlFile.listing(lines, trees)
+    tree = REXML::Document.new(listing).elements["//*[@id='tree-1']"]
+    spans = tree.elements.to_a('.//span[@class]/span[@class]')
+    coloured = spans.map do |span|
+      [span.attributes['class'], text_of(span)]
+    end
+    assert_equal [%w(o &&), %w(n 6)], coloured
+  end
+
   test 'gae548', %w(
   | Example: case x when 1 then :small else :other end
   | The arms' rows are labelled when and else.
@@ -707,7 +766,8 @@ class HtmlFileTest < Id58TestBase
   | Example: the page of source/json.rb, in a run measuring
   | methods
   | Its header's top line holds, in order, the Path coverage
-  | title, the mode toggle, then the file's path.
+  | title, the mode toggle, the file's path, then the theme
+  | button.
   ) do
     lines = [
       { number: 1, text: "require 'json'", status: nil, span: nil }
@@ -718,8 +778,45 @@ class HtmlFileTest < Id58TestBase
     parts = top.elements.to_a.map do |part|
       [part.name, part.attributes['class']]
     end
-    expected = [%w(p title), %w(nav modes), %w(h1 path)]
+    expected = [%w(p title), %w(nav modes), %w(h1 path),
+                %w(button theme)]
     assert_equal expected, parts
+  end
+
+  test 'gae564', %w(
+  | Example: the page of source/json.rb, in a run not measuring
+  | methods
+  | Its title bar ends with the light and dark theme button.
+  | Its script switches the theme as that button is pressed.
+  ) do
+    lines = [
+      { number: 1, text: "require 'json'", status: nil, span: nil }
+    ]
+    page = PathCoverage::HtmlFile.page('source/json.rb', lines, {})
+    top = REXML::Document.new(page).elements['//div[@class="top"]']
+    assert_equal 'button', top.elements.to_a.last.name
+    assert_equal 'theme', top.elements.to_a.last.attributes['class']
+    script = '// Switches the page between light and dark'
+    assert_includes page, script
+  end
+
+  test 'gae565', %w(
+  | Example: the line def ok? = true # yes, with its tokens
+  | Its code holds each token's text in a span of its class.
+  | Its code's text is the line's, whole.
+  ) do
+    lines = [
+      { number: 1, text: 'def ok? = true # yes', status: nil,
+        span: nil,
+        tokens: [[0, 3, 'k'], [10, 14, 'k'], [15, 20, 'c']] }
+    ]
+    html = REXML::Document.new(PathCoverage::HtmlFile.listing(lines))
+    code = html.elements['//*[@data-src]']
+    spans = code.elements.to_a('span').map do |span|
+      [span.attributes['class'], text_of(span)]
+    end
+    assert_equal [%w(k def), %w(k true), ['c', '# yes']], spans
+    assert_equal 'def ok? = true # yes', text_of(code)
   end
 
   test 'gae561', %w(

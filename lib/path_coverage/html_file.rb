@@ -1,6 +1,7 @@
 require 'cgi/escape'
 require_relative 'html_mode'
 require_relative 'html_nav'
+require_relative 'html_syntax'
 require_relative 'html_template'
 require_relative 'html_tree'
 
@@ -27,9 +28,9 @@ module PathCoverage
     end
 
     # The page's script: its tree toggles, its side rails, then
-    # its mode toggle.
+    # its mode toggle and its theme button.
     def self.script
-      %w[toggle.js side.js mode.js].map do |name|
+      %w[toggle.js side.js mode.js theme.js].map do |name|
         HtmlTemplate.asset(name)
       end.join
     end
@@ -105,9 +106,10 @@ module PathCoverage
       %(<span class="lineno" #{attributes}>#{number}</span>)
     end
 
-    # One line's code, escaped.
+    # One line's code, escaped, each of its tokens, if any, in a
+    # span of its colour's class.
     def self.code(line)
-      text = CGI.escapeHTML(line[:text])
+      text = HtmlSyntax.html(line[:text], line.fetch(:tokens, []))
       %(<span class="src" data-src="">#{text}</span>)
     end
   end
