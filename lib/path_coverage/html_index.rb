@@ -45,10 +45,11 @@ module PathCoverage
     end
 
     # The page's script: its column sorting, with groups its tab
-    # switching, then its mode toggle and its theme button.
+    # switching, then its settings, its mode toggle and its theme
+    # button.
     def self.script(groups)
       names = ['sort.js', *('tabs.js' unless groups.empty?),
-               'mode.js', 'theme.js']
+               'settings.js', 'mode.js', 'theme.js']
       names.map { |name| HtmlTemplate.asset(name) }.join
     end
 

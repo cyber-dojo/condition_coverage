@@ -9,17 +9,9 @@
   --rule: #D5DAE2;
   --ok: #1F5FBF;
   --ok-tint: #E6EEFA;
-  --warn: #A35200;
   --bad: #B54708;
   --on-status: #FFFFFF;
   --link: #1F5FBF;
-  /* The tree is inverted from the page, so it never reads as
-     more source lines. */
-  --tree-bg: #1E2638;
-  --tree-fg: #E8ECF4;
-  --tree-muted: #A3AEC2;
-  --tree-rule: #3A4560;
-  --tree-gap: #F5A25D;
   --font-body: "Helvetica Neue", Arial, sans-serif;
   --font-code: Menlo, Consolas, "DejaVu Sans Mono", monospace;
 }
@@ -29,9 +21,7 @@
 :root:not([data-theme="light"]) {
   --bg: #12151C; --surface: #181C25; --panel: #212633; --fg: #E4E8EF;
   --muted: #9AA4B5; --rule: #323949; --ok: #7FB0FF; --ok-tint: #1A2740;
-  --warn: #F0A35E; --bad: #F08A3C; --on-status: #12151C; --link: #7FB0FF;
-  --tree-bg: #E6EAF2; --tree-fg: #1C2230; --tree-muted: #4E5869;
-  --tree-rule: #BCC4D2; --tree-gap: #A8480A;
+  --bad: #F08A3C; --on-status: #12151C; --link: #7FB0FF;
   --syn-k: #C79BEA; --syn-s: #9CCB9E; --syn-c: #7F8A99;
   --syn-n: #E9A3C9; --syn-t: #AEB5F5; --syn-v: #7FCFC4; --syn-o: #E6D27A;
   color-scheme: dark;
@@ -53,12 +43,22 @@
 :is(.src, .tree) .t { color: var(--syn-t); }
 :is(.src, .tree) .v { color: var(--syn-v); }
 :is(.src, .tree) .o { color: var(--syn-o); font-weight: 700; }
+/* Everything a site's tree or a method's grid draws has this one
+   tint, in either mode; status is only ever the orange or blue of
+   an edge. A lit line, on a path being shown, is yellow. */
+:root { --cond-tint: #E2F2D3; --lit: #FFE98A; }
+:root:not([data-theme="light"]) { --cond-tint: #26361A; --lit: #5A4A12; }
+/* --rail is the width of the column of trees and grids left of the
+   code; dragging the divider changes it. */
+body { --rail: 560px; }
 body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 14px; }
 a { color: var(--link); }
 .page {
   max-width: 1080px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px;
   padding: 0 max(16px, env(safe-area-inset-right, 0px)) 64px max(16px, env(safe-area-inset-left, 0px));
 }
+/* A file's page is wider, to hold its rail beside its code. */
+.page:has(.code) { max-width: 1800px; }
 h1 { margin: 0; font-size: 24px; font-weight: 600; }
 /* Every page's top line: the Path coverage title, a link back to
    the index on a file's page, then the mode toggle beside it. */
@@ -146,12 +146,21 @@ a.jump[data-status] { background: var(--cond-tint); border-right-color: transpar
 a.jump[data-status="covered"] { color: var(--ok); border-top-color: var(--ok); border-left-color: var(--ok); }
 a.jump[data-status="gaps"] { color: var(--bad); border-top-color: var(--bad); border-left-color: var(--bad); }
 a.jump:focus-visible, .nav a:focus-visible { outline: 3px solid var(--link); outline-offset: 2px; }
-/* The source pane's border and background start after the nav
-   column, so the arrows sit outside the pane yet scroll with
-   their line. */
-.box:has(> .code) { position: relative; isolation: isolate; border: 0; background: none; border-radius: 0; }
+/* The code sits right of two rails sharing one column, condition
+   trees in one and path grids in the other, as a page shows one
+   mode's only. The column is always there, --rail wide, and the
+   divider in the gap after it drags to change that. */
+.box:has(> .code) {
+  position: relative; isolation: isolate; border: 0; background: none; border-radius: 0;
+  display: grid; column-gap: 12px; grid-template-columns: var(--rail) minmax(0, 1fr);
+}
+.box > .rail { grid-column: 1; grid-row: 1; }
+.box > .code { grid-column: 2; grid-row: 1; }
+/* The source pane's border and background start after the rail,
+   the gap and the nav column, so the arrows sit outside the pane
+   yet scroll with their line. */
 .box:has(> .code)::before {
-  content: ""; position: absolute; inset: 0 0 0 26px; z-index: -1;
+  content: ""; position: absolute; inset: 0 0 0 calc(var(--rail) + 38px); z-index: -1;
   border: 1px solid var(--rule); border-radius: 8px;
   background: var(--surface); pointer-events: none;
 }
@@ -160,31 +169,53 @@ a.jump:focus-visible, .nav a:focus-visible { outline: 3px solid var(--link); out
 .nav { display: flex; flex-direction: column; justify-content: center; width: 26px; flex-shrink: 0; }
 .nav a { width: 22px; text-align: center; line-height: 14px; font-size: 12px; color: var(--bad); text-decoration: none; }
 .nav a:hover { color: var(--fg); }
-/* Clears the sticky header when a link jumps to a line. */
-.lineno { scroll-margin-top: 190px; }
-button.lnum:has(.lineno:target) { outline: 3px solid var(--link); outline-offset: 1px; }
-.code { font-family: var(--font-code); font-size: 13px; line-height: 32px; padding: 10px 0; min-width: 720px; }
+/* Every row is as wide as the longest line (or the pane, if
+   wider), so a site's band and outline, and a lit line, reach
+   past the code when it scrolls sideways. Lines keep their height
+   when the box grows to hold a tree. */
+.code {
+  font-family: var(--font-code); font-size: 13px; line-height: 32px; padding: 10px 0;
+  position: relative; isolation: isolate; min-width: 0; overflow-x: auto;
+  display: grid; grid-template-columns: minmax(max-content, 1fr); align-content: start;
+}
 .line, .block { display: flex; align-items: flex-start; }
+/* A site's whole block, its lines' code included, opens its tree. */
+.block { cursor: pointer; border-radius: 6px; }
+.block:hover { filter: brightness(0.97); }
+.line:has(.lineno) { cursor: default; }
 .srcs { display: flex; flex-direction: column; }
+.block .srcs { flex: 1; }
 .src { white-space: pre; }
+/* A lit line's background spans the code pane's full width. */
+.line .src { flex: 1; }
+/* Each line's code is as tall as its row, even an empty line's, so
+   a method's stripe runs unbroken from row to row. */
+.line > .src, .block > .srcs { align-self: stretch; }
+.srcs > .src:last-child { flex-grow: 1; }
+/* scroll-margin-top clears the sticky header when a link jumps to
+   a line. */
 .lineno {
   display: block; width: 52px; padding-right: 20px; text-align: right;
   color: var(--muted); font-variant-numeric: tabular-nums; flex-shrink: 0;
+  scroll-margin-top: 190px;
 }
 /* A site's button, its 9px right margin included, takes the 72px a
    plain number takes, so its lines' code starts where every other
    line's does. */
 button.lnum {
-  display: flex; flex-direction: column; flex-shrink: 0; margin: 4px 9px 4px 0; padding: 0;
+  position: relative; display: flex; flex-direction: column; flex-shrink: 0;
+  margin: 4px 9px 4px 0; padding: 0;
   border: 1px solid transparent; border-radius: 6px; cursor: pointer;
   font: 600 13px/24px var(--font-code); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
 }
-button.lnum { position: relative; }
+/* A site's tree opens in the left rail: a closed button points
+   left, where its tree will open; an open one has no arrow, as a
+   click leaves it open. */
 button.lnum::before {
-  content: "\25B8"; position: absolute; left: 7px; top: 4px;
-  font-size: 11px; line-height: 24px; transition: transform 120ms;
+  content: "\25C2"; position: absolute; left: 7px; top: 4px;
+  font-size: 11px; line-height: 24px;
 }
-button.lnum[aria-expanded="true"]::before { transform: rotate(90deg); }
+button.lnum[aria-expanded="true"]::before { content: none; }
 /* With a site count the count and the triangle share the
    button's height, one 11px line each. */
 button.lnum:has(.site-count)::before { top: 12px; line-height: 11px; }
@@ -199,34 +230,63 @@ button.lnum:has(.lineno + .lineno)::before { top: auto; bottom: 2px; line-height
    its 16px side padding. It names the tree, so the tinted sites
    side by side on a line of code are never matched. */
 .tree .site + .site {
-  border-top: 1px solid var(--tree-rule); margin: 6px -16px 0; padding: 6px 16px 0;
+  border-top: 1px solid var(--rule); margin: 6px -16px 0; padding: 6px 16px 0;
 }
 button.lnum .lineno { width: 50px; padding-right: 11px; color: inherit; line-height: 32px; margin: -4px 0; }
 /* A site's button wears the condition tint, edged in its
-   status colour on the top and left only, as a method's bar is. */
+   status colour on the top and left only. */
 button.lnum[data-status] { box-shadow: none; background: var(--cond-tint); border-right-color: transparent; border-bottom-color: transparent; }
 button.lnum[data-status="covered"] { color: var(--ok); border-top-color: var(--ok); border-left-color: var(--ok); }
 button.lnum[data-status="gaps"] { color: var(--bad); border-top-color: var(--bad); border-left-color: var(--bad); }
 button.lnum:hover { filter: brightness(1.1); }
 button.lnum:focus-visible { outline: 3px solid var(--link); outline-offset: 1px; }
+/* An open site has its status edges doubled to 2px: its button's
+   top and left, and its expressions' underlines. A jump to a site
+   opens its tree, whose doubled edges mark it, so its button has
+   no outline of the jump to it. */
+button.lnum[aria-expanded="true"][data-status="gaps"] { box-shadow: inset 1px 1px 0 var(--bad); }
+button.lnum[aria-expanded="true"][data-status="covered"] { box-shadow: inset 1px 1px 0 var(--ok); }
+.block:has(> button.lnum[aria-expanded="true"]) mark.site[data-status="gaps"] { box-shadow: inset 0 -2px 0 var(--bad); }
+.block:has(> button.lnum[aria-expanded="true"]) mark.site[data-status="covered"] { box-shadow: inset 0 -2px 0 var(--ok); }
+button.lnum:has(.lineno:target) { outline: none; }
+/* While a method's paths are open, no button keeps a focus
+   outline. */
+body[data-open="pc"] button.lnum:focus-visible { outline: none; }
+/* A site's own characters are tinted, not its whole lines: the
+   expression is what its tree is about. The padding stretches the
+   tint to the full 32px line without moving the text. */
+mark.site { color: inherit; border-radius: 3px; padding: 8px 0; background: var(--cond-tint); }
+mark.site[data-status="gaps"] { box-shadow: inset 0 -1px 0 var(--bad); }
+mark.site[data-status="covered"] { box-shadow: inset 0 -1px 0 var(--ok); }
+/* A tree sits in the rail, level with its site (its top set by
+   side.js), as wide as the rail, its padding and border included,
+   so it never reaches over the code's gutter of gap arrows; a tree
+   with more paths than fit scrolls sideways within itself. */
 .tree {
-  margin: 4px 20px 12px 120px; padding: 10px 16px; border: 1px solid var(--tree-rule);
-  border-radius: 8px; background: var(--tree-bg); color: var(--tree-fg); line-height: 30px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  position: absolute; left: 0; right: 0; z-index: 2; width: 100%; box-sizing: border-box;
+  overflow-x: auto; padding: 10px 16px; border: 1px solid var(--rule);
+  border-radius: 8px; background: var(--cond-tint); color: var(--fg); line-height: 30px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25); font-family: var(--font-code); font-size: 13px;
 }
-/* A row is its branch and label, then one fixed-width column per
-   path: flowing by column, each cell after the label takes the
-   next path's column, however many paths the site has. */
-.row {
-  display: grid; grid-template-columns: auto minmax(200px, 1fr);
-  grid-auto-flow: column; grid-auto-columns: 32px; column-gap: 16px;
+.rail { position: relative; min-width: 0; }
+/* Each row lays its branch and label out at their own width, the
+   label pushing its cells to the row's right edge, so a site's
+   cells line up in columns however long or deep its labels. */
+.row { display: flex; align-items: center; gap: 8px; }
+.row > :is(.text, .arm, .operator) { margin-right: auto; padding-right: 8px; }
+/* An explicit width, not just a flex basis, so a row's natural
+   width counts each cell as 26px, not as its one letter. */
+.row > :is(.cell, .count) { flex: none; width: 26px; }
+/* A thin rule under each site's counts row, across the tree's
+   full width through its 16px side padding. */
+.site > .row:first-child {
+  border-bottom: 1px solid var(--rule); margin: 0 -16px 6px; padding: 0 16px 4px;
 }
-.operator { grid-column: span 2; font-weight: 600; }
-.row[data-subtree] .operator { grid-column: auto; }
+.operator { font-weight: 600; }
 .row .arm { white-space: pre; font-weight: 600; }
 /* An if's then names its arm, quoting no code, so is italic. */
 .row .arm[data-named] { font-style: italic; }
-.branch { white-space: pre; color: var(--tree-muted); margin-right: -16px; }
+.branch { white-space: pre; color: var(--muted); margin-right: -16px; }
 .row .text { white-space: pre; }
 /* A branch glyph drawn as a cell a whole row tall: v a vertical
    line, t a vertical with a stub right, l the top half of a
@@ -240,25 +300,13 @@ button.lnum:focus-visible { outline: 3px solid var(--link); outline-offset: 1px;
    taken; a leaf's T or F on that path sits in a chip, as in a
    path grid, and a blank means the path never reached it. */
 .row .count { text-align: center; font-variant-numeric: tabular-nums; color: var(--ok); font-weight: 600; }
-.row .count.never { color: var(--tree-gap); }
+.row .count.never { color: var(--bad); }
 .row .cell { text-align: center; }
 .row .cell:not(:empty) {
   align-self: center; line-height: 22px; border-radius: 3px;
   background: var(--surface); color: var(--fg); font: 600 12px var(--font-code);
 }
 
-/* SPIKE: the code and a rail share the box; each tree sits in
-   the rail, level with its site (its top set by side.js). */
-body[data-layout="beside"] .page { max-width: 1800px; }
-/* The code sits right of two rails sharing one column, condition
-   trees in one and path grids in the other, as a page shows one
-   mode's only. The column is always there, --rail wide, and the
-   divider in the gap after it drags to change that. */
-body[data-layout="beside"] { --rail: 560px; }
-body[data-layout="beside"] .box:has(> .code) {
-  display: grid; column-gap: 12px;
-  grid-template-columns: var(--rail) minmax(0, 1fr);
-}
 /* The divider: the gap between the rail and the code, a line down
    its middle that darkens as it is hovered or dragged. */
 .divider {
@@ -271,87 +319,7 @@ body[data-layout="beside"] .box:has(> .code) {
 }
 .divider:hover::after, .divider.dragging::after { background: var(--link); }
 body.dragging { cursor: col-resize; user-select: none; }
-body[data-layout="beside"] .box > .rail { grid-column: 1; grid-row: 1; }
-body[data-layout="beside"] .box > .code { grid-column: 2; grid-row: 1; }
-/* Every row is as wide as the longest line (or the pane, if
-   wider), so a site's band and outline, and a lit line, reach
-   past the code when it scrolls sideways. */
-body[data-layout="beside"] .code {
-  min-width: 0; overflow-x: auto;
-  display: grid; grid-template-columns: minmax(max-content, 1fr);
-  /* Lines keep their height when the box grows to hold a tree. */
-  align-content: start;
-}
-body[data-layout="beside"] .box:has(> .code)::before {
-  left: calc(var(--rail) + 38px); right: 0;
-}
-.rail { position: relative; min-width: 0; }
-/* The rail's tree sits on the condition tint, in the page's own
-   text colours, as a path grid sits on the path tint. */
-.rail .tree {
-  --tree-bg: var(--cond-tint); --tree-fg: var(--fg); --tree-muted: var(--muted);
-  --tree-rule: var(--rule); --tree-gap: var(--bad);
-}
-/* The rail's tree has narrower columns, to fit its width; a
-   thin rule under each site's counts row, across the tree's
-   full width through its 16px side padding. */
-/* Each row lays its branch and label out at their own width, the
-   label pushing its cells to the row's right edge, so a site's
-   cells line up in columns however long or deep its labels. */
-.rail .row { display: flex; align-items: center; gap: 8px; }
-.rail .row > :is(.text, .arm, .operator) { margin-right: auto; padding-right: 8px; }
-/* An explicit width, not just a flex basis, so a row's natural
-   width counts each cell as 26px, not as its one letter. */
-.rail .row > :is(.cell, .count) { flex: none; width: 26px; }
-/* The tree is as wide as the rail, its padding and border included,
-   so it never reaches over the code's gutter of gap arrows; a tree
-   with more paths than fit scrolls sideways within itself. */
-.rail .tree { width: 100%; box-sizing: border-box; overflow-x: auto; }
-.rail .site > .row:first-child {
-  border-bottom: 1px solid var(--tree-rule); margin: 0 -16px 6px; padding: 0 16px 4px;
-}
-.rail .tree { position: absolute; left: 0; right: 0; margin: 0; z-index: 2; font-family: var(--font-code); font-size: 13px; }
-/* Beside, a site's whole block, its lines' code included, is
-   tinted by status and opens its tree, so each tree lines up
-   with a band the eye can follow across. */
-:root { --bad-tint: #FBE6D6; }
-:root:not([data-theme="light"]) { --bad-tint: #3A2416; }
-/* Everything a site's tree or a method's grid draws has this one
-   tint, in either mode; status is only ever the orange or blue
-   of an edge. */
-:root { --cond-tint: #E2F2D3; }
-:root:not([data-theme="light"]) { --cond-tint: #26361A; }
-body[data-layout="beside"] .block { cursor: pointer; border-radius: 6px; }
-/* A site's own characters are tinted, not its whole lines: the
-   expression is what its grid is about. */
-/* The padding stretches the tint to the full 32px line, as tall
-   as a method's band, without moving the text. */
-mark.site { color: inherit; border-radius: 3px; padding: 8px 0; }
-mark.site { background: var(--cond-tint); }
-mark.site[data-status="gaps"] { box-shadow: inset 0 -1px 0 var(--bad); }
-mark.site[data-status="covered"] { box-shadow: inset 0 -1px 0 var(--ok); }
-/* An open site, like an open method's bar, has its status edges
-   doubled to 2px: its button's top and left, and its
-   expressions' underlines. */
-body[data-layout="beside"] button.lnum[aria-expanded="true"][data-status="gaps"] { box-shadow: inset 1px 1px 0 var(--bad); }
-body[data-layout="beside"] button.lnum[aria-expanded="true"][data-status="covered"] { box-shadow: inset 1px 1px 0 var(--ok); }
-body[data-layout="beside"] .block:has(> button.lnum[aria-expanded="true"]) mark.site[data-status="gaps"] { box-shadow: inset 0 -2px 0 var(--bad); }
-body[data-layout="beside"] .block:has(> button.lnum[aria-expanded="true"]) mark.site[data-status="covered"] { box-shadow: inset 0 -2px 0 var(--ok); }
-/* Beside, a jump to a site opens its tree, whose doubled edges
-   mark it, so its button has no outline of the jump to it; and
-   while a method's paths are open, none keeps a focus outline. */
-body[data-layout="beside"] button.lnum:has(.lineno:target) { outline: none; }
-body[data-open="pc"] button.lnum:focus-visible { outline: none; }
-body[data-layout="beside"] .block .srcs { flex: 1; }
-body[data-layout="beside"] .block:hover { filter: brightness(0.97); }
-/* A site's tree opens in the left rail: a closed button points
-   left, where its tree will open; an open one has no arrow, as a
-   click leaves it open. */
-body[data-layout="beside"] button.lnum::before { content: "\25C2"; transform: none; }
-body[data-layout="beside"] button.lnum[aria-expanded="true"]::before { content: none; }
 
-body[data-layout="beside"] .code { position: relative; isolation: isolate; }
-.line:has(.lineno) { cursor: default; }
 /* Within each method, each line of a method has a stripe in the
    method's status colour, just left of its def's d, from its def
    line to its last; its def line also has a band of the one tint,
@@ -359,11 +327,6 @@ body[data-layout="beside"] .code { position: relative; isolation: isolate; }
    lines' code, placed in characters (side.js gives each line its
    def's column), so the code's own layout keeps them aligned. Open,
    a method's stripe thickens. */
-/* Each line's code is as tall as its row, even an empty line's, so
-   a method's stripe runs unbroken from row to row. */
-body[data-layout="beside"] .line > .src,
-body[data-layout="beside"] .block > .srcs { align-self: stretch; }
-body[data-layout="beside"] .srcs > .src:last-child { flex-grow: 1; }
 html[data-mode="methods"] .src.in-method {
   --method-colour: var(--bad); --stripe: 2px;
   --at: calc(var(--def-col) * 1ch - 4px);
@@ -399,17 +362,12 @@ html[data-mode="methods"] .src.def-line {
 .prow.calls .pcell.taken { background: var(--ok-tint); color: var(--ok); }
 .prow.calls .pcell.never { background: var(--bad); color: var(--on-status); }
 .prow.calls .plabel { color: var(--fg); }
-/* SPIKE: hovering a path's column shows it in the code: the
-   column outlined, skipped lines faded, each decision's line
-   chipped with its outcome. */
-.pcell { cursor: default; }
+/* Hovering a path's column shows it in the code: the column
+   outlined, each line it ran lit, each decision's line chipped
+   with its outcome. */
 .pcell { cursor: pointer; }
 .pcell.hot { outline: 2px solid var(--fg); outline-offset: -1px; }
 .pcell.pinned { outline: 3px solid var(--link); outline-offset: -2px; }
-:root { --lit: #FFE98A; }
-:root:not([data-theme="light"]) { --lit: #5A4A12; }
-/* A lit line's background spans the code pane's full width. */
-.line .src { flex: 1; }
 .src.lit { background: var(--cond-tint); }
 mark.chars { background: var(--lit); color: inherit; border-radius: 3px; box-shadow: 0 0 0 2px var(--lit); }
 .tree .row[data-at] { cursor: default; }

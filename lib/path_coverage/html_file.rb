@@ -27,10 +27,10 @@ module PathCoverage
       )
     end
 
-    # The page's script: its tree toggles, its side rails, then
-    # its mode toggle and its theme button.
+    # The page's script: its side rails, then its settings, its
+    # mode toggle and its theme button.
     def self.script
-      %w[toggle.js side.js mode.js theme.js].map do |name|
+      %w[side.js settings.js mode.js theme.js].map do |name|
         HtmlTemplate.asset(name)
       end.join
     end
