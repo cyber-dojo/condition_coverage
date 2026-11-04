@@ -469,6 +469,11 @@ source/user.rb:4:9 path taken that a treatment rules out: `user.name` nil
 - an evaluation that raised part way through a site, eg
   `ok?(id) && fetch(id)` where `fetch` raises, reported as a path that
   raised rather than dropped as unfinished.
+- within each method, every top-level decision, not only `if`
+  statements. A top-level `case`, ternary, `&.` or `&&` decides as much
+  as an `if` does. Two decisions on the same value combine into paths
+  that cannot happen, eg `x&.call` then `x ? 1 : 2` has 2 paths, not 4.
+  Such paths must be found before any are listed as gaps.
 - complexity maximums, reported and gated, since the possible paths
   count how much there is to test, not only how much was tested. A
   file's total measures its size, so each is a maximum over smaller
@@ -521,8 +526,8 @@ test:
   Branch coverage: 43 / 43 (100.00%)
   Path coverage within decisions: 65 / 84 (77.38%)
   Path coverage within methods: 3 / 3 (100.00%)
-Coverage report: .../reports/index.html
-Path coverage report: .../reports/paths/index.html
+SimpleCov report: .../reports/index.html
+PathCov report: .../reports/paths/index.html
 coverage: ALLOWED
 ```
 

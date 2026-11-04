@@ -1,41 +1,35 @@
+require_relative 'html_mode'
+
 module PathCoverage
-  # The two heading rows of the HTML index's files tables: File
-  # and Sites, then each total's name over its taken, / of and %
-  # columns, every column sortable.
+  # The heading row of the HTML index's files tables: File and
+  # Sites, then each mode's total's taken, / of and % columns,
+  # every column sortable. The mode toggle names the total the
+  # page shows, so no heading names it.
   module HtmlIndexHead
     # The class and label of each of a total's three columns.
     PARTS = [%w[taken taken], ['of', '/ of'], %w[percent %]].freeze
 
-    # The two heading rows; methods' total only when methods are
+    # The heading row; methods' total only when methods are
     # measured.
     def self.of(methods)
-      names = ['Within each decision']
-      names << 'Within each method' if methods
-      rows = [top_row(names), part_row(names)]
-      rows.map { |row| "<tr>\n#{row}\n</tr>" }.join("\n")
-    end
-
-    # The first heading row: File and Sites, each over both rows,
-    # then each total's name over its three columns.
-    def self.top_row(names)
+      modes = HtmlMode::MODES.first(methods ? 2 : 1)
       fixed = [
-        heading(' rowspan="2"', 0, 'text', 'File'),
-        heading(' class="num" rowspan="2"', 1, 'number', 'Sites')
+        heading('', 0, 'text', 'File'),
+        heading(' class="num"', 1, 'number', 'Sites')
       ]
-      groups = names.map do |name|
-        %(<th class="group" colspan="3">#{name}</th>)
-      end
-      (fixed + groups).join("\n")
+      "<tr>\n#{(fixed + parts(modes)).join("\n")}\n</tr>"
     end
 
-    # The second heading row: each total's taken, / of and %.
-    def self.part_row(names)
-      names.each_index.flat_map do |group|
+    # Each mode's total's taken, / of and %, each naming its
+    # mode, so the page can show one mode's only.
+    def self.parts(modes)
+      modes.each_with_index.flat_map do |(mode, _), group|
         PARTS.each_with_index.map do |(css, label), i|
           column = 2 + (3 * group) + i
-          heading(%( class="#{css}"), column, 'number', label)
+          attrs = %( class="#{css}" data-mode="#{mode}")
+          heading(attrs, column, 'number', label)
         end
-      end.join("\n")
+      end
     end
 
     # A sortable heading, attrs its th's, sorting the column-th

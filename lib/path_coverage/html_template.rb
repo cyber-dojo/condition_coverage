@@ -10,6 +10,12 @@ module PathCoverage
       File.read(File.join(DIR, name))
     end
 
+    # The page template named name, its {{style}} the report's
+    # style sheet, and each other {{name}} values[name].
+    def self.page(name, values)
+      fill(asset(name), values.merge('style' => asset('style.css')))
+    end
+
     # template with each {{name}} replaced by values[name].
     def self.fill(template, values)
       template.gsub(/\{\{(\w+)\}\}/) do

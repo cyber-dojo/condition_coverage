@@ -26,7 +26,7 @@ module PathCoverage
         path = config.relative(full_path)
         out = "#{dir}/files/#{path}.html"
         # simplecov:disable
-        grids = paths ? path_grids(path, parsed, paths) : ''
+        grids = paths ? path_grids(path, parsed, paths) : nil
         # simplecov:enable
         write_page(out, path, parsed, [operands, site_paths], grids)
       end
@@ -61,14 +61,17 @@ module PathCoverage
     # simplecov:enable
 
     # Writes one file's page to out, from its sites' operand
-    # counts and paths.
+    # counts and paths, and grids, its methods' path grids, nil
+    # when methods are not measured.
     def self.write_page(out, path, parsed,
                         (operands, site_paths), grids)
       source, sites = parsed.values_at(:source, :sites)
       lines = SourceLines.of(source, sites, operands)
       trees = trees(source, sites, lines, site_paths)
+      page = HtmlFile.page(path, lines, trees, grids.to_s,
+                           methods: !grids.nil?)
       FileUtils.mkdir_p(File.dirname(out))
-      File.write(out, HtmlFile.page(path, lines, trees, grids))
+      File.write(out, page)
     end
 
     # { first line of a span => [SiteTree.of, ...] } for the

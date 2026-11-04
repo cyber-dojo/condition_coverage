@@ -1,4 +1,5 @@
 require 'cgi/escape'
+require_relative 'html_mode'
 require_relative 'html_nav'
 require_relative 'html_template'
 require_relative 'html_tree'
@@ -10,13 +11,14 @@ module PathCoverage
   module HtmlFile
     # The whole page for the file at path (relative to root),
     # written at files/<path>.html, so it links back to the
-    # index one folder up for each folder in that.
-    def self.page(path, lines, trees, grids = '')
-      HtmlTemplate.fill(
-        HtmlTemplate.asset('file.html'),
+    # index one folder up for each folder in that. Measuring
+    # methods, its header holds the mode toggle.
+    def self.page(path, lines, trees, grids = '', methods: false)
+      HtmlTemplate.page(
+        'file.html',
         'path' => CGI.escapeHTML(path),
+        'modes' => HtmlMode.toggle(methods),
         'index' => "#{'../' * (path.count('/') + 1)}index.html",
-        'style' => HtmlTemplate.asset('style.css'),
         'script' => script,
         'grids' => grids,
         'jumps' => HtmlNav.jumps(lines),
@@ -24,9 +26,12 @@ module PathCoverage
       )
     end
 
-    # The page's script: its tree toggles, then its side rails.
+    # The page's script: its tree toggles, its side rails, then
+    # its mode toggle.
     def self.script
-      HtmlTemplate.asset('toggle.js') + HtmlTemplate.asset('side.js')
+      %w[toggle.js side.js mode.js].map do |name|
+        HtmlTemplate.asset(name)
+      end.join
     end
 
     # The source listing of lines, as SourceLines.of gives them:

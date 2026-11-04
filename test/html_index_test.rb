@@ -52,9 +52,9 @@ class HtmlIndexTest < Id58TestBase
   test 'zr0H30', %w(
   | Example: rows for kata.rb and fee.rb, and their total
   | The index page is a table with a sort button heading each
-  | of its columns.
-  | Within each decision and Within each method each head three:
-  | taken, / of, and the percent.
+  | of its columns, in one heading row.
+  | Each total has three columns: taken, / of, and the percent.
+  | The mode toggle names the total shown, so no heading does.
   | It has one row per covered file.
   | Its footer is the Total row, which sorting leaves last.
   ) do
@@ -73,9 +73,7 @@ class HtmlIndexTest < Id58TestBase
                 'taken', '/ of', '%']
     assert_equal(expected, buttons.map { |button| text_of(button) })
 
-    groups = html.elements.to_a('//thead//th[@colspan="3"]')
-    expected = ['Within each decision', 'Within each method']
-    assert_equal(expected, groups.map { |group| text_of(group) })
+    assert_equal 1, html.elements.to_a('//thead/tr').size
 
     files = html.elements.to_a('//tbody/tr/td[1]')
     expected = ['source/kata.rb', 'source/fee.rb']
@@ -84,6 +82,90 @@ class HtmlIndexTest < Id58TestBase
     foot = html.elements.to_a('//tfoot/tr/td')
     expected = ['Total', '5', '5', '/ 10', '50%', '1', '/ 4', '25%']
     assert_equal(expected, foot.map { |cell| text_of(cell) })
+  end
+
+  test 'zr0H80', %w(
+  | Example: the index pages of runs measuring methods, and not
+  | The page starts with a header holding its title.
+  | Measuring methods, the mode toggle is on the title's line.
+  | Not measuring methods, there is one mode only, so no toggle.
+  ) do
+    row = { path: 'source/fee.rb', sites: 3, decisions: [2, 4],
+            methods: [1, 4] }
+    total = { sites: 3, decisions: [2, 4], methods: [1, 4] }
+    measured = REXML::Document.new(
+      PathCoverage::HtmlIndex.page([row], total)
+    )
+    top = '//header/div[@class="top"]'
+    modes = measured.elements.to_a("#{top}/nav[@class=\"modes\"]")
+    assert_equal 1, modes.size
+    title = measured.elements.to_a("#{top}/h1")
+    assert_equal(['Path coverage'], title.map { |h1| text_of(h1) })
+
+    unmeasured = REXML::Document.new(
+      PathCoverage::HtmlIndex.page(
+        [row.merge(methods: nil)], total.merge(methods: nil)
+      )
+    )
+    assert_empty unmeasured.elements.to_a('//nav[@class="modes"]')
+  end
+
+  test 'zr0H81', %w(
+  | Example: the index page of a run measuring methods
+  | Each total's headings and cells name the mode they belong to.
+  | So the page can show one mode's columns only.
+  | File and Sites belong to every mode, so name none.
+  ) do
+    row = { path: 'source/fee.rb', sites: 3, decisions: [2, 4],
+            methods: [1, 4] }
+    total = { sites: 3, decisions: [2, 4], methods: [1, 4] }
+    page = PathCoverage::HtmlIndex.page([row], total)
+    html = REXML::Document.new(page)
+    modes = lambda do |path|
+      html.elements.to_a(path).map do |cell|
+        cell.attributes['data-mode']
+      end
+    end
+    parts = (%w(decisions) * 3) + (%w(methods) * 3)
+    assert_equal [nil, nil] + parts, modes.call('//thead/tr/th')
+    assert_equal [nil, nil] + parts, modes.call('//tbody/tr/td')
+    assert_equal [nil, nil] + parts, modes.call('//tfoot/tr/td')
+  end
+
+  test 'zr0H82', %w(
+  | Example: the index page of a run measuring methods
+  | Its script switches the mode as its toggle is pressed.
+  ) do
+    row = { path: 'source/fee.rb', sites: 3, decisions: [2, 4],
+            methods: [1, 4] }
+    total = row.merge(path: 'Total')
+    page = PathCoverage::HtmlIndex.page([row], total)
+    assert_includes page, '// Shows the paths of one mode only'
+  end
+
+  test 'zr0H83', %w(
+  | Example: rows for kata.rb and fee.rb, and a group, models,
+  | holding fee.rb
+  | Each row of the All files table has an id, row- then its path.
+  | So a file's page can link back to its own row.
+  | The group's tab repeats fee.rb's row, with no id, so each id
+  | names one row.
+  ) do
+    kata = { path: 'source/kata.rb', sites: 2, decisions: [3, 6],
+             methods: nil }
+    fee = { path: 'source/fee.rb', sites: 3, decisions: [2, 4],
+            methods: nil }
+    total = { sites: 5, decisions: [5, 10], methods: nil }
+    models = ['models', [fee], fee.merge(path: 'Total')]
+    page = PathCoverage::HtmlIndex.page([kata, fee], total, [models])
+    html = REXML::Document.new(page)
+    ids = lambda do |table|
+      html.elements.to_a("//table[@id=\"#{table}\"]/tbody/tr")
+          .map { |row| row.attributes['id'] }
+    end
+    assert_equal %w(row-source/kata.rb row-source/fee.rb),
+                 ids.call('files-0')
+    assert_equal [nil], ids.call('files-1')
   end
 
   test 'zr0H40', %w(

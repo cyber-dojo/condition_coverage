@@ -102,7 +102,8 @@ module PathCoverage
     end
 
     # The row level with the def: how many calls took each path,
-    # never-taken ones marked.
+    # never-taken ones marked. Its label cell is empty, keeping
+    # the columns level with the decision rows' labelled ones.
     def self.calls_row(first, ordered, taken, method, seen)
       cells = ordered.map do |path|
         calls = taken.fetch(path, 0)
@@ -110,7 +111,7 @@ module PathCoverage
         %(<span class="#{css}">#{calls.zero? ? '0' : calls}</span>)
       end
       name = CGI.escapeHTML(method.name.to_s)
-      label = %(<span class="plabel">#{seen}/#{ordered.size}</span>)
+      label = '<span class="plabel"></span>'
       title = %( title="#{name}: #{seen} of #{ordered.size} paths taken")
       %(<div class="prow calls" data-line="#{first}"#{title}>#{label}#{cells.join}</div>)
     end

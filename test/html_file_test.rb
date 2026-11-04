@@ -660,6 +660,81 @@ class HtmlFileTest < Id58TestBase
     assert_equal({ 'covered' => [], 'gaps' => [] }, jumps_of(html))
   end
 
+  test 'gae560', %w(
+  | Example: the page of a file holding require 'json' only, in
+  | runs measuring methods, and not
+  | Its header's top line is the Path coverage title, linking
+  | to the index.
+  | Measuring methods, the mode toggle is on that line too.
+  | Not measuring methods, there is one mode only, so no toggle.
+  ) do
+    lines = [
+      { number: 1, text: "require 'json'", status: nil, span: nil }
+    ]
+    top = '//header/div[@class="top"]'
+    html_of = lambda do |methods|
+      page = PathCoverage::HtmlFile.page('source/json.rb', lines, {},
+                                         methods:)
+      REXML::Document.new(page)
+    end
+    modes = lambda do |methods|
+      html = html_of.call(methods)
+      html.elements.to_a("#{top}/nav[@class=\"modes\"]").size
+    end
+    assert_equal [1, 0], [modes.call(true), modes.call(false)]
+    link = html_of.call(true).elements["#{top}/p[@class=\"title\"]/a"]
+    actual = [text_of(link), link.attributes['href']]
+    assert_equal ['Path coverage', '../../index.html'], actual
+  end
+
+  test 'gae562', %w(
+  | Example: the page of source/models/fee.rb
+  | Its path heading links back to its own row on the index.
+  | So the index opens with that row scrolled into view.
+  ) do
+    lines = [
+      { number: 1, text: "require 'json'", status: nil, span: nil }
+    ]
+    page = PathCoverage::HtmlFile.page('source/models/fee.rb',
+                                       lines, {})
+    link = REXML::Document.new(page).elements['//h1[@class="path"]/a']
+    expected = ['source/models/fee.rb',
+                '../../../index.html#row-source/models/fee.rb']
+    assert_equal expected, [text_of(link), link.attributes['href']]
+  end
+
+  test 'gae563', %w(
+  | Example: the page of source/json.rb, in a run measuring
+  | methods
+  | Its header's top line holds, in order, the Path coverage
+  | title, the mode toggle, then the file's path.
+  ) do
+    lines = [
+      { number: 1, text: "require 'json'", status: nil, span: nil }
+    ]
+    page = PathCoverage::HtmlFile.page('source/json.rb', lines, {},
+                                       methods: true)
+    top = REXML::Document.new(page).elements['//header/div[@class="top"]']
+    parts = top.elements.to_a.map do |part|
+      [part.name, part.attributes['class']]
+    end
+    expected = [%w(p title), %w(nav modes), %w(h1 path)]
+    assert_equal expected, parts
+  end
+
+  test 'gae561', %w(
+  | Example: the page of a file holding require 'json' only, in
+  | a run measuring methods
+  | Its script switches the mode as its toggle is pressed.
+  ) do
+    lines = [
+      { number: 1, text: "require 'json'", status: nil, span: nil }
+    ]
+    page = PathCoverage::HtmlFile.page('source/json.rb', lines, {},
+                                       methods: true)
+    assert_includes page, '// Shows the paths of one mode only'
+  end
+
   test 'gae551', %w(
   | Example: a file holding require 'json' only
   | Its one line has no site.

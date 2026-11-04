@@ -66,8 +66,8 @@ breaches.each { |line| puts line }
 # paths HOST_ROOT names.
 host = ENV.fetch('HOST_ROOT', '')
 unless host.empty?
-  puts "Coverage report: #{host}/reports/index.html"
-  puts "Path coverage report: #{host}/reports/paths/index.html"
+  puts "SimpleCov report: #{host}/reports/index.html"
+  puts "PathCov report: #{host}/reports/paths/index.html"
 end
 puts breaches.empty? ? 'coverage: ALLOWED' : 'coverage: DENIED'
 exit breaches.empty?
