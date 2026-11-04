@@ -1,5 +1,4 @@
 require_relative 'test_helper'
-require 'path_coverage/path_manifest'
 require 'path_coverage/summary'
 
 class SummaryTest < Id58TestBase
@@ -37,11 +36,11 @@ class SummaryTest < Id58TestBase
   end
 
   test 'SEye20', %w(
-  | Example: fee.rb's fee with two ifs, called with true then
-  | false only, and kata.rb with no method of two decisions
+  | Example: fee.rb's fee with two ifs, its card 4 of its 6
+  | paths taken, and kata.rb with no def
   | :methods is measured, so each row has a methods total.
-  | fee.rb's is [1, 4], one of fee's four paths.
-  | kata.rb's is [0, 0], as it has no method's paths.
+  | fee.rb's is [4, 6], fee's card.
+  | kata.rb's is [0, 0], as it has no card.
   ) do
     site_paths = {
       'source/fee.rb:4:4' => [
@@ -54,20 +53,11 @@ class SummaryTest < Id58TestBase
         { path: [true], count: 1 }, { path: [false], count: 1 }
       ]
     }
-    decisions = [4, 7].map do |line|
-      PathCoverage::Decision.new(
-        line:, range: 0...1, command: false, exits: nil
-      )
-    end
-    fee = PathCoverage::PathMethod.new(
-      name: :fee, entry: 0, decisions:
-    )
-    methods = { 'source/fee.rb:2:2' => fee }
-    paths = { 'source/fee.rb:2:2' => { [true, false] => 1 } }
-    rows = PathCoverage::Summary.files(site_paths, methods, paths)
+    cards = { 'source/fee.rb:2:2' => [4, 6] }
+    rows = PathCoverage::Summary.files(site_paths, cards)
     actual = rows.to_h { |row| [row[:path], row[:methods]] }
     expected = {
-      'source/fee.rb' => [1, 4], 'source/kata.rb' => [0, 0]
+      'source/fee.rb' => [4, 6], 'source/kata.rb' => [0, 0]
     }
     assert_equal expected, actual
   end
@@ -135,30 +125,24 @@ class SummaryTest < Id58TestBase
   end
 
   test 'SEye50', %w(
-  | Example: methods of no file, of fee.rb only, and of fee.rb and
+  | Example: cards of no file, of fee.rb only, and of fee.rb and
   | kata.rb
-  | A file's methods total adds its own methods' paths alone.
-  | No methods at all gives [0, 0].
-  | fee.rb's two methods of 4 paths each give [0, 8], whether or
-  | not kata.rb has a method too; kata.rb's alone give [0, 4].
+  | A file's methods total adds its own defs' cards alone.
+  | No cards at all gives [0, 0].
+  | fee.rb's two cards, [1, 6] and [2, 6], give [3, 12], whether
+  | or not kata.rb has a card too; kata.rb's alone gives [4, 4].
   ) do
-    decisions = [4, 7].map do |line|
-      PathCoverage::Decision.new(line:, range: 0...1, command: false)
-    end
-    fee = PathCoverage::PathMethod.new(
-      name: :fee, entry: 0, decisions:
-    )
-    two = { 'src/fee.rb:2:2' => fee, 'src/fee.rb:9:2' => fee }
-    three = two.merge('src/kata.rb:5:2' => fee)
+    two = { 'src/fee.rb:2:2' => [1, 6], 'src/fee.rb:9:2' => [2, 6] }
+    three = two.merge('src/kata.rb:5:2' => [4, 4])
     summary = PathCoverage::Summary
     actual = [
-      summary.methods_of('src/kata.rb', {}, {}),
-      summary.methods_of('src/fee.rb', two, {}),
-      summary.methods_of('src/kata.rb', two, {}),
-      summary.methods_of('src/fee.rb', three, {}),
-      summary.methods_of('src/kata.rb', three, {})
+      summary.methods_of('src/kata.rb', {}),
+      summary.methods_of('src/fee.rb', two),
+      summary.methods_of('src/kata.rb', two),
+      summary.methods_of('src/fee.rb', three),
+      summary.methods_of('src/kata.rb', three)
     ]
-    assert_equal [[0, 0], [0, 8], [0, 0], [0, 8], [0, 4]], actual
+    assert_equal [[0, 0], [3, 12], [0, 0], [3, 12], [4, 4]], actual
   end
 
   test 'SEye60', %w(

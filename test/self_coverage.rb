@@ -14,15 +14,14 @@ module SelfCoverage
   COPY = '/tmp/path_coverage_self'.freeze
 
   # Copies lib/ to COPY with every PathCoverage renamed
-  # PathCoverageSelf, and every inserted local renamed too, so
-  # no name is shared with the code it measures.
+  # PathCoverageSelf, so no name is shared with the code it
+  # measures.
   def self.copy
     FileUtils.rm_rf(COPY)
     FileUtils.cp_r('/gem/lib/.', COPY)
     Dir["#{COPY}/**/*.rb"].each do |file|
       text = File.read(file).gsub('PathCoverage', 'PathCoverageSelf')
-      local = '__path_coverage_path'
-      File.write(file, text.gsub(local, '__path_coverage_self_path'))
+      File.write(file, text)
     end
   end
 
@@ -34,9 +33,6 @@ module SelfCoverage
     cover 'lib/**/*.rb'
     cover 'test/**/*.rb'
     skip 'test/projects/**/*.rb'
-    # SPIKE: the path grids of the HTML report, untested while
-    # their design settles, as SimpleCov skips them too.
-    skip 'lib/path_coverage/html_paths.rb'
     coverage_dir '/reports/paths'
     measure :decisions, :methods
     report :html

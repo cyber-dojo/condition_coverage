@@ -236,7 +236,8 @@ module PathCoverage
       def grouped(operand)
         return operand unless operand.type == :parentheses_node
 
-        statements = operand.body&.body || []
+        body = operand.body
+        statements = body ? body.body : []
         statements.size == 1 ? statements.first : operand
       end
     end

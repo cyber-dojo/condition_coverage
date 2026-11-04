@@ -357,6 +357,12 @@ html[data-mode="methods"] .src.def-line {
    do, their fixed width keeping the cells in columns. */
 .plabel { width: 48px; flex-shrink: 0; text-align: left; padding-right: 8px; color: var(--muted); line-height: 24px; }
 .pcell { width: 24px; flex-shrink: 0; text-align: center; line-height: 24px; border-radius: 3px; }
+/* A statement card's cells hold words, eg return, not T or F. */
+.statements .pcell { width: 56px; cursor: default; }
+.statements .plabel { width: 120px; overflow: hidden; text-overflow: ellipsis; }
+.statements .prow.site, .statements .prow.site .pcell { cursor: pointer; }
+.statements .prow.site:hover .pcell, .statements .prow.site:hover .plabel { color: var(--link); }
+.statements .prow.columns .plabel, .statements .prow.columns .pcell { color: var(--muted); }
 .pcell.ended { background: transparent; }
 .pcell.true, .pcell.false { background: var(--surface); color: var(--fg); }
 .prow.calls .pcell.taken { background: var(--ok-tint); color: var(--ok); }

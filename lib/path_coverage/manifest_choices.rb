@@ -117,10 +117,11 @@ module PathCoverage
       Arm.new(kind:, extent:, body:)
     end
 
-    # True for a condition that folds into a ternary's site:
-    # an &&, ||, and, or, or a ternary, none of them ignored.
+    # True for a condition that folds into a ternary's site: a
+    # ternary, never ignored, as the ternary it folds into is
+    # not; or an &&, ||, and or or not ignored.
     def foldable?(node)
-      (operator?(node) || ternary?(node)) && !ignored?(node)
+      ternary?(node) || (operator?(node) && !ignored?(node))
     end
 
     # True for a ternary, an if with no if keyword.

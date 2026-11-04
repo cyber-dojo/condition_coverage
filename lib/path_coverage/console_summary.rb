@@ -8,36 +8,34 @@ module PathCoverage
   # groups configured each group is a heading, its own totals
   # indented under it, and there is no total over every group.
   module ConsoleSummary
-    # The summary lines of site_paths and, when paths are given,
-    # as they are when methods are measured, of methods; groups
-    # is { name => [glob, ...] }.
-    def self.lines(site_paths, methods, paths, groups = {})
-      if groups.empty?
-        return totals_lines(totals(site_paths, methods, paths))
-      end
+    # The summary lines of site_paths and, when cards, { def
+    # site => [taken, size] }, are given, as they are when
+    # methods are measured, of cards; groups is { name =>
+    # [glob, ...] }.
+    def self.lines(site_paths, cards, groups = {})
+      return totals_lines(totals(site_paths, cards)) if groups.empty?
 
-      all = group_totals(site_paths, methods, paths, groups)
+      all = group_totals(site_paths, cards, groups)
       all.flat_map do |name, totals|
         ["#{name}:", *totals_lines(totals).map { |line| "  #{line}" }]
       end
     end
 
     # { 'decisions' => [taken, possible] } of site_paths, with
-    # 'methods' => [taken, possible] of methods when paths are
-    # given.
-    def self.totals(site_paths, methods, paths)
+    # 'methods' => [taken, possible] of cards when given.
+    def self.totals(site_paths, cards)
       totals = { 'decisions' => Totals.decisions(site_paths) }
-      return totals if paths.nil?
+      return totals if cards.nil?
 
-      totals.merge('methods' => Totals.methods(methods, paths))
+      totals.merge('methods' => Totals.methods(cards))
     end
 
     # { group name => totals } of each group's own sites and
-    # methods alone.
-    def self.group_totals(site_paths, methods, paths, groups)
+    # cards alone.
+    def self.group_totals(site_paths, cards, groups)
       groups.to_h do |name, globs|
-        own_sites = own(site_paths, globs)
-        [name, totals(own_sites, own(methods, globs), paths)]
+        own_cards = cards && own(cards, globs)
+        [name, totals(own(site_paths, globs), own_cards)]
       end
     end
 

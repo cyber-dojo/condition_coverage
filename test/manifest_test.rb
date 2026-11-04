@@ -764,4 +764,57 @@ class ManifestTest < Id58TestBase
     sites = PathCoverage::Manifest.sites(source, 'k.rb', ['||='])
     assert_equal ['&&'], sites.values.map(&:operator)
   end
+
+  test '6asyb7', %w(
+  | Example: a select whose do block rescues
+  | Its block's body is its statements and its rescue, not one
+  | expression, so it cannot be wrapped.
+  | So the select is no site.
+  ) do
+    source = <<~RUBY
+      def valid(ids)
+        ids.select do |id|
+          Integer(id).positive?
+        rescue ArgumentError
+          false
+        end
+      end
+    RUBY
+    assert_equal({}, PathCoverage::Manifest.sites(source, 'k.rb'))
+  end
+
+  test '6asyb8', %w(
+  | Example: an if comparing a select's size with a reject's
+  | Its predicate is one leaf with two block calls inside it.
+  | So the leaf contains both, select then reject, in the
+  | order they run, then its own outcome.
+  ) do
+    source = <<~RUBY
+      def mostly_odd?(ids)
+        if ids.select { |id| id.odd? }.size > ids.reject { |id| id.odd? }.size
+          true
+        end
+      end
+    RUBY
+    sites = PathCoverage::Manifest.sites(source, 'k.rb')
+    predicate = sites.values.first.operands.first
+    operators = predicate.operands.first(2).map(&:operator)
+    assert_equal ['contains', %w(select reject)],
+                 [predicate.operator, operators]
+  end
+
+  test '6asyb9', %w(
+  | Example: ready? && order, ready? a call with no receiver
+  | A call of the method's own, with no receiver or arguments,
+  | is a plain leaf, as is order.
+  ) do
+    source = <<~RUBY
+      def ship(order)
+        ready? && order
+      end
+    RUBY
+    site = PathCoverage::Manifest.sites(source, 'k.rb').values.first
+    assert_equal ['&&', [Range, Range]],
+                 [site.operator, site.operands.map(&:class)]
+  end
 end

@@ -77,21 +77,15 @@ class ProjectsTest < Id58TestBase
 
   test '4WXv40', %w(
   | Example: total -= 10 if order.fetch(:total) > 100 && ...
-  | The project measures paths too.
-  | It first prints its site gaps.
+  | The project measures methods too.
+  | It prints its site gaps.
   | The modifier if's site is named at its keyword (5:16).
-  | Then it prints each path fee never took.
-  | fee has two decisions, on lines 4 and 5.
   | fee still runs unchanged when instrumented.
   ) do
     stdout, stderr, status = run_project('two_decisions')
     expected = [
       'source/shop.rb:5:16 path never taken: ' \
-      '`order.fetch(:total) > 100` true, `order.fetch(:paid)` false',
-      'source/shop.rb:2:2 fee path never taken: ' \
-      'line 4 true, line 5 true',
-      'source/shop.rb:2:2 fee path never taken: ' \
-      'line 4 false, line 5 false'
+      '`order.fetch(:total) > 100` true, `order.fetch(:paid)` false'
     ].join("\n")
     assert_equal "#{expected}\n", stdout
     assert_equal '', stderr

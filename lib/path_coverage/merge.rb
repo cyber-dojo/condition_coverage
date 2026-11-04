@@ -28,11 +28,11 @@ module PathCoverage
       end
     end
 
-    # One method paths hash, { site => { path => count } }, as
-    # the recorder counts them, each path's count the sum of
+    # One listed hash, { site => { path => count } }, eg the
+    # paths a treatment rules out, each path's count the sum of
     # every run's, eg [true, false] taken once in each of two
     # runs is taken twice.
-    def self.method_paths(runs)
+    def self.listed(runs)
       runs.reduce do |total, run|
         total.merge(run) do |_site, mine, theirs|
           mine.merge(theirs) { |_path, a, b| a + b }

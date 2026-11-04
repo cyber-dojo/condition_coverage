@@ -232,7 +232,8 @@ class KernelTest < Id58TestBase
   | fee with two ifs called once, with true then false
   | index.html's Total row shows both totals.
   | Within each decision: 2 / 4 50%, one of each if's two.
-  | Within each method: 1 / 4 25%, one of fee's four.
+  | Within each method: 4 / 6 67%, fee's card: its two
+  | 1-path statements reached and one of each if's two.
   ) do
     dir = Dir.mktmpdir('6rTS4f')
     File.write("#{dir}/fee.rb", <<~RUBY)
@@ -264,7 +265,7 @@ class KernelTest < Id58TestBase
 
     index = REXML::Document.new(File.read("#{dir}/index.html"))
     total = index.elements.to_a('//tfoot/tr/td')
-    expected = ['Total', '2', '2', '/ 4', '50%', '1', '/ 4', '25%']
+    expected = ['Total', '2', '2', '/ 4', '50%', '4', '/ 6', '67%']
     assert_equal(expected, total.map { text_of(_1) })
   end
 
@@ -372,10 +373,10 @@ class KernelTest < Id58TestBase
   | Example: measure :decisions, :methods, fee with two ifs
   | called once, with true then false, then a render of the
   | run's JSON report into another dir
-  | The JSON report holds the method paths taken too.
+  | The JSON report holds the statements reached too.
   | So the render's index has the same Total row as the run's.
   | Within each decision: 2 / 4 50%.
-  | Within each method: 1 / 4 25%.
+  | Within each method: 4 / 6 67%.
   ) do
     dir = Dir.mktmpdir('6rTS4q')
     File.write("#{dir}/fee.rb", <<~RUBY)
@@ -420,7 +421,7 @@ class KernelTest < Id58TestBase
 
     index = REXML::Document.new(File.read("#{later}/index.html"))
     total = index.elements.to_a('//tfoot/tr/td')
-    expected = ['Total', '2', '2', '/ 4', '50%', '1', '/ 4', '25%']
+    expected = ['Total', '2', '2', '/ 4', '50%', '4', '/ 6', '67%']
     assert_equal(expected, total.map { text_of(_1) })
   end
 
@@ -428,9 +429,10 @@ class KernelTest < Id58TestBase
   | Example: measure :decisions, :methods, fee with two ifs,
   | a report after fee(true, false), another after
   | fee(false, false) too, then a render of both reports
-  | The render merges the method paths of every report.
-  | So fee's paths taken are true false and false false.
-  | Within each method: 2 / 4 50%, not the first report's 1.
+  | The render merges the paths and reaches of every report.
+  | So member was taken both ways, big false only, and both
+  | 1-path statements reached.
+  | Within each method: 5 / 6 83%, not the first report's 4.
   ) do
     dir = Dir.mktmpdir('6rTS4r')
     File.write("#{dir}/fee_runs.rb", <<~RUBY)
@@ -461,9 +463,9 @@ class KernelTest < Id58TestBase
     end
     require "#{dir}/fee_runs.rb"
     Fee6rTS4r.fee(true, false)
-    assert_output(/fee path never taken/, '') { exit_reports[0].call }
+    assert_output(/path never taken/, '') { exit_reports[0].call }
     Fee6rTS4r.fee(false, false)
-    assert_output(/fee path never taken/, '') { exit_reports[1].call }
+    assert_output(/path never taken/, '') { exit_reports[1].call }
 
     later = "#{dir}/later"
     FileUtils.mkdir_p(later)
@@ -480,15 +482,16 @@ class KernelTest < Id58TestBase
     index = REXML::Document.new(File.read("#{later}/index.html"))
     total = index.elements.to_a('//tfoot/tr/td')
     methods = total.map { text_of(_1) }.last(3).join(' ')
-    assert_equal '2 / 4 50%', methods
+    assert_equal '5 / 6 83%', methods
   end
 
   test '6rTS4s', %w(
   | Example: a run of fee with two ifs that measures :decisions
   | alone, then a render of its report that measures :methods too
-  | The report holds no method paths, so it cannot say which
-  | of fee's paths were taken.
-  | So the render claims none: within each method 0 / 4 0%.
+  | The report holds no reaches, so it cannot say whether
+  | fee's 1-path statements ran: the render claims they did
+  | not. Its ifs' paths it does hold, one of each's two.
+  | So within each method: 2 / 6 33%.
   ) do
     dir = Dir.mktmpdir('6rTS4s')
     File.write("#{dir}/fee_plain.rb", <<~RUBY)
@@ -533,7 +536,7 @@ class KernelTest < Id58TestBase
     index = REXML::Document.new(File.read("#{later}/index.html"))
     total = index.elements.to_a('//tfoot/tr/td')
     methods = total.map { text_of(_1) }.last(3).join(' ')
-    assert_equal '0 / 4 0%', methods
+    assert_equal '2 / 6 33%', methods
   end
 
   test '6rTS4t', %w(
@@ -1229,14 +1232,13 @@ class KernelTest < Id58TestBase
   test '6rTS41', %w(
   | Example: fee with if member ... end and if big ... end
   | measure :decisions, :methods is chosen.
-  | fee has two decisions, so each call records its path.
   | fee is called once, with member true and big false.
-  | The exit report prints each path never taken.
-  | First each if's own, as a site, eg `member` false.
-  | Then fee's, eg line 4 true, line 7 true.
+  | The exit report prints each if's path never taken, eg
+  | `member` false.
   | The JSON report's totals are [taken, possible]:
   | decisions [2, 4], one path of each if's two.
-  | methods [1, 4], one path of fee's four.
+  | methods [4, 6], fee's card: its two 1-path statements
+  | reached and one of each if's two.
   ) do
     dir = Dir.mktmpdir('6rTS41')
     File.write("#{dir}/fee.rb", <<~RUBY)
@@ -1265,14 +1267,11 @@ class KernelTest < Id58TestBase
     assert_equal 95, Fee6rTS41.fee(true, false)
     expected = [
       'fee.rb:4:4 path never taken: `member` false',
-      'fee.rb:7:4 path never taken: `big` true',
-      'fee.rb:2:2 fee path never taken: line 4 true, line 7 true',
-      'fee.rb:2:2 fee path never taken: line 4 false, line 7 true',
-      'fee.rb:2:2 fee path never taken: line 4 false, line 7 false'
+      'fee.rb:7:4 path never taken: `big` true'
     ].join("\n")
     assert_output("#{expected}\n") { report.call }
     json = JSON.parse(File.read("#{dir}/path_coverage.json"))
-    totals = { 'decisions' => [2, 4], 'methods' => [1, 4] }
+    totals = { 'decisions' => [2, 4], 'methods' => [4, 6] }
     assert_equal totals, json['totals']
   end
 
@@ -1387,7 +1386,8 @@ class KernelTest < Id58TestBase
   | At exit it prints a line per total, as SimpleCov prints its
   | line and branch coverage.
   | Within decisions: 2 / 4, one of each if's two paths.
-  | Within methods, only when methods are measured: 1 / 4.
+  | Within methods, only when methods are measured: 4 / 6,
+  | fee's card.
   ) do
     # Each measure covers a file and module of its own, so neither
     # run redefines the other's fee.
@@ -1422,7 +1422,7 @@ class KernelTest < Id58TestBase
       capture_io { exit_report.call }.first
     end
     decisions = "Path coverage within decisions: 2 / 4 (50.00%)\n"
-    methods = "Path coverage within methods: 1 / 4 (25.00%)\n"
+    methods = "Path coverage within methods: 4 / 6 (66.67%)\n"
     assert_equal [decisions, decisions + methods], printed
   end
 
@@ -1645,5 +1645,152 @@ class KernelTest < Id58TestBase
     assert_equal %w(user account owner), texts
     cells = rows.last.elements.to_a('*[@data-cell]')
     assert_includes cells.map { text_of(_1) }, [0x2713].pack('U')
+  end
+
+  test '6rTS6a', %w(
+  | Example: ship, a write then a value, and zero, an endless
+  | def of 0, measured within methods, ship called twice and
+  | zero once
+  | Each statement that is no site is counted each time it
+  | runs, by its name.
+  | Each method returns what the same code, uninstrumented,
+  | returns.
+  ) do
+    dir = Dir.mktmpdir('6rTS6a')
+    source = lambda do |name|
+      <<~RUBY
+        module #{name}
+          def self.ship(order)
+            box = order * 2
+            box
+          end
+          def self.zero = 0
+        end
+      RUBY
+    end
+    File.write("#{dir}/ship6a.rb", source.call('Ship6rTS6a'))
+    exit_report = nil
+    on_exit = ->(&block) { exit_report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+      measure :decisions, :methods
+    end
+    require "#{dir}/ship6a.rb"
+    eval(source.call('Plain6rTS6a')) # rubocop:disable Security/Eval
+    calls = ->(mod) { [mod.ship(3), mod.ship(4), mod.zero] }
+    plain = calls.call(Plain6rTS6a)
+    actual = calls.call(Ship6rTS6a)
+    assert_equal [[6, 8, 0], plain], [actual, actual]
+    reached = PathCoverage.recorder.reached.select do |name, _|
+      name.start_with?('ship6a.rb:')
+    end
+    expected = {
+      'ship6a.rb:3:4' => 2, 'ship6a.rb:4:4' => 2,
+      'ship6a.rb:6:18' => 1
+    }
+    assert_equal expected, reached
+    assert_output('', '') { exit_report.call }
+  end
+
+  test '6rTS6b', %w(
+  | Example: ship, a write, a return if empty, then a value,
+  | measured within methods, called once with a full order
+  | Its card in the HTML report shows each row's taken, and
+  | its JSON report holds each statement's reaches.
+  | The write and the value were reached, so each has its 1
+  | path taken; the if's then never ran, so it has 1 of 2.
+  ) do
+    dir = Dir.mktmpdir('6rTS6b')
+    File.write("#{dir}/ship6b.rb", <<~RUBY)
+      module Ship6rTS6b
+        def self.ship(order)
+          box = order * 2
+          return 0 if box.zero?
+          box
+        end
+      end
+    RUBY
+    exit_report = nil
+    on_exit = ->(&block) { exit_report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+      measure :decisions, :methods
+      report :html
+    end
+    require "#{dir}/ship6b.rb"
+    Ship6rTS6b.ship(3)
+    exit_report.call
+    page = File.read("#{dir}/files/ship6b.rb.html")
+    expected = [
+      %w(ship 3), %w(line:col taken),
+      %w(3:04 1), %w(4:13 1), %w(5:04 1)
+    ]
+    assert_equal expected, card_taken(page, 2)
+    json = JSON.parse(File.read("#{dir}/path_coverage.json"))
+    reached = json['reached'].select { _1.start_with?('ship6b.rb:') }
+    expected = { 'ship6b.rb:3:4' => 1, 'ship6b.rb:5:4' => 1 }
+    assert_equal expected, reached
+  end
+
+  test '6rTS6c', %w(
+  | Example: label, a ternary whose then arm is an && chain,
+  | and mark, an if whose then arm holds only a comment
+  | Each arm's row in its tree is located in the source,
+  | data-at, but the empty then arm, as it has no code.
+  | The && in label's then arm is located too, its operands
+  | with it.
+  ) do
+    dir = Dir.mktmpdir('6rTS6c')
+    File.write("#{dir}/label6c.rb", <<~RUBY)
+      module Label6rTS6c
+        def self.label(sale, cheap)
+          sale ? (cheap && 'bargain') : 'full price'
+        end
+
+        def self.mark(ok)
+          if ok
+            # nothing to mark
+          else
+            'unmarked'
+          end
+        end
+      end
+    RUBY
+    exit_report = nil
+    on_exit = ->(&block) { exit_report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+      report :html
+    end
+    require "#{dir}/label6c.rb"
+    Label6rTS6c.label(true, true)
+    Label6rTS6c.mark(false)
+    exit_report.call
+    page = REXML::Document.new(File.read("#{dir}/files/label6c.rb.html"))
+    located = lambda do |tree, kind|
+      rows = page.elements.to_a("//*[@id='#{tree}']//*[@#{kind}]")
+      rows.map { !_1.attributes['data-at'].nil? }
+    end
+    assert_equal [true, true], located.call('tree-3', 'data-arm')
+    assert_equal [true] * 3, located.call('tree-3', 'data-operand')
+    assert_equal [false, true], located.call('tree-7', 'data-arm')
+  end
+
+  private
+
+  # [label, last cell's text] of each row of the statement card
+  # of the def at line first in page.
+  def card_taken(page, first)
+    card = page[%r{id="paths-#{first}".*?</div></div>}]
+    card.scan(%r{<div class="prow[^>]*>(.*?)</div>}).map do |(row)|
+      texts = row.scan(%r{<span[^>]*>([^<]*)</span>}).flatten
+      [texts.first, texts.last]
+    end
   end
 end

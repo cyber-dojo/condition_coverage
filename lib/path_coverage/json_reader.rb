@@ -17,18 +17,28 @@ module PathCoverage
       Merge.operands(paths.map { |path| read(path, fingerprint) })
     end
 
-    # The method paths of the JSON reports at paths, merged.
-    def self.method_paths(paths)
-      merged(paths, 'method_paths')
-    end
-
     # The paths taken of the JSON reports at paths, as
     # Render.run takes them: site_paths:, each site's possible
-    # paths, and outside:, those a treatment rules out, each
-    # merged.
+    # paths, outside:, those a treatment rules out, and reached:,
+    # each statement's reaches, each merged.
     def self.taken(paths)
       site_paths = Merge.paths(paths.map { |path| paths_of(path) })
-      { site_paths:, outside: merged(paths, 'outside') }
+      outside = merged(paths, 'outside')
+      { site_paths:, outside:, reached: reached(paths) }
+    end
+
+    # Example: { "k.rb:2:2" => 2 } and { "k.rb:2:2" => 1 } give
+    # { "k.rb:2:2" => 3 }.
+    # The reaches of the JSON reports at paths, each statement's
+    # summed; nil when none has any, eg from runs that did not
+    # measure methods, so a render cannot say what was reached.
+    def self.reached(paths)
+      runs = paths.filter_map do |path|
+        JSON.parse(File.read(path))['reached']
+      end
+      return nil if runs.empty?
+
+      runs.reduce { |all, run| all.merge(run) { |_, a, b| a + b } }
     end
 
     # Raises unless json, the JSON report at path, measured the
@@ -46,14 +56,12 @@ module PathCoverage
     # The key lists of the JSON reports at paths, as listed_of
     # gives them, each path's count the sum of every report's.
     def self.merged(paths, key)
-      Merge.method_paths(paths.map { |path| listed_of(path, key) })
+      Merge.listed(paths.map { |path| listed_of(path, key) })
     end
 
-    # The JSON report at path's list under key, eg its method
-    # paths as the recorder counts them, { site => { path =>
-    # count } }; none for a report that has none, eg from a run
-    # that did not measure methods, so the render claims no
-    # path taken.
+    # The JSON report at path's list under key, eg its paths a
+    # treatment rules out, { site => { path => count } }; none
+    # for a report that has none, so the render claims none.
     def self.listed_of(path, key)
       json = JSON.parse(File.read(path))
       json.fetch(key, {}).transform_values do |taken|

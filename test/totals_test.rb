@@ -1,5 +1,4 @@
 require_relative 'test_helper'
-require 'path_coverage/path_manifest'
 require 'path_coverage/totals'
 
 class TotalsTest < Id58TestBase
@@ -25,46 +24,22 @@ class TotalsTest < Id58TestBase
   end
 
   test 'Tq7m20', %w(
-  | Example: fee with two ifs, called with true then false only
-  | Its two decisions have 4 paths together, of which 1 was taken.
-  | The methods total is [taken, possible] over every method.
-  | So it is [1, 4].
-  | It counts the same paths the method gap lines list.
+  | Example: fee, its card 4 of its 6 paths taken, and price,
+  | 17 of its 21
+  | The methods total is [taken, possible] over every method's
+  | card, its size its possible paths.
+  | So it is [21, 27].
   ) do
-    decisions = [4, 7].map do |line|
-      PathCoverage::Decision.new(
-        line:, range: 0...1, command: false, exits: nil
-      )
-    end
-    fee = PathCoverage::PathMethod.new(
-      name: :fee, entry: 0, decisions:
-    )
-    methods = { 'source/fee.rb:2:2' => fee }
-    paths = { 'source/fee.rb:2:2' => { [true, false] => 1 } }
-    assert_equal [1, 4], PathCoverage::Totals.methods(methods, paths)
+    cards = {
+      'source/fee.rb:2:2' => [4, 6], 'source/shop.rb:18:2' => [17, 21]
+    }
+    assert_equal [21, 27], PathCoverage::Totals.methods(cards)
   end
 
   test 'Tq7m30', %w(
-  | Example: fee with two ifs, called with true true, true false,
-  | false true and false false
-  | Every one of its 4 paths was taken.
-  | So the methods total is [4, 4].
+  | Example: a file with no def
+  | It has no cards, so its methods total is [0, 0].
   ) do
-    decisions = [4, 7].map do |line|
-      PathCoverage::Decision.new(
-        line:, range: 0...1, command: false, exits: nil
-      )
-    end
-    fee = PathCoverage::PathMethod.new(
-      name: :fee, entry: 0, decisions:
-    )
-    methods = { 'source/fee.rb:2:2' => fee }
-    paths = {
-      'source/fee.rb:2:2' => {
-        [true, true] => 1, [true, false] => 2,
-        [false, true] => 1, [false, false] => 3
-      }
-    }
-    assert_equal [4, 4], PathCoverage::Totals.methods(methods, paths)
+    assert_equal [0, 0], PathCoverage::Totals.methods({})
   end
 end

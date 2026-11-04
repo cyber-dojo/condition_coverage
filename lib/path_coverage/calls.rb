@@ -91,16 +91,9 @@ module PathCoverage
     @recorder.chained(site, index, first, value)
   end
 
-  # The call rewritten code makes as a call reaches its
-  # method's first decision; returns the call's new path.
-  def self.path(site, size)
-    @recorder.path(site, size)
-  end
-
-  # The call rewritten code makes around each decision's
-  # predicate, with exits for one whose arm leaves the method;
-  # returns value unchanged.
-  def self.decide(path, index, value, exits = nil)
-    @recorder.decide(path, index, value, exits)
+  # The call rewritten code makes before each statement that is
+  # no site, counting its run.
+  def self.reach(name)
+    @recorder.reach(name)
   end
 end

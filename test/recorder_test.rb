@@ -32,53 +32,6 @@ class RecorderTest < Id58TestBase
     assert_equal expected, recorder.counts
   end
 
-  test '8TuB30', %w(
-  | each call's path, the outcomes of its method's decisions
-  | in order, is counted when its last decision is made,
-  | keyed by the method's site; deciding returns the
-  | predicate's value unchanged
-  ) do
-    recorder = PathCoverage::Recorder.new
-    site = 'k.rb:1:0'
-    # fee(user, order), called three times
-    calls = [[:gold, false], [false, :big], [:gold, false]]
-    calls.each do |member, big|
-      path = recorder.path(site, 2)
-      assert_same member, recorder.decide(path, 0, member)
-      assert_same big, recorder.decide(path, 1, big)
-    end
-    expected = { site => { [true, false] => 2, [false, true] => 1 } }
-    assert_equal expected, recorder.paths
-  end
-
-  test '8TuB31', %w(
-  | a call that leaves before its last decision, by return
-  | or raise, counts no path, so no path is ever claimed
-  | as seen that was not taken all the way through
-  ) do
-    recorder = PathCoverage::Recorder.new
-    path = recorder.path('k.rb:1:0', 2)
-    recorder.decide(path, 0, true)
-    assert_equal({}, recorder.paths)
-  end
-
-  test '8TuB32', %w(
-  | a decision taking the outcome whose arm always leaves
-  | the method counts its path there, cut short, as the
-  | call makes no more decisions
-  ) do
-    recorder = PathCoverage::Recorder.new
-    site = 'k.rb:1:0'
-    # fork(id), whose first decision fails when id has no group
-    path = recorder.path(site, 2)
-    recorder.decide(path, 0, :no_group, true)
-    path = recorder.path(site, 2)
-    recorder.decide(path, 0, false, true)
-    recorder.decide(path, 1, :odd)
-    expected = { site => { [true] => 1, [false, true] => 1 } }
-    assert_equal expected, recorder.paths
-  end
-
   test '8TuB50', %w(
   | each evaluation of a site, entered before its first leaf
   | and left after its last, counts its path: the outcome of
@@ -338,6 +291,52 @@ class RecorderTest < Id58TestBase
     assert_same user, noted
     recorder.leave(trail, 'kim')
     assert_equal({ site => { [nil] => 1 } }, recorder.site_paths)
+    assert_equal({ truthy: 1, falsy: 0 }, recorder.counts[[site, 0]])
+  end
+
+  test '8TuB70', %w(
+  | Example: a write reached twice, a value once
+  | Each reach of a statement is counted, by its name.
+  | A statement never reached has no count.
+  ) do
+    recorder = PathCoverage::Recorder.new
+    recorder.reach('k.rb:2:2')
+    recorder.reach('k.rb:3:2')
+    recorder.reach('k.rb:2:2')
+    expected = { 'k.rb:2:2' => 2, 'k.rb:3:2' => 1 }
+    assert_equal expected, recorder.reached
+  end
+
+  test '8TuB71', %w(
+  | Example: ok && ids.any? { |id| id.odd? }, the any? begun in
+  | another fiber than its site was entered in, then ended
+  | There is no trail its items were begun on.
+  | So its receiver is counted as called, truthy.
+  | Its value is returned unchanged.
+  ) do
+    recorder = PathCoverage::Recorder.new
+    site = 'k.rb:2:4'
+    trail = recorder.enter(site, 3)
+    begun = Fiber.new { recorder.begin_items(site, 1) }.resume
+    ended = recorder.end_items(site, 1, begun, true)
+    recorder.leave(trail, ended)
+    assert_equal true, ended
+    assert_equal({ truthy: 1, falsy: 0 }, recorder.counts[[site, 1]])
+  end
+
+  test '8TuB72', %w(
+  | Example: @port ||= 8080 settled in a fiber where its site
+  | was never entered
+  | There is no trail to have noted its target's outcome.
+  | So the outcome skipped is noted, here truthy, as @port
+  | was already set.
+  | The write's value is returned unchanged.
+  ) do
+    recorder = PathCoverage::Recorder.new
+    site = 'k.rb:3:4'
+    settling = Fiber.new { recorder.settle(site, 0, true, 8080) }
+    settled = settling.resume
+    assert_equal 8080, settled
     assert_equal({ truthy: 1, falsy: 0 }, recorder.counts[[site, 0]])
   end
 end

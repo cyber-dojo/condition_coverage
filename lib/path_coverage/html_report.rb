@@ -1,51 +1,59 @@
 require 'fileutils'
 require_relative 'html_file'
 require_relative 'html_index'
-require_relative 'html_paths'
+require_relative 'html_statements'
 require_relative 'html_syntax'
-require_relative 'path_manifest'
+require_relative 'method_statements'
 require_relative 'site_tree'
 require_relative 'source_lines'
 require_relative 'summary'
+require_relative 'within_methods'
 
 module PathCoverage
   # The :html reporter: index.html, and files/<path>.html for
   # each covered file, written to the configuration's
   # output_dir.
   module HtmlReport
-    # Writes every page. operands and site_paths are as Result
-    # gives them, site_paths holding every site in files; files
-    # is { full path => {source:, sites:} } for each covered
-    # file, as the kernel parsed it. The files dir is emptied
-    # first, so it holds no page for a file no longer covered.
-    def self.write(operands, files, config, paths = nil, site_paths:)
+    # Writes every page. recorded is [site_paths, reached]:
+    # site_paths, like operands, as Result gives them, holding
+    # every site in files; reached as Recorder#reached gives it,
+    # nil when not known. files is { full path => {source:,
+    # sites:} } for each covered file, as the kernel parsed it.
+    # The files dir is emptied first, so it holds no page for a
+    # file no longer covered.
+    def self.write(operands, files, config, recorded)
+      site_paths, reached = recorded
       dir = config.output_dir
       FileUtils.rm_rf("#{dir}/files")
-      index = index(files, config, paths, site_paths)
+      cards = WithinMethods.cards(files, config, site_paths, reached)
+      index = index(config, site_paths, cards)
       File.write("#{dir}/index.html", index)
+      write_pages(operands, files, config, recorded)
+    end
+
+    # Writes each covered file's page, recorded as write has it,
+    # with its methods' cards when config measures methods.
+    def self.write_pages(operands, files, config, recorded)
+      measured = config.measures.include?(:methods)
       files.each do |full_path, parsed|
         path = config.relative(full_path)
-        out = "#{dir}/files/#{path}.html"
         # simplecov:disable
-        grids = paths ? path_grids(path, parsed, paths) : nil
+        grids = measured ? cards(path, parsed, recorded) : nil
         # simplecov:enable
-        write_page(out, path, parsed, [operands, site_paths], grids)
+        out = "#{config.output_dir}/files/#{path}.html"
+        write_page(out, path, parsed, [operands, recorded[0]], grids)
       end
     end
 
     # The index page: a row per file of its totals within each
-    # decision, and, when paths are given, as they are when
-    # methods are measured, within each method too;
-    # then their Total row. With groups configured, each group,
-    # and the files in none, get a tab of their own too. Any
-    # operators config ignored are named after them.
-    def self.index(files, config, paths, site_paths)
-      methods = files.map do |full_path, parsed|
-        path = config.relative(full_path)
-        PathManifest.methods(parsed[:source], path)
-      end
-      all = methods.reduce({}, :merge)
-      rows = Summary.files(site_paths, all, paths)
+    # decision, and, when cards are given, as they are when
+    # methods are measured, within each method too, its defs'
+    # cards added up; then their Total row. With groups
+    # configured, each group, and the files in none, get a tab
+    # of their own too. Any operators config ignored are named
+    # after them.
+    def self.index(config, site_paths, cards)
+      rows = Summary.files(site_paths, cards)
       groups = config.groups
       tabs = groups.empty? ? [] : Summary.groups(rows, groups)
       ignored = config.ignored
@@ -53,11 +61,18 @@ module PathCoverage
     end
 
     # simplecov:disable
-    # SPIKE: the hidden path grids of one file's methods.
-    def self.path_grids(path, parsed, paths)
+    # SPIKE: the hidden statement cards of one file's methods,
+    # site_paths as Result#paths gives them, reached as
+    # Recorder#reached does.
+    def self.cards(path, parsed, (site_paths, reached))
       source = parsed[:source]
-      methods = PathManifest.methods(source, path)
-      HtmlPaths.grids(source, methods, paths)
+      names = MethodStatements.names(source, path)
+      lasts = MethodStatements.lasts(source, path)
+      MethodStatements.of(source, path).map do |site, rows|
+        taken = MethodStatements.taken(rows, site_paths, reached)
+        last = lasts[site]
+        HtmlStatements.card(site, names[site], rows, taken, last)
+      end.join("\n")
     end
     # simplecov:enable
 

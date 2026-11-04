@@ -1,5 +1,3 @@
-require_relative 'path_gaps'
-
 module PathCoverage
   # The two coverage totals, each [taken, possible] paths over
   # every covered file. They count the very paths the gap
@@ -13,16 +11,12 @@ module PathCoverage
       [every.count { |each| each[:count].positive? }, every.size]
     end
 
-    # Paths within each method, through its decisions: methods, as
-    # PathManifest.methods gives them, each with every path
-    # through its decisions; paths, as the recorder counts
-    # them, holds the ones taken.
-    def self.methods(methods, paths)
-      methods.reduce([0, 0]) do |(taken, possible), (site, method)|
-        every = PathGaps.possible(method.decisions)
-        seen = paths.fetch(site, {})
-        [taken + every.count { |path| seen.key?(path) },
-         possible + every.size]
+    # Example: cards [4, 6] and [17, 21] give [21, 27].
+    # Paths within each method: cards is { def site => [taken,
+    # size] }, each method's card's paths taken of its size.
+    def self.methods(cards)
+      cards.values.reduce([0, 0]) do |(taken, possible), (more, of)|
+        [taken + more, possible + of]
       end
     end
   end

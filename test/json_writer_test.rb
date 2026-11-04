@@ -43,4 +43,22 @@ class JsonWriterTest < Id58TestBase
     actual = JSON.parse(File.read(path))
     assert_equal ['&&='], actual['ignored']
   end
+
+  test 'wdt912', %w(
+  | Example: a run measuring methods, its write reached twice,
+  | then one that reached nothing
+  | Each statement's reaches are written under "reached".
+  | One that reached nothing still writes it, empty, so a
+  | render knows its statements were never reached.
+  ) do
+    sites = { 'k.rb:2:2' => condition('&&', 16...23, 27...35) }
+    operands = PathCoverage::Result.new(sites, {}).operands
+    dir = Dir.mktmpdir('wdt912')
+    written = [{ 'k.rb:3:4' => 2 }, {}].map.with_index do |reached, i|
+      path = "#{dir}/#{i}.json"
+      PathCoverage::JsonWriter.write(operands, path, reached:)
+      JSON.parse(File.read(path))['reached']
+    end
+    assert_equal [{ 'k.rb:3:4' => 2 }, {}], written
+  end
 end

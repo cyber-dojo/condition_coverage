@@ -50,8 +50,10 @@ module PathCoverage
       # matched holds the cells of each when before it, and a
       # when's own are added.
       def self.arm_node(source, arm, matched, (outcomes, leaves))
-        body = arm.body &&
-               SiteTree.node(source, arm.body, outcomes, leaves)
+        condition = arm.body
+        body = if condition
+                 SiteTree.node(source, condition, outcomes, leaves)
+               end
         matched << body[:cells].map { |cell| cell == true } if body
         cells = body ? matched.last : unmatched(matched, outcomes)
         text = SiteTree.text_of(source, arm)

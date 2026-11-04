@@ -6,11 +6,9 @@ module PathCoverage
   # other reporter can read back.
   module JsonWriter
     # Writes operands, as Result gives them, paths, as
-    # PathsReport gives them, totals, as Kernel.totals gives
-    # them, and method_paths, as the recorder counts them, to
-    # path as {"sites": {site: [counts, ...]}, "paths":
-    # {site: {leaves:, taken:}}, "method_paths": {site:
-    # [{path:, count:}, ...]}, "totals": {"decisions": [taken,
+    # PathsReport gives them, and totals, as Kernel.totals gives
+    # them, to path as {"sites": {site: [counts, ...]}, "paths":
+    # {site: {leaves:, taken:}}, "totals": {"decisions": [taken,
     # possible]}}.
     # parts are json's.
     def self.write(operands, path, paths = {}, **parts)
@@ -18,19 +16,22 @@ module PathCoverage
     end
 
     # The keys of parts listed as { site => [{path:, count:}] }:
-    # each method's paths taken, and each path taken that a
-    # treatment rules out, as Result#outside gives them.
-    LISTED = %i[method_paths outside].freeze
+    # each path taken that a treatment rules out, as
+    # Result#outside gives them.
+    LISTED = %i[outside].freeze
 
-    # operands, and any paths, and parts' method_paths:,
-    # outside: and totals:, as the JSON report's text, with
+    # operands, and any paths, and parts' outside: and totals:,
+    # as the JSON report's text, with
     # parts' fingerprint:, as Configuration#fingerprint gives
-    # it, and the names of the kinds measured.
+    # it, the names of the kinds measured, and parts' reached:,
+    # as Recorder#reached gives it, even empty, as a run that
+    # reached no statement says so; none when not given.
     def self.json(operands, paths = {}, **parts)
       fingerprint = parts.fetch(:fingerprint, {})
       report = { 'sites' => operands, **fingerprint }
       report['paths'] = paths unless paths.empty?
       report.merge!(lists(parts))
+      report['reached'] = parts[:reached] if parts.key?(:reached)
       totals = parts.fetch(:totals, {})
       report['totals'] = totals unless totals.empty?
       report['kinds'] = Kinds.names

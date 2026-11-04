@@ -7,19 +7,33 @@ module PathCoverage
   # outcome when the code runs. It inserts text at the byte
   # ranges the manifest found, and never parses.
   module Rewriter
-    PATH_NAME = '__path_coverage_path'.freeze
-
     # Returns source with each operand in sites wrapped in a
     # record call, each site as a whole in a leave call that
-    # enters it first, and each method in methods starting a
-    # path that its decisions are wrapped in decide calls to add
-    # to. Only text is inserted, never a newline, so backtrace
-    # line numbers still match the file on disk.
-    def self.rewrite(source, sites, methods = {})
+    # enters it first, and each statement in reaches, { name =>
+    # offset }, after a reach call that counts its runs. Only
+    # text is inserted, never a newline, so backtrace line
+    # numbers still match the file on disk.
+    def self.rewrite(source, sites, reaches = {})
       inserts = sites.flat_map do |site, condition|
         site_inserts(site, condition)
       end
-      apply(source.dup, inserts + path_inserts(methods))
+      apply(source.dup, inserts + reach_inserts(reaches))
+    end
+
+    # Example: { "k.rb:2:2" => 18 } puts a reach call at 18.
+    # The inserts that put a reach call, a statement of its
+    # own, before each statement in reaches, outside all else
+    # there. A statement reached by
+    # its byte range, eg an endless def's body, is wrapped in
+    # parentheses with its call, being one expression.
+    def self.reach_inserts(reaches)
+      rank = [Float::INFINITY, LAYERS.index(:reach)]
+      reaches.flat_map do |name, at|
+        call = "PathCoverage.reach(#{name.inspect}); "
+        next [[at, call, rank]] unless at.is_a?(Range)
+
+        [[at.begin, "(#{call}", rank], [at.end, ')', rank, :close]]
+      end
     end
 
     # The inserts for one site, as its kind gives them, eg its
@@ -69,53 +83,21 @@ module PathCoverage
       "PathCoverage.record(#{site.inspect}, #{index}, "
     end
 
-    # The inserts that start each method's path at its entry,
-    # outermost of all there, and wrap each of its decisions'
-    # predicates in a decide call, outside any record or
-    # outcome call.
-    def self.path_inserts(methods)
-      methods.flat_map do |site, method|
-        decisions = method.decisions
-        decides = decisions.each_with_index.flat_map do |decision, i|
-          call = "PathCoverage.decide(#{PATH_NAME}, #{i}, "
-          tail = decision.exits.nil? ? '' : ", #{decision.exits}"
-          command = decision.command
-          wrap(call, decision.range, command, :decision, tail)
-        end
-        [start_insert(site, method)] + decides
-      end
-    end
-
-    # The insert at method's entry that starts a call's path,
-    # outermost of all there.
-    def self.start_insert(site, method)
-      start = path_start(site, method.decisions.size)
-      [method.entry, start, [Float::INFINITY, LAYERS.index(:path)]]
-    end
-
-    # The statement that starts a call's path through the
-    # method at site, which has size decisions.
-    def self.path_start(site, size)
-      call = "PathCoverage.path(#{site.inspect}, #{size})"
-      "#{PATH_NAME} = #{call}; "
-    end
-
     # The layers of inserts, innermost first, that break a tie
     # between inserts wrapping the same range: a leaf's call, a
     # nested kind's call around its whole, eg end_items, a site's
-    # leave, a method's decide, and a method's path start.
-    LAYERS = %i[leaf kind site decision path].freeze
+    # leave, and a statement's reach.
+    LAYERS = %i[leaf kind site reach].freeze
 
-    # The two inserts that wrap the code at range in call, with
-    # tail as the call's further arguments. Their order, [size,
-    # rank], nests them among inserts at the same offset: the
-    # longer range outside, the rank of layer in LAYERS breaking
-    # a tie. A command call is parenthesised, as it is no bare
-    # argument; nothing else is, since parentheses make a
-    # statement, which gives its line a line-coverage count of
-    # its own.
-    def self.wrap(call, range, command, layer, tail = '')
-      open, close = command ? ['(', ")#{tail})"] : ['', "#{tail})"]
+    # The two inserts that wrap the code at range in call. Their
+    # order, [size, rank], nests them among inserts at the same
+    # offset: the longer range outside, the rank of layer in
+    # LAYERS breaking a tie. A command call is parenthesised, as
+    # it is no bare argument; nothing else is, since parentheses
+    # make a statement, which gives its line a line-coverage
+    # count of its own.
+    def self.wrap(call, range, command, layer)
+      open, close = command ? ['(', '))'] : ['', ')']
       order = [range.size, LAYERS.index(layer)]
       [
         [range.begin, call + open, order],
@@ -129,10 +111,9 @@ module PathCoverage
     # offset lands before text already there, so at one offset
     # opening inserts go in lowest order first, leaving the
     # highest outermost, then closing ones highest order first,
-    # so the innermost call closes first and each tail stays
-    # with its own call. Eg a ternary that is a method's
-    # decision is a site too: its leave, wrapping the whole
-    # ternary, opens outside the decide wrapping its predicate.
+    # so the innermost call closes first. Eg a ternary whose
+    # predicate is a leaf: the site's leave, wrapping the whole
+    # ternary, opens outside the record wrapping its predicate.
     def self.apply(source, inserts)
       sorted = inserts.sort_by do |offset, _, order, close|
         size, rank = order

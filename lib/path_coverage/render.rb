@@ -6,21 +6,24 @@ require_relative 'manifest'
 require_relative 'paths_report'
 require_relative 'post'
 require_relative 'site_paths'
+require_relative 'within_methods'
 
 module PathCoverage
   # The reporters, run from operands alone: needing nothing the
   # run recorded beyond them, they can run in another process.
   module Render
     # Runs each reporter chosen in config. operands, and taken's
-    # site_paths: and outside:, are as Result gives them; files
-    # is { full path => {source:, sites:} } for each covered file.
-    def self.run(operands, files, config, paths = nil, **taken)
+    # site_paths: and outside:, are as Result gives them, and its
+    # reached: as Recorder#reached gives it; files is
+    # { full path => {source:, sites:} } for each covered file.
+    def self.run(operands, files, config, **taken)
       site_paths = every_site(taken.fetch(:site_paths, {}), files)
       reporters = config.reporters
       if reporters.include?(:gaps)
         gaps(operands, files, site_paths, taken.fetch(:outside, {}))
       end
-      html_and_summary(operands, files, config, [paths, site_paths])
+      html_and_summary(operands, files, config,
+                       [site_paths, taken[:reached]])
       return unless reporters.include?(:post)
 
       post(operands, files, config, site_paths)
@@ -36,29 +39,25 @@ module PathCoverage
     end
 
     # Runs the :html and :summary reporters, each when chosen.
-    def self.html_and_summary(operands, files, config, paths_pair)
-      paths, site_paths = paths_pair
+    def self.html_and_summary(operands, files, config, recorded)
+      site_paths, reached = recorded
       reporters = config.reporters
       if reporters.include?(:html)
-        HtmlReport.write(operands, files, config, paths, site_paths:)
+        HtmlReport.write(operands, files, config, recorded)
       end
       return unless reporters.include?(:summary)
 
-      summary(files, config, paths, site_paths)
+      cards = WithinMethods.cards(files, config, site_paths, reached)
+      summary(config, site_paths, cards)
     end
 
     # Prints the summary lines: the paths taken of all possible
-    # within decisions, and, when paths are given, as they are
+    # within decisions, and, when cards are given, as they are
     # when methods are measured, within methods; then any
     # operators ignored.
-    def self.summary(files, config, paths, site_paths)
-      methods = files.map do |full_path, parsed|
-        path = config.relative(full_path)
-        PathManifest.methods(parsed[:source], path)
-      end
-      all = methods.reduce({}, :merge)
+    def self.summary(config, site_paths, cards)
       groups = config.groups
-      puts ConsoleSummary.lines(site_paths, all, paths, groups) +
+      puts ConsoleSummary.lines(site_paths, cards, groups) +
            ConsoleSummary.ignored_lines(config.ignored)
     end
 
@@ -88,17 +87,15 @@ module PathCoverage
     end
 
     # Runs the reporters chosen in config from the JSON reports
-    # at paths, their counts merged, parsing each covered file
-    # afresh; with methods measured, the method paths they hold
-    # too. paths is config.json_path alone by default.
+    # at paths, their counts and reaches merged, parsing each
+    # covered file afresh. paths is config.json_path alone by
+    # default.
     def self.from_json(config, paths = [config.json_path])
       operands = JsonReader.operands(paths, config.fingerprint)
       files = config.files.to_h do |path|
         [path, Manifest.parse(path, config)]
       end
-      methods = config.measures.include?(:methods)
-      taken = methods ? JsonReader.method_paths(paths) : nil
-      run(operands, files, config, taken, **JsonReader.taken(paths))
+      run(operands, files, config, **JsonReader.taken(paths))
     end
   end
 end

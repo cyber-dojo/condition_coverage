@@ -4,13 +4,12 @@ require_relative 'configuration'
 require_relative 'console_summary'
 require_relative 'json_writer'
 require_relative 'manifest'
-require_relative 'path_gaps'
-require_relative 'path_manifest'
 require_relative 'paths_report'
 require_relative 'recorder'
 require_relative 'render'
 require_relative 'result'
 require_relative 'rewriter'
+require_relative 'within_methods'
 
 # Path coverage for Ruby. This file is the kernel: it loads
 # before any covered file and is never itself instrumented, since
@@ -90,43 +89,26 @@ module PathCoverage
     return unless config.covers?(path)
 
     parsed = @parsed[path] = Manifest.parse(path, config)
-    methods = path_methods(path, parsed[:source], config)
-    sites = parsed[:sites]
-    rewritten = Rewriter.rewrite(parsed[:source], sites, methods)
+    source = parsed[:source]
+    reaches = WithinMethods.reaches(path, source, config)
+    rewritten = Rewriter.rewrite(source, parsed[:sites], reaches)
     RubyVM::InstructionSequence.compile(rewritten, path, path)
   end
 
-  # The methods of the covered file at path whose paths are
-  # counted, none unless config measures methods.
-  def self.path_methods(path, source, config)
-    return {} unless config.measures.include?(:methods)
-
-    PathManifest.methods(source, config.relative(path))
+  # The statements' reaches recorded, as Recorder#reached gives
+  # them, when config measures methods; nil when not.
+  def self.reached(config)
+    @recorder.reached if config.measures.include?(:methods)
   end
 
   # Writes the JSON report, then runs the chosen reporters, for
   # every covered file whether or not the run loaded it, into
-  # coverage_dir, created first if need be. The paths never
-  # taken follow the condition gaps.
+  # coverage_dir, created first if need be.
   def self.report(config)
     files = parsed_files(config)
     result = collect(files, config)
-    methods = config.measures.include?(:methods)
-    paths = methods ? @recorder.paths : nil
-    Render.run(result.operands, files, config, paths, **result.taken)
-    return unless config.reporters.include?(:gaps)
-
-    methods = path_methods_of(files, config)
-    PathGaps.lines(methods, @recorder.paths).each { |line| puts line }
-  end
-
-  # The methods whose paths are counted of every covered file,
-  # in one manifest.
-  def self.path_methods_of(files, config)
-    all = files.map do |path, parsed|
-      path_methods(path, parsed[:source], config)
-    end
-    all.reduce({}, :merge)
+    Render.run(result.operands, files, config,
+               **result.taken, reached: reached(config))
   end
 
   # The Result of every covered file, with the counts and site
@@ -142,16 +124,19 @@ module PathCoverage
 
   # Writes result as the JSON report at config's json_path: its
   # operands, site paths, paths a treatment rules out, and
-  # totals, and the method paths the recorder counted, so a
-  # render from the JSON alone has them, and config's
-  # fingerprint.
+  # totals, and, when config measures methods, the statements
+  # the recorder reached, so a render from the JSON alone has
+  # them, and config's fingerprint.
   def self.write_json(result, files, config)
     report = PathsReport.of(result.paths, files)
-    totals = totals(result, files, config)
-    JsonWriter.write(result.operands, config.json_path, report,
-                     totals:, method_paths: @recorder.paths,
-                     outside: result.outside,
-                     fingerprint: config.fingerprint)
+    parts = {
+      totals: totals(result, files, config), outside: result.outside,
+      fingerprint: config.fingerprint
+    }
+    reached = reached(config)
+    parts[:reached] = reached if reached
+    path = config.json_path
+    JsonWriter.write(result.operands, path, report, **parts)
   end
 
   # The JSON report's totals, each [taken, possible] paths:
@@ -159,15 +144,13 @@ module PathCoverage
   # within each method too; with groups configured, each group's
   # own too, under groups.
   def self.totals(result, files, config)
-    measured = config.measures.include?(:methods)
-    methods = measured ? path_methods_of(files, config) : {}
-    paths = measured ? @recorder.paths : nil
-    totals = ConsoleSummary.totals(result.paths, methods, paths)
+    reached = reached(config)
+    cards = WithinMethods.cards(files, config, result.paths, reached)
+    totals = ConsoleSummary.totals(result.paths, cards)
     groups = config.groups
     return totals if groups.empty?
 
-    summary = ConsoleSummary
-    own = summary.group_totals(result.paths, methods, paths, groups)
+    own = ConsoleSummary.group_totals(result.paths, cards, groups)
     totals.merge('groups' => own)
   end
 

@@ -12,27 +12,30 @@ module PathCoverage
     include RecorderChains
     include RecorderWrites
 
-    # One call's way through its method: the outcome of each
-    # decision made so far, of the number of decisions its
-    # method has.
-    Path = Struct.new(:site, :decisions, :outcomes)
-
     # One evaluation's way through its site: the outcome of
     # each leaf, nil for one not yet, or never, reached.
     Trail = Struct.new(:site, :outcomes)
 
-    # Starts with no outcomes, paths or site paths counted.
+    # Starts with no outcomes, site paths or reaches counted.
     def initialize
       @counts = Hash.new do |counts, key|
         counts[key] = { truthy: 0, falsy: 0 }
       end
-      @paths = Hash.new do |paths, site|
-        paths[site] = Hash.new(0)
-      end
       @site_paths = Hash.new do |site_paths, site|
         site_paths[site] = Hash.new(0)
       end
+      @reached = Hash.new(0)
       @trails_key = :"path_coverage_trails_#{object_id}"
+    end
+
+    # { name => runs } of each statement reached so far, by its
+    # name, eg { "k.rb:2:2" => 2 }; none never reached.
+    attr_reader :reached
+
+    # Counts a run of the statement named name.
+    def reach(name)
+      @reached[name] += 1
+      nil
     end
 
     # The stack of site's evaluations under way in the current
@@ -67,28 +70,6 @@ module PathCoverage
       clean = stack.last.equal?(trail)
       nil until stack.empty? || stack.pop.equal?(trail)
       @site_paths[trail.site][trail.outcomes] += 1 if clean
-      value
-    end
-
-    # { method site => { [outcome, ...] => calls } } for every
-    # path taken all the way through so far.
-    attr_reader :paths
-
-    # A new call's path through the method at site, which has
-    # size decisions.
-    def path(site, size)
-      Path.new(site, size, [])
-    end
-
-    # Notes value's outcome as path's index-th decision, counts
-    # path once that is its last, or once it is exits, the
-    # outcome whose arm leaves the method, and returns value
-    # unchanged.
-    def decide(path, index, value, exits = nil)
-      outcome = value ? true : false
-      path.outcomes[index] = outcome
-      last = index == path.decisions - 1 || outcome == exits
-      @paths[path.site][path.outcomes] += 1 if last
       value
     end
 

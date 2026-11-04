@@ -1,5 +1,4 @@
 require_relative 'test_helper'
-require 'path_coverage/path_manifest'
 require 'path_coverage/rewriter'
 
 class RewriterTest < Id58TestBase
@@ -296,154 +295,6 @@ class RewriterTest < Id58TestBase
     assert_equal expected, rewriter.rewrite(source, sites)
   end
 
-  test '6D1Ke3', %w(
-  | Example: if rates.empty? return end
-  | The predicate is wrapped in a record, a leave, and a
-  | decide call.
-  | All three close at the same offset, after rates.empty?
-  | They close innermost first.
-  | So the decide call's last argument (true) stays its own.
-  ) do
-    source = <<~RUBY
-      def fee(rates)
-        if rates.empty?
-          return
-        end
-        1
-      end
-    RUBY
-    choice = condition(
-      'if', 20...32, arm(:then, 37...43), extent: 17...32
-    )
-    sites = { 'k.rb:2:2' => choice }
-    methods = {
-      'k.rb:1:0' => PathCoverage::PathMethod.new(
-        name: :fee,
-        entry: 17,
-        decisions: [
-          PathCoverage::Decision.new(
-            line: 2, range: 20...32, command: false, exits: true
-          )
-        ]
-      )
-    }
-    expected = [
-      'def fee(rates)',
-      '  __path_coverage_path = ' \
-      'PathCoverage.path("k.rb:1:0", 1); ' \
-      'if PathCoverage.decide(__path_coverage_path, 0, ' \
-      'PathCoverage.leave(' \
-      'PathCoverage.enter("k.rb:2:2", 1), ' \
-      'PathCoverage.record("k.rb:2:2", 0, rates.empty?)), true)',
-      '    return',
-      '  end',
-      '  1',
-      'end',
-      ''
-    ].join("\n")
-    rewriter = PathCoverage::Rewriter
-    assert_equal expected, rewriter.rewrite(source, sites, methods)
-  end
-
-  test '6D1Kc1', %w(
-  | a method's path starts just before its first decision,
-  | on the same line, and each decision's predicate is
-  | wrapped in a decide call outside any record and
-  | leave calls in it; a command-call predicate is
-  | parenthesised
-  ) do
-    source = <<~RUBY
-      def fee(user, order)
-        if user.member? && order.paid?
-          5
-        end
-        if order.tier? :big
-          10
-        end
-      end
-    RUBY
-    both = condition('&&', 26...38, 42...53, extent: 26...53)
-    sites = { 'k.rb:2:5' => both }
-    methods = {
-      'k.rb:1:0' => PathCoverage::PathMethod.new(
-        name: :fee,
-        entry: 23,
-        decisions: [
-          PathCoverage::Decision.new(
-            line: 2, range: 26...53, command: false
-          ),
-          PathCoverage::Decision.new(
-            line: 5, range: 71...87, command: true
-          )
-        ]
-      )
-    }
-    expected = [
-      'def fee(user, order)',
-      '  __path_coverage_path = ' \
-      'PathCoverage.path("k.rb:1:0", 2); ' \
-      'if PathCoverage.decide(__path_coverage_path, 0, ' \
-      'PathCoverage.leave(' \
-      'PathCoverage.enter("k.rb:2:5", 2), ' \
-      'PathCoverage.record("k.rb:2:5", 0, user.member?) && ' \
-      'PathCoverage.record("k.rb:2:5", 1, order.paid?)))',
-      '    5',
-      '  end',
-      '  if PathCoverage.decide(__path_coverage_path, 1, ' \
-      '(order.tier? :big))',
-      '    10',
-      '  end',
-      'end',
-      ''
-    ].join("\n")
-    rewriter = PathCoverage::Rewriter
-    assert_equal expected, rewriter.rewrite(source, sites, methods)
-  end
-
-  test '6D1Kc2', %w(
-  | a decision whose arm always leaves the method passes
-  | decide the outcome that leaves, so the path is counted
-  | there, cut short
-  ) do
-    source = <<~RUBY
-      def fork(id)
-        fail 'no group' if id.group.nil?
-        if id.odd?
-          1
-        end
-      end
-    RUBY
-    methods = {
-      'k.rb:1:0' => PathCoverage::PathMethod.new(
-        name: :fork,
-        entry: 15,
-        decisions: [
-          PathCoverage::Decision.new(
-            line: 2, range: 34...47, command: false, exits: true
-          ),
-          PathCoverage::Decision.new(
-            line: 3, range: 53...60, command: false
-          )
-        ]
-      )
-    }
-    expected = [
-      'def fork(id)',
-      '  __path_coverage_path = ' \
-      'PathCoverage.path("k.rb:1:0", 2); ' \
-      "fail 'no group' if PathCoverage.decide(" \
-      '__path_coverage_path, 0, id.group.nil?, true)',
-      '  if PathCoverage.decide(' \
-      '__path_coverage_path, 1, id.odd?)',
-      '    1',
-      '  end',
-      'end',
-      ''
-    ].join("\n")
-    rewriter = PathCoverage::Rewriter
-    assert_equal expected, rewriter.rewrite(source, {}, methods)
-  end
-
   test '6D1Kd1', %w(
   | a ternary is wrapped whole, its arms included, in a leave
   | call, so each evaluation's path runs on into the arm its
@@ -525,5 +376,40 @@ class RewriterTest < Id58TestBase
     ].join("\n")
     rewriter = PathCoverage::Rewriter
     assert_equal expected, rewriter.rewrite(source, sites)
+  end
+
+  test '6D1Kr1', %w(
+  | Example: ship, a write then a value, each reached
+  | Each reached statement has a reach call put before it,
+  | on the same line, naming it, so each run counts it.
+  ) do
+    source = <<~RUBY
+      def ship(order)
+        box = order.pack
+        box
+      end
+    RUBY
+    reaches = { 'k.rb:2:2' => 18, 'k.rb:3:2' => 37 }
+    expected = [
+      'def ship(order)',
+      '  PathCoverage.reach("k.rb:2:2"); box = order.pack',
+      '  PathCoverage.reach("k.rb:3:2"); box',
+      'end',
+      ''
+    ].join("\n")
+    rewriter = PathCoverage::Rewriter
+    assert_equal expected, rewriter.rewrite(source, {}, reaches)
+  end
+
+  test '6D1Kr2', %w(
+  | Example: zero, an endless def of 0, reached by its range
+  | Its reach call and its body are wrapped together in
+  | parentheses, so the def still returns its body's value.
+  ) do
+    source = "def zero = 0\n"
+    reaches = { 'k.rb:1:11' => 11...12 }
+    expected = "def zero = (PathCoverage.reach(\"k.rb:1:11\"); 0)\n"
+    rewriter = PathCoverage::Rewriter
+    assert_equal expected, rewriter.rewrite(source, {}, reaches)
   end
 end

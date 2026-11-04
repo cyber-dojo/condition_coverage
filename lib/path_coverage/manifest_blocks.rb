@@ -20,11 +20,10 @@ module PathCoverage
       plain_call?(node) && value?(block_expression(node.block))
     end
 
-    # True for a call on a receiver, with no arguments, and not
-    # by &.
+    # True for a call on a receiver, with no arguments. A call by
+    # &. never gets here, as it is a site of its own first.
     def plain_call?(node)
-      !node.receiver.nil? && node.arguments.nil? &&
-        !node.safe_navigation?
+      !node.receiver.nil? && node.arguments.nil?
     end
 
     # True for a block's one expression that is a value, so can

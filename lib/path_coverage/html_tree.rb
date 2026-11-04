@@ -141,7 +141,7 @@ module PathCoverage
     # it has one, eg select { for a site inside a leaf, coloured
     # as the code it is part of.
     def self.operator(condition)
-      label = condition[:label] || condition[:operator]
+      label = condition.fetch(:label) { condition[:operator] }
       name = HtmlSyntax.fragment(label)
       %(<span class="operator" data-operator="">#{name}</span>)
     end

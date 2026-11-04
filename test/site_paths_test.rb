@@ -253,6 +253,24 @@ class SitePathsTest < Id58TestBase
     assert_equal expected, actual
   end
 
+  test 'Sp3x97', %w(
+  | Example: xs.select { |x| x > 1 } || []
+  | select always returns an array, which is truthy, however
+  | many items it was called with and whatever they answered.
+  | So it is never false, and the [] never runs.
+  ) do
+    source = "def k(xs) = xs.select { |x| x > 1 } || []\n"
+    sites = PathCoverage::Manifest.sites(source, 'k.rb')
+    expected = [
+      ['0 items', nil, nil],
+      ['1 item', 'all true', nil], ['1 item', 'all false', nil],
+      ['2+ items', 'all true', nil], ['2+ items', 'all false', nil],
+      ['2+ items', 'both', nil]
+    ]
+    actual = PathCoverage::SitePaths.possible(sites.values.first)
+    assert_equal expected, actual
+  end
+
   private
 
   # [whether items? says the result of ids.name { |i| i.odd? }

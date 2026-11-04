@@ -172,4 +172,33 @@ class RenderTest < Id58TestBase
     end
     assert_equal "#{file} measured other kinds", error.message
   end
+
+  test 'Rn5d34', %w(
+  | Example: two JSON reports of runs measuring methods, one
+  | reaching a write twice, the other the write once and a
+  | value once
+  | Their reaches are read back, each statement's the sum of
+  | both runs'.
+  ) do
+    dir = Dir.mktmpdir('Rn5d34')
+    runs = [{ 'k.rb:2:2' => 2 }, { 'k.rb:2:2' => 1, 'k.rb:3:2' => 1 }]
+    files = runs.map.with_index do |reached, i|
+      file = "#{dir}/#{i}.json"
+      PathCoverage::JsonWriter.write({}, file, reached:)
+      file
+    end
+    taken = PathCoverage::JsonReader.taken(files)
+    expected = { 'k.rb:2:2' => 3, 'k.rb:3:2' => 1 }
+    assert_equal expected, taken[:reached]
+  end
+
+  test 'Rn5d35', %w(
+  | Example: a JSON report of a run that did not measure methods
+  | It has no reaches, so none are read back, and a render
+  | cannot say whether a statement was reached.
+  ) do
+    file = "#{Dir.mktmpdir('Rn5d35')}/run.json"
+    PathCoverage::JsonWriter.write({}, file)
+    assert_nil PathCoverage::JsonReader.taken([file])[:reached]
+  end
 end
