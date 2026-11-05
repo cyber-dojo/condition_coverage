@@ -22,7 +22,8 @@ module PathCoverage
   # again.
   @parsed = {}
 
-  # The one recorder that every instrumented operand reports to.
+  # The recorder of the latest start, that every instrumented
+  # operand reports to.
   def self.recorder
     @recorder
   end
@@ -36,9 +37,12 @@ module PathCoverage
   # Instruments every file later required that the settings
   # block covers, and reports when the process exits. on_exit
   # is Kernel#at_exit except in tests, which must not print
-  # a report as their own process exits.
+  # a report as their own process exits. Each start records
+  # afresh, so a later start, as a later test makes, never
+  # counts an earlier one's evaluations.
   def self.start(on_exit: method(:at_exit), &)
     config = Configuration.new(&)
+    @recorder = Recorder.new
     install_hook if @config.nil?
     @config = config
     on_exit.call { report(config) }

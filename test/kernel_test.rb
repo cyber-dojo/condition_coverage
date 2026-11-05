@@ -1947,6 +1947,33 @@ class KernelTest < Id58TestBase
     assert_equal expected, json['cards']
   end
 
+  test '6rTS6m', %w(
+  | Example: two starts in one process, eg two tests, each over
+  | its own rate.rb, a ?: whose site has the same name in both,
+  | each evaluated once, with no RATE set
+  | Each start records afresh, so the second run's report counts
+  | its own one evaluation, not the first run's too.
+  ) do
+    dirs = %w(first second).map { |run| Dir.mktmpdir("6rTS6m#{run}") }
+    jsons = dirs.map.with_index do |dir, index|
+      File.write("#{dir}/rate.rb", <<~RUBY)
+        RATE6rTS6m#{index} = ENV.key?('RATE6rTS6m') ? 2 : 1
+      RUBY
+      exit_report = nil
+      on_exit = ->(&block) { exit_report = block }
+      PathCoverage.start(on_exit:) do
+        root dir
+        cover '*.rb'
+        coverage_dir dir
+      end
+      require "#{dir}/rate.rb"
+      exit_report.call
+      JSON.parse(File.read("#{dir}/path_coverage.json"))
+    end
+    taken = jsons.last['paths'].values.first['taken']
+    assert_equal([0, 1], taken.map { _1['count'] })
+  end
+
   private
 
   # [label, last cell's text] of each row of the statement card
