@@ -1764,6 +1764,36 @@ class KernelTest < Id58TestBase
     assert_equal tree.to_s, site.to_s
   end
 
+  test '6rTS6e', %w(
+  | Example: rate.rb, a ?: at its top level, with no RATE set,
+  | and fee, a def of a ?:, called once with big true
+  | The top level's ?: is on no card, outside every def, so
+  | its paths are in the methods total as they are: 1 of 2.
+  | So the methods total is fee's card's 1 of 2 and the top
+  | level's 1 of 2: [2, 4].
+  ) do
+    dir = Dir.mktmpdir('6rTS6e')
+    File.write("#{dir}/rate.rb", <<~RUBY)
+      RATE6rTS6e = ENV.key?('RATE6rTS6e') ? 2 : 1
+      module Fee6rTS6e
+        def self.fee(big) = big ? 10 : 5
+      end
+    RUBY
+    exit_report = nil
+    on_exit = ->(&block) { exit_report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+      report :html
+    end
+    require "#{dir}/rate.rb"
+    Fee6rTS6e.fee(true)
+    exit_report.call
+    json = JSON.parse(File.read("#{dir}/path_coverage.json"))
+    assert_equal [2, 4], json['totals']['methods']
+  end
+
   private
 
   # [label, last cell's text] of each row of the statement card

@@ -5,6 +5,7 @@ require_relative 'manifest_choices'
 require_relative 'site'
 require_relative 'site_paths'
 require_relative 'statement_arms'
+require_relative 'totals'
 
 module PathCoverage
   # One row of a method's popout, a top-level statement or a
@@ -56,6 +57,17 @@ module PathCoverage
       collector = Collector.new(path, known)
       Prism.parse(source).value.accept(collector)
       collector
+    end
+
+    # Example: RATE = x ? 2 : 1 at the top level, its then
+    # taken, gives [1, 2].
+    # [taken, possible] of the paths of the sites in source on
+    # no card, outside every def, each opening its tree from its
+    # own line; paths as Result#paths gives them.
+    def self.top_level(source, path, paths, sites = nil)
+      collector = collect(source, path, sites)
+      carded = collector.methods.values.flatten.map(&:site)
+      Totals.decisions(paths.slice(*(collector.sites.keys - carded)))
     end
 
     # Example: { "k.rb:1:0" => [2, 4] }, 2 of ship's 4 taken.
@@ -122,9 +134,10 @@ module PathCoverage
 
       # The methods found so far, { def site => rows }; their
       # names and last lines, { def site => name } and { def site
-      # => line }; and where each row that is no site is reached,
-      # as MethodStatements.reaches has it.
-      attr_reader :methods, :names, :lasts, :reaches
+      # => line }; where each row that is no site is reached, as
+      # MethodStatements.reaches has it; and the sites it was
+      # given, { site => Condition }.
+      attr_reader :methods, :names, :lasts, :reaches, :sites
 
       # Notes node's name, its last line, its body statements as
       # its rows, those in its sites' arms too, none for an empty

@@ -727,6 +727,27 @@ class MethodStatementsTest < Id58TestBase
     assert_equal [[2, 9, '&&']], tops
   end
 
+  test 'St3e33', %w(
+  | Example: rate, a ?: at the top level, its then taken, and
+  | fee, a def of a ?:
+  | The sites on no card, those outside every def, total
+  | [taken, possible] of their own: rate's 1 of 2. fee's ?:
+  | is on fee's card, so is not among them.
+  ) do
+    source = <<~RUBY
+      RATE = ENV.key?('RATE') ? 2 : 1
+      def fee(big) = big ? 10 : 5
+    RUBY
+    taken = lambda do |counts|
+      [{ path: [true], count: counts[0] },
+       { path: [false], count: counts[1] }]
+    end
+    paths = { 'k.rb:1:7' => taken.call([3, 0]),
+              'k.rb:2:15' => taken.call([1, 1]) }
+    statements = PathCoverage::MethodStatements
+    assert_equal [1, 2], statements.top_level(source, 'k.rb', paths)
+  end
+
   private
 
   # { def site => its statements' rows } for source, as if it
