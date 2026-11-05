@@ -344,13 +344,21 @@ html[data-mode="methods"] .src.in-method {
 }
 html[data-mode="methods"] .src.in-method[data-method-status="covered"] { --method-colour: var(--ok); }
 html[data-mode="methods"] .src.in-method.method-open { --stripe: 3px; }
+/* A def line's band stops 1px short of its line's bottom, so the
+   bands of def lines one after another, eg one-line methods, stay
+   apart. Its stripe runs the full height, on into its body, but on
+   its method's last line, where it too stops 1px short, so the
+   stripes of methods one after another stay apart as well. */
 html[data-mode="methods"] .src.def-line {
+  --band: calc((var(--def-end) - var(--def-col)) * 1ch + 8px) calc(100% - 1px);
   background-image:
     linear-gradient(var(--method-colour), var(--method-colour)),
     linear-gradient(var(--cond-tint), var(--cond-tint));
-  background-size: var(--stripe) 100%, calc((var(--def-end) - var(--def-col)) * 1ch + 8px) 100%;
+  background-size: var(--stripe) 100%, var(--band);
   background-position: var(--at) 0, var(--at) 0;
 }
+html[data-mode="methods"] .src.in-method.method-end { background-size: var(--stripe) calc(100% - 1px); }
+html[data-mode="methods"] .src.def-line.method-end { background-size: var(--stripe) calc(100% - 1px), var(--band); }
 /* A grid is framed as a tree is: the same border, corners and
    shadow, its rows 16px in from its sides; side.js keeps 10px
    above its first row and below its last. */
@@ -505,8 +513,12 @@ html[data-mode="methods"] button.lnum:not(.loose):has(> .lineno.mdef) { margin-b
 /* Within each method, a line's gap arrows sit in the middle of its
    row, level with its number, however tall its row is. */
 html[data-mode="methods"] .nav { align-self: stretch; }
-html[data-mode="methods"] .block:not(:has(> button.loose)) mark.site,
-html[data-mode="methods"] body .block:not(:has(> button.loose)) mark.site[data-status] {
+/* Within each method, no site's code is marked, a top-level one's
+   included, its card open or not: a line's number, and its card,
+   say how it was taken. The :has() outweighs the open button's own
+   rule, which marks its sites more thickly. */
+html[data-mode="methods"] mark.site,
+html[data-mode="methods"] .block:has(> button.lnum) mark.site[data-status] {
   background: none; box-shadow: none;
 }
 html[data-mode="methods"] button.lnum:not(.loose) .site-count { visibility: hidden; }
