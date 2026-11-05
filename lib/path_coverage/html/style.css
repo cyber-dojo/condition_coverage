@@ -162,6 +162,9 @@ a.jump:focus-visible, .nav a:focus-visible { outline: 3px solid var(--link); out
    tall, keeping the gutter narrow. */
 .nav { display: flex; flex-direction: column; justify-content: center; width: 26px; flex-shrink: 0; }
 .nav a { width: 22px; text-align: center; line-height: 14px; font-size: 12px; color: var(--bad); text-decoration: none; }
+/* A covered card's arrows, between the covered cards' lines, are
+   blue, as their numbers are. */
+.nav a[data-status="covered"] { color: var(--ok); }
 .nav a:hover { color: var(--fg); }
 /* Every row is as wide as the longest line (or the pane, if
    wider), so a site's band and outline, and a lit line, reach
@@ -369,12 +372,16 @@ html[data-mode="methods"] .src.def-line {
    gaps): its first row, the site's operator and its count on each
    path, stands where the row's top and counts were, which hide,
    and its other rows are indented as far, so they stay aligned
-   with the operator. A rule ends it. */
+   with the operator. A rule ends it. Lying over its row, it takes
+   no click itself, so one on the row's arrow or line:col beneath
+   reaches the row and folds it back; its tree's rows take theirs. */
 .fold {
   position: relative; margin: -26px 0 6px; padding: 0 16px 4px 88px;
   border-bottom: 1px solid var(--rule);
   font: 400 13px var(--font-code); line-height: 24px; color: var(--fg);
+  pointer-events: none;
 }
+.fold .site { pointer-events: auto; }
 .fold .bx { height: 24px; }
 .fold .site > .row:first-child { margin: 0 0 4px; padding: 0 0 2px; cursor: pointer; }
 .statements .prow.site:has(> .fold-arrow[aria-expanded="true"]) > .pcell { visibility: hidden; }
@@ -490,6 +497,14 @@ html[data-mode="methods"] .lineno.mdef[aria-expanded="true"]::before { content: 
 html[data-mode="methods"] .lineno.mdef[aria-expanded="true"] { box-shadow: inset 1px 1px 0 var(--mdef-status); }
 html[data-mode="methods"] .lineno.mdef:hover { filter: brightness(1.1); }
 html[data-mode="methods"] button.lnum:not(.loose) .lineno { font-weight: inherit; }
+/* A def line that holds a site too has its number inside the site's
+   button, whose margins and borders would add to the def number's
+   own: the button keeps none, so the line is as tall as any other
+   def line. */
+html[data-mode="methods"] button.lnum:not(.loose):has(> .lineno.mdef) { margin-block: 0; border-width: 0; }
+/* Within each method, a line's gap arrows sit in the middle of its
+   row, level with its number, however tall its row is. */
+html[data-mode="methods"] .nav { align-self: stretch; }
 html[data-mode="methods"] .block:not(:has(> button.loose)) mark.site,
 html[data-mode="methods"] body .block:not(:has(> button.loose)) mark.site[data-status] {
   background: none; box-shadow: none;
