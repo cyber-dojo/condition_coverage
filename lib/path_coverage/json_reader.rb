@@ -30,12 +30,11 @@ module PathCoverage
     # Example: { "k.rb:2:2" => 2 } and { "k.rb:2:2" => 1 } give
     # { "k.rb:2:2" => 3 }.
     # The reaches of the JSON reports at paths, each statement's
-    # summed; nil when none has any, eg from runs that did not
-    # measure methods, so a render cannot say what was reached.
+    # summed; nil when none has any, eg reports the :post reporter
+    # sent, so a render cannot say what was reached.
     def self.reached(paths)
-      runs = paths.filter_map do |path|
-        JSON.parse(File.read(path))['reached']
-      end
+      reports = paths.map { |path| JSON.parse(File.read(path)) }
+      runs = reports.map { |report| report['reached'] }.compact
       return nil if runs.empty?
 
       runs.reduce { |all, run| all.merge(run) { |_, a, b| a + b } }

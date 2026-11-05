@@ -13,9 +13,8 @@ module PathCoverage
     def case_site?(node)
       return false if node.predicate.nil?
 
-      node.conditions.none? do |clause|
-        clause.conditions.any? { |each| each.type == :splat_node }
-      end
+      patterns = node.conditions.flat_map(&:conditions)
+      !patterns.map(&:type).include?(:splat_node)
     end
 
     # A case as a Condition, its extent its case keyword to the

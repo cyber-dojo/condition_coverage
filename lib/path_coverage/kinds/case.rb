@@ -60,10 +60,11 @@ module PathCoverage
         { arm: arm.kind, text:, cells:, body: }
       end
 
-      # Whether each column matched none of its whens' patterns.
+      # Whether each column matched none of its whens' patterns:
+      # a when's cell is true where it matched.
       def self.unmatched(matched, outcomes)
         outcomes.each_index.map do |column|
-          matched.none? { |taken| taken[column] }
+          !matched.map { |taken| taken[column] }.include?(true)
         end
       end
 

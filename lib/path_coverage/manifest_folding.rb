@@ -70,7 +70,7 @@ module PathCoverage
 
       receiver = extent_of(grouped(node.receiver))
       @nonempty.include?(node.name.to_s) &&
-        inner.any? { |site| site.extent == receiver }
+        inner.map(&:extent).include?(receiver)
     end
 
     # A block's body is a new scope: it runs once per item.

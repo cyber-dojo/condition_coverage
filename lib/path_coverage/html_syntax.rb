@@ -51,13 +51,14 @@ module PathCoverage
 
       # [[line number, first column, last column], ...] for each
       # line the bytes from...to reach, columns counting characters
-      # and kept within the line.
+      # and kept within the line: from the line holding from to the
+      # last starting before to. The last start is the source's
+      # size, so both searches always find a line.
       def ranges(from, to)
         first = @starts.bsearch_index { |start| start > from } - 1
-        indexes = (first...(@starts.size - 1)).take_while do |index|
-          @starts[index] < to
-        end
-        indexes.filter_map { |index| columns(index, from, to) }
+        last = @starts.bsearch_index { |start| start >= to }
+        reached = (first...last).map { |n| columns(n, from, to) }
+        reached.compact
       end
 
       # [line number, first column, last column] of the bytes

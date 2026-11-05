@@ -44,9 +44,11 @@ module PathCoverage
       end
 
       # Its value in each column: false where a receiver was nil,
-      # as the chain then gives nil, else its last leaf's.
+      # as the chain then gives nil, else its last leaf's. Only the
+      # chain's end, after its last leaf, can be a node only
+      # called, so it alone is left out.
       def self.value(_operator, operands)
-        leaves = operands.reject { |operand| operand[:called] }
+        leaves = operands.last[:called] ? operands[0...-1] : operands
         columns = leaves.map { |operand| operand[:cells] }.transpose
         columns.map do |column|
           column.include?(PRESENCE[1]) ? false : column.last

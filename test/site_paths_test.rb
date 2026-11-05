@@ -247,6 +247,25 @@ class SitePathsTest < TidTest
     assert_equal expected, actual
   end
 
+  test 'Sp3x9a', %w(
+  | Example: ids.select { |i| i.odd? }.any? { |i| i > 1 } && c
+  | The leaf holds two sites, the any? the whole of it, so the
+  | leaf's outcome is the any?'s value: true exactly when an
+  | answer was true, and so c is evaluated only then.
+  ) do
+    source = 'def k(ids, c) = ' \
+             "ids.select { |i| i.odd? }.any? { |i| i > 1 } && c\n"
+    sites = PathCoverage::Manifest.sites(source, 'k.rb')
+    paths = PathCoverage::SitePaths.possible(sites.values.first)
+    any = paths.map { |path| path[2..4] }.uniq
+    expected = [
+      ['0 items', nil, false], ['1 item', true, true],
+      ['1 item', false, false], ['2+ items', true, true],
+      ['2+ items', false, false]
+    ]
+    assert_equal expected, any
+  end
+
   test 'Sp3x95', %w(
   | Example: ids.reject { |i| i.odd? }.any?, and each other
   | block method whose result can have items, over real ids

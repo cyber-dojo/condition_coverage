@@ -34,7 +34,7 @@ module PathCoverage
     # cards alone.
     def self.group_totals(site_paths, cards, groups)
       groups.to_h do |name, globs|
-        own_cards = cards && own(cards, globs)
+        own_cards = cards ? own(cards, globs) : nil
         [name, totals(own(site_paths, globs), own_cards)]
       end
     end

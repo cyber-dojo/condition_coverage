@@ -186,12 +186,28 @@ class RenderTest < TidTest
   end
 
   test 'Rn5d35', %w(
-  | Example: a JSON report of a run that did not measure methods
-  | It has no reaches, so none are read back, and a render
-  | cannot say whether a statement was reached.
+  | Example: a JSON report with no reaches, as the :post
+  | reporter sends
+  | None are read back, so a render cannot say whether a
+  | statement was reached.
   ) do |t|
     file = "#{t.dir}/run.json"
     PathCoverage::JsonWriter.write({}, file)
     assert_nil PathCoverage::JsonReader.taken([file])[:reached]
+  end
+
+  test 'Rn5d36', %w(
+  | Example: a local run's JSON report reaching a write twice,
+  | and a posted one with no reaches
+  | The reaches read back are the local run's alone, as the
+  | posted run says nothing of what it reached.
+  ) do |t|
+    local = "#{t.dir}/local.json"
+    reached = { 'k.rb:2:2' => 2 }
+    PathCoverage::JsonWriter.write({}, local, reached:)
+    posted = "#{t.dir}/posted.json"
+    PathCoverage::JsonWriter.write({}, posted)
+    taken = PathCoverage::JsonReader.taken([local, posted])
+    assert_equal({ 'k.rb:2:2' => 2 }, taken[:reached])
   end
 end

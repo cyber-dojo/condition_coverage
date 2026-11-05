@@ -52,15 +52,17 @@ module PathCoverage
           receiver = inner.max_by { |site| site.extent.size }
           return Block.items?(receiver, outcomes)
         end
-        whole = inner.find { |site| site.extent == range }
+        whole = inner.to_h { |site| [site.extent, site] }[range]
         whole && value_on(whole, outcomes, fixed)
       end
 
       # site's value on its way that took outcomes, one of its
-      # own, nil when its kind cannot tell.
+      # own, nil when its kind cannot tell. outcomes always hold
+      # one of site's ways, so one is always found.
       def self.value_on(site, outcomes, fixed)
-        ways = SitePaths.walk(site, fixed)
-        ways.find { |more, _| more <= outcomes }.last
+        SitePaths.walk(site, fixed).each do |more, value|
+          return value if more <= outcomes
+        end
       end
 
       # Its value in each column: the leaf's own, its last operand.
