@@ -431,12 +431,6 @@ mark.chars { background: var(--lit); color: inherit; border-radius: 3px; box-sha
 .fold .row[data-at] { cursor: default; }
 .fold .row[data-at]:hover { background: rgba(255, 255, 255, 0.08); }
 
-/* A page shows one mode's paths only. The html element names the
-   mode; with none named, as when methods are not measured, the
-   paths within each decision show. These rules come last, so they
-   win over the rules above. */
-html:not([data-mode="methods"]) table.files [data-mode="methods"],
-html[data-mode="methods"] table.files [data-mode="decisions"] { display: none; }
 /* A row of jumps with none keeps its height, though hidden, so the
    sticky header, and the code below it, never move. */
 .jump-list[data-empty] { visibility: hidden; }

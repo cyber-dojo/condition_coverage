@@ -12,14 +12,12 @@ module PathCoverage
     # their Summary.total. groups are [name, rows, total] for
     # each group, each given a tab after All files; with none
     # there is no tab bar, just the one table. Any operators
-    # ignored are named after the tables. Measuring methods, its
-    # html element names that mode.
+    # ignored are named after the tables.
     def self.page(rows, total, groups = [], ignored: [])
       tables = [['All files', rows, total], *groups]
       names = tables.map(&:first)
       HtmlTemplate.page(
         'index.html',
-        'mode' => HtmlMode.attribute(!total[:methods].nil?),
         'script' => script(groups),
         'tabs' => groups.empty? ? '' : HtmlTabs.bar(names),
         'tables' => tables_of(tables),
@@ -58,7 +56,7 @@ module PathCoverage
     def self.table(index, rows, total)
       anchored = index.zero?
       body = rows.map { |row| row(row, anchored:) }.join("\n")
-      head = HtmlIndexHead.of(total[:methods])
+      head = HtmlIndexHead.row
       [
         open_tag(index),
         "<thead>\n#{head}\n</thead>",
@@ -92,46 +90,38 @@ module PathCoverage
     end
 
     # The cells after the file's: its sites, then its total
-    # within each decision, then, when methods are measured, its
-    # total within each method.
+    # within each method.
     def self.counts(row)
-      cells = [
-        cell(row[:sites], row[:sites]),
-        *paths_cells(row[:decisions], 'no decisions', 'decisions')
-      ]
-      return cells unless row[:methods]
-
-      none = 'no method with two or more decisions'
-      cells + paths_cells(row[:methods], none, 'methods')
+      [cell(row[:sites], row[:sites]), *paths_cells(row[:methods])]
     end
 
+    # Why a total of no paths shows no percent.
+    NONE = 'no method with two or more decisions'.freeze
+
     # Three cells showing [taken, possible] paths, eg 3, / 6 and
-    # 50%, each sorted by its number, so they read 3 / 6 50%,
-    # each naming mode, the mode they belong to. With no paths
-    # to take, as in a group no file is in, or a file with no
-    # method of two or more decisions, the percent shows -,
-    # titled with none, saying why, with an empty sort value,
-    # which sort.js keeps last whichever way the column is
+    # 50%, each sorted by its number, so they read 3 / 6 50%.
+    # With no paths to take, as in a group no file is in, or a
+    # file with no method of two or more decisions, the percent
+    # shows -, titled with NONE, saying why, with an empty sort
+    # value, which sort.js keeps last whichever way the column is
     # sorted.
-    def self.paths_cells(pair, none, mode)
+    def self.paths_cells(pair)
       taken, possible = pair
-      counts = [cell(taken, taken, css: 'taken', mode:),
-                cell(possible, "/ #{possible}", css: 'of', mode:)]
-      none_cell = cell('', '-', none, css: 'percent', mode:)
-      return [*counts, none_cell] if possible.zero?
+      counts = [cell(taken, taken, css: 'taken'),
+                cell(possible, "/ #{possible}", css: 'of')]
+      none = cell('', '-', NONE, css: 'percent')
+      return [*counts, none] if possible.zero?
 
       percent = (100.0 * taken / possible).round
-      [*counts, cell(percent, "#{percent}%", css: 'percent', mode:)]
+      [*counts, cell(percent, "#{percent}%", css: 'percent')]
     end
 
     # One table cell, sorted by sort_value, showing content,
-    # with title as its hover text, css as its class and mode as
-    # the mode it belongs to, each when there is one.
-    def self.cell(sort_value, content, title = nil,
-                  css: nil, mode: nil)
+    # with title as its hover text and css as its class, each
+    # when there is one.
+    def self.cell(sort_value, content, title = nil, css: nil)
       hover = title ? %( title="#{title}") : ''
       klass = css ? %( class="#{css}") : ''
-      klass += %( data-mode="#{mode}") if mode
       %(<td#{klass} data-sort="#{sort_value}"#{hover}>#{content}</td>)
     end
   end

@@ -7,16 +7,15 @@ module PathCoverage
   module Summary
     # One row per file that has sites in site_paths, as
     # Result#paths gives them, in path order: its sites, and
-    # its decisions total. Its methods total is nil unless
-    # cards, { def site => [taken, size] }, are given, as they
-    # are when methods are measured.
-    def self.files(site_paths, cards = nil)
+    # its decisions total, and its methods total, its defs' cards
+    # in cards, { def site => [taken, size] }, added up.
+    def self.files(site_paths, cards)
       by_path = site_paths.group_by { |site, _| path_of(site) }
       by_path.sort.map do |path, sites|
         {
           path:, sites: sites.size,
           decisions: Totals.decisions(sites.to_h),
-          methods: cards ? methods_of(path, cards) : nil
+          methods: methods_of(path, cards)
         }
       end
     end
@@ -27,14 +26,13 @@ module PathCoverage
       Totals.methods(cards.select { |site, _| path_of(site) == path })
     end
 
-    # The sum of each column over rows, a methods total being
-    # nil when the rows' are.
+    # The sum of each column over rows; no rows, as for a group
+    # no file is in, gives 0 sites and [0, 0] totals.
     def self.total(rows)
-      methods = rows.map { |row| row[:methods] }
       {
         sites: rows.sum { |row| row[:sites] },
         decisions: add(rows.map { |row| row[:decisions] }),
-        methods: methods.first ? add(methods) : nil
+        methods: add(rows.map { |row| row[:methods] })
       }
     end
 

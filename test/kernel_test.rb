@@ -180,11 +180,10 @@ class KernelTest < TidTest
   end
 
   test '6rTS4f', %w(
-  | Example: report :html, measure :decisions, :methods, and
-  | fee with two ifs called once, with true then false
-  | index.html's Total row shows both totals.
-  | Within each decision: 2 / 4 50%, one of each if's two.
-  | Within each method: 5 / 8 63%, fee's card: its two
+  | Example: report :html, and fee with two ifs called once,
+  | with true then false
+  | index.html's Total row shows its total within each method:
+  | 5 / 8 63%, fee's card: its two
   | 1-path statements reached and one of each if's two, and,
   | in the ifs' thens, member's write reached, big's not.
   ) do |t|
@@ -208,7 +207,7 @@ class KernelTest < TidTest
 
     index = REXML::Document.new(File.read("#{t.dir}/index.html"))
     total = index.elements.to_a('//tfoot/tr/td')
-    expected = ['Total', '2', '2', '/ 4', '50%', '5', '/ 8', '63%']
+    expected = ['Total', '2', '5', '/ 8', '63%']
     assert_equal(expected, total.map { text_of(_1) })
   end
 
@@ -252,7 +251,8 @@ class KernelTest < TidTest
   | and lib/zip.rb the only covered file
   | No covered file is in the Models group.
   | So the Models tab's Total row shows 0 sites and - paths.
-  | The - is titled no decisions, saying why.
+  | The - is titled no method with two or more decisions,
+  | saying why.
   | The JSON report's Models totals are [0, 0], within
   | decisions and within methods.
   ) do |t|
@@ -273,7 +273,7 @@ class KernelTest < TidTest
     total = index.elements.to_a(xpath).map { text_of(_1) }
     assert_equal ['Total', '0', '0', '/ 0', '-'], total
     none = index.elements["#{xpath}[5]"].attributes['title']
-    assert_equal 'no decisions', none
+    assert_equal 'no method with two or more decisions', none
     json = t.json
     groups = {
       'Models' => { 'decisions' => [0, 0], 'methods' => [0, 0] }
@@ -307,12 +307,11 @@ class KernelTest < TidTest
   end
 
   test '6rTS4q', %w(
-  | Example: measure :decisions, :methods, fee with two ifs
-  | called once, with true then false, then a render of the
-  | run's JSON report into another dir
+  | Example: fee with two ifs called once, with true then
+  | false, then a render of the run's JSON report into another
+  | dir
   | The JSON report holds the statements reached too.
   | So the render's index has the same Total row as the run's.
-  | Within each decision: 2 / 4 50%.
   | Within each method: 5 / 8 63%, member's write in its then
   | reached too.
   ) do |t|
@@ -355,7 +354,7 @@ class KernelTest < TidTest
 
     index = REXML::Document.new(File.read("#{later}/index.html"))
     total = index.elements.to_a('//tfoot/tr/td')
-    expected = ['Total', '2', '2', '/ 4', '50%', '5', '/ 8', '63%']
+    expected = ['Total', '2', '5', '/ 8', '63%']
     assert_equal(expected, total.map { text_of(_1) })
   end
 
@@ -816,9 +815,9 @@ class KernelTest < TidTest
   | It writes a page per covered file too, eg crew.rb.html.
   | Each site on the page counts the paths it took.
   | It prints no gaps, since :gaps was not chosen.
-  | index.html's Total row shows 1 / 3 33% within each
-  | decision, and 2 / 4 50% within each method: ok?'s one row
-  | reached, and one of crew?'s && row's three paths taken.
+  | index.html's Total row shows 2 / 4 50% within each method:
+  | ok?'s one row reached, and one of crew?'s && row's three
+  | paths taken.
   ) do |t|
     t.write(<<~RUBY, 'crew.rb')
       module Crew
@@ -833,7 +832,7 @@ class KernelTest < TidTest
 
     index = REXML::Document.new(File.read("#{t.dir}/index.html"))
     total = index.elements.to_a('//tfoot/tr/td')
-    expected = ['Total', '1', '1', '/ 3', '33%', '2', '/ 4', '50%']
+    expected = ['Total', '1', '2', '/ 4', '50%']
     assert_equal(expected, total.map { text_of(_1) })
     html = File.read("#{t.dir}/files/crew.rb.html")
     page = REXML::Document.new(html)

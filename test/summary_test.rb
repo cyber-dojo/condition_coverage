@@ -7,7 +7,7 @@ class SummaryTest < TidTest
   | Each covered file gets one row for the index page.
   | Its sites, eg 2 for kata.rb.
   | Its decisions total as [taken, possible] paths, eg [3, 6].
-  | Its methods total is nil, as :methods is not measured.
+  | Its methods total, [0, 0] as neither file has a card.
   ) do
     site_paths = {
       'source/kata.rb:3:23' => [
@@ -28,17 +28,17 @@ class SummaryTest < TidTest
     }
     expected = [
       { path: 'source/kata.rb', sites: 2, decisions: [3, 6],
-        methods: nil },
+        methods: [0, 0] },
       { path: 'source/team.rb', sites: 1, decisions: [3, 3],
-        methods: nil }
+        methods: [0, 0] }
     ]
-    assert_equal expected, PathCoverage::Summary.files(site_paths)
+    assert_equal expected, PathCoverage::Summary.files(site_paths, {})
   end
 
   test 'SEye20', %w(
   | Example: fee.rb's fee with two ifs, its card 4 of its 6
   | paths taken, and kata.rb with no def
-  | :methods is measured, so each row has a methods total.
+  | Each row has a methods total.
   | fee.rb's is [4, 6], fee's card.
   | kata.rb's is [0, 0], as it has no card.
   ) do
@@ -70,7 +70,8 @@ class SummaryTest < TidTest
   | The rows no group matches get a group of their own, Ungrouped.
   ) do
     row = lambda do |path, taken|
-      { path:, sites: 1, decisions: [taken, 2], methods: nil }
+      { path:, sites: 1, decisions: [taken, 2],
+        methods: [taken, 2] }
     end
     kata = row.call('source/models/kata.rb', 1)
     team = row.call('source/models/team.rb', 2)
@@ -84,10 +85,11 @@ class SummaryTest < TidTest
     actual = PathCoverage::Summary.groups(rows, groups)
     expected = [
       ['Models', [kata, team],
-       { sites: 2, decisions: [3, 4], methods: nil }],
-      ['App', [fee], { sites: 1, decisions: [0, 2], methods: nil }],
+       { sites: 2, decisions: [3, 4], methods: [3, 4] }],
+      ['App', [fee],
+       { sites: 1, decisions: [0, 2], methods: [0, 2] }],
       ['Ungrouped', [zip],
-       { sites: 1, decisions: [2, 2], methods: nil }]
+       { sites: 1, decisions: [2, 2], methods: [2, 2] }]
     ]
     assert_equal expected, actual
   end
@@ -98,9 +100,9 @@ class SummaryTest < TidTest
   | Every row is in a group, so there is no Ungrouped group.
   ) do
     kata = { path: 'source/models/kata.rb', sites: 1,
-             decisions: [1, 2], methods: nil }
+             decisions: [1, 2], methods: [1, 2] }
     fee = { path: 'source/app/fee.rb', sites: 1,
-            decisions: [0, 2], methods: nil }
+            decisions: [0, 2], methods: [0, 2] }
     groups = { 'Models' => ['source/models/*.rb'],
                'App' => ['source/app/*.rb'] }
     found = PathCoverage::Summary.groups([kata, fee], groups)
@@ -113,6 +115,7 @@ class SummaryTest < TidTest
   | Sites 2 + 3 = 5.
   | Decisions [3, 6] + [2, 4] = [5, 10].
   | Methods [0, 0] + [1, 4] = [1, 4].
+  | No rows, as in a group no file is in, total 0 and [0, 0].
   ) do
     rows = [
       { path: 'source/kata.rb', sites: 2, decisions: [3, 6],
@@ -122,6 +125,8 @@ class SummaryTest < TidTest
     ]
     expected = { sites: 5, decisions: [5, 10], methods: [1, 4] }
     assert_equal expected, PathCoverage::Summary.total(rows)
+    none = { sites: 0, decisions: [0, 0], methods: [0, 0] }
+    assert_equal none, PathCoverage::Summary.total([])
   end
 
   test 'SEye50', %w(
@@ -153,7 +158,7 @@ class SummaryTest < TidTest
   | A group with no globs matches no row.
   ) do
     row = lambda do |path|
-      { path:, sites: 1, decisions: [1, 2], methods: nil }
+      { path:, sites: 1, decisions: [1, 2], methods: [1, 2] }
     end
     models = { 'Models' => ['m/*.rb'] }
     cases = [
