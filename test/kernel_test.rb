@@ -621,7 +621,7 @@ class KernelTest < TidTest
   | chain's value, true or false, when every receiver was not
   | nil.
   | So the four calls take the site's four paths.
-  | The popout shows the chain's rows under its &. as user then
+  | The card shows the chain's rows under its &. as user then
   | admin?, so the &. is not shown twice.
   | user's cells are a disc for not nil and an empty set for nil.
   | Each is titled not nil or nil, for its hover text.
@@ -749,9 +749,9 @@ class KernelTest < TidTest
   | ids.all? { |id| id > 0 }
   | Both block calls fold into the && site, as one expression.
   | The select sits inside the leaf ids.select { ... }.any?, so
-  | the popout shows the select's rows, headed select {, then
+  | the card shows the select's rows, headed select {, then
   | the leaf's own row, }.any?, so they read as the code does.
-  | The all? is the &&'s operand itself, so the popout shows it
+  | The all? is the &&'s operand itself, so the card shows it
   | as a nested condition, its value following from its path.
   ) do |t|
     t.write(<<~RUBY, 'both_html.rb')
@@ -1319,7 +1319,7 @@ class KernelTest < TidTest
   test '6rTS55', %w(
   | Example: user&.account&.owner, called with no user, and
   | with a user whose account has an owner
-  | The popout shows the chain's rows as user, account, then
+  | The card shows the chain's rows as user, account, then
   | owner, so they read as the code does.
   | owner is ticked on the one path that called it.
   ) do |t|

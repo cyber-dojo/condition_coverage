@@ -9,7 +9,7 @@ require_relative 'statement_arms'
 require_relative 'totals'
 
 module PathCoverage
-  # One row of a method's popout, a top-level statement or a
+  # One row of a method's card, a top-level statement or a
   # site at its top: where it starts; its top, what it is as
   # written, eg = for a write; how many paths it has; the name
   # of its site, nil when it is no site; and its own name, by
@@ -17,7 +17,7 @@ module PathCoverage
   Statement = Data.define(:line, :column, :top, :paths, :site, :name)
 
   # Finds, without running it, the top-level statements of each
-  # method in source, one row each in its method-mode popout.
+  # method in source, one row each in its method's card.
   module MethodStatements
     # Each function below takes sites, { site => Condition }, the
     # sites the run has in source, as Manifest.parse gives them

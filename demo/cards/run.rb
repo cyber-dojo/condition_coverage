@@ -1,6 +1,6 @@
 # Runs cells.rb under path coverage, calling each method so its
-# popout shows every kind of cell, and writes the HTML report to
-# COVERAGE_DIR. Run by bin/capture_popout_images.sh.
+# card shows every kind of cell, and writes the HTML report to
+# COVERAGE_DIR. Run by bin/capture_card_images.sh.
 require 'path_coverage'
 
 PathCoverage.start do
@@ -36,7 +36,7 @@ Person = Data.define(:role) do
 end
 
 # Each method is called on all but one of its paths, so each
-# popout shows a gap.
+# card shows a gap.
 
 # Both leaves true; the first false; never the second false.
 ['kim', 'al'].each { |name| Cells.long?(name) }

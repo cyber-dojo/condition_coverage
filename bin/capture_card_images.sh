@@ -5,25 +5,26 @@ readonly ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly RUBY_IMAGE=path_coverage-test
 readonly CHROME_IMAGE=ghcr.io/puppeteer/puppeteer:23.10.4
 readonly HOME_DIR=/home/pptruser
-readonly REPORT_DIR="${ROOT_DIR}/reports/popouts"
+readonly REPORT_DIR="${ROOT_DIR}/reports/cards"
 
 show_help()
 {
   cat <<EOF
-Usage: bin/capture_popout_images.sh [OPTIONS]
+Usage: bin/capture_card_images.sh [OPTIONS]
 
-Runs demo/popouts/run.rb, one method per kind of popout cell,
-under path coverage, writing its HTML report to reports/popouts/.
-Then opens files/cells.rb.html in headless Chrome, in the
-Puppeteer Docker image, and saves each method's popout to docs/,
-eg docs/cell-blank.png, for the README's Reading the HTML report.
-Run it again whenever the popout's look changes.
+Runs demo/cards/run.rb, one method per kind of card cell,
+under path coverage, writing its HTML report to reports/cards/.
+Then, in headless Chrome, in the Puppeteer Docker image, saves
+each method's card to docs/, eg docs/cell-blank.png, and each
+example page, its card open, eg docs/example-taken.png, for the
+README's Reading the HTML.
+Run it again whenever the card's look changes.
 
 Options:
   -h    Show this help
 
 Example:
-  bin/capture_popout_images.sh
+  bin/capture_card_images.sh
 EOF
 }
 
@@ -42,7 +43,7 @@ docker run --rm \
   --volume "${REPORT_DIR}:/report" \
   --env COVERAGE_DIR=/report \
   "${RUBY_IMAGE}" \
-  sh -c 'rm -rf /report/* && ruby -Ilib demo/popouts/run.rb'
+  sh -c 'rm -rf /report/* && ruby -Ilib demo/cards/run.rb'
 
 # Run as root so the bind-mounted docs/ is writable; the module
 # and browser paths then name pptruser's, as root's home differs.
@@ -54,6 +55,6 @@ docker run --rm \
   --volume "${ROOT_DIR}/docs:/out" \
   --volume "${ROOT_DIR}/bin:/capture:ro" \
   "${CHROME_IMAGE}" \
-  node /capture/capture_popout_images.js
+  node /capture/capture_card_images.js
 
-ls "${ROOT_DIR}"/docs/cell-*.png
+ls "${ROOT_DIR}"/docs/cell-*.png "${ROOT_DIR}"/docs/example-*.png

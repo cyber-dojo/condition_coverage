@@ -376,18 +376,26 @@ body.dragging { cursor: col-resize; user-select: none; }
    gaps): its first row, the site's operator and its count on each
    path, stands where the row's top and counts were, which hide,
    and its other rows are indented as far, so they stay aligned
-   with the operator. A rule ends it. Lying over its row, it takes
-   no click itself, so one on the row's arrow or line:col beneath
-   reaches the row and folds it back; its tree's rows take theirs. */
+   with the operator. The rows it reveals, below its first row
+   (24px and 2px padding), are tinted a shade off the card,
+   toward the text colour, so in either theme they stand out as
+   opened, with no rule needed above or below them. Lying over
+   its row, it takes no click itself, so one on the row's arrow
+   or line:col beneath reaches the row and folds it back; its
+   tree's rows take theirs. */
 .fold {
   position: relative; margin: -26px 0 6px; padding: 0 16px 4px 88px;
-  border-bottom: 1px solid var(--rule);
   font: 400 13px var(--font-code); line-height: 24px; color: var(--fg);
   pointer-events: none;
+  background: linear-gradient(transparent 26px,
+    color-mix(in srgb, var(--cond-tint), var(--fg) 6%) 26px);
 }
+.fold:last-child { margin-bottom: 0; }
 .fold .site { pointer-events: auto; }
 .fold .bx { height: 24px; }
-.fold .site > .row:first-child { margin: 0 0 4px; padding: 0 0 2px; cursor: pointer; }
+.fold .site > .row:first-child {
+  border-bottom: 0; margin: 0 0 4px; padding: 0 0 2px; cursor: pointer;
+}
 .statements .prow.site:has(> .fold-arrow[aria-expanded="true"]) > .pcell { visibility: hidden; }
 /* A site row's arrow, left of its line:col, points down while its
    fold is shut and up while it is open; every other row's label
