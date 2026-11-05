@@ -1007,7 +1007,7 @@ class KernelTest < Id58TestBase
     page = REXML::Document.new(File.read("#{dir}/files/crew.rb.html"))
     tree = "//div[@class='tree']//*[@data-count]"
     counts = page.elements.to_a(tree)
-    assert_equal(%w(0 0 1), counts.map { |count| text_of(count) })
+    assert_equal(%w(0 0 *), counts.map { |count| text_of(count) })
   end
 
   test '6rTS49', %w(
@@ -1759,7 +1759,7 @@ class KernelTest < Id58TestBase
     fold = "//div[@class='fold'][@data-site='ship6d.rb:3:4']"
     site = page.elements["#{fold}/div[@class='site']"]
     counts = page.elements.to_a("#{fold}//*[@data-count]")
-    assert_equal(%w(0 1), counts.map { text_of(_1) })
+    assert_equal(%w(0 *), counts.map { text_of(_1) })
     tree = page.elements["//div[@id='tree-3']/div[@class='site']"]
     assert_equal tree.to_s, site.to_s
   end

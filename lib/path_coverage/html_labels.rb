@@ -19,5 +19,18 @@ module PathCoverage
 
       HtmlSyntax.fragment(label)
     end
+
+    # [class, mark] of a path's count cell, by whether its count
+    # is zero.
+    MARKS = { true => ['count never', '0'],
+              false => ['count', '*'] }.freeze
+
+    # Example: 1 gives 1 time, 1284 gives 1,284 times.
+    # How many times a path was taken, as its mark's hover chip
+    # reads it, its thousands apart, so a big count still reads.
+    def self.times(count)
+      digits = count.to_s.reverse.scan(/\d{1,3}/).join(',').reverse
+      "#{digits} #{count == 1 ? 'time' : 'times'}"
+    end
   end
 end

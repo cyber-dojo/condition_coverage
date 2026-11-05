@@ -38,12 +38,16 @@ module PathCoverage
       [row(at(site), operator(site), counts), *operand_rows(site, '')]
     end
 
-    # One cell per path's count, a path never taken marked as a
-    # gap.
+    # Example: counts 0, 2 and 1284 give 0, * and *.
+    # One cell per path: 0 for a path never taken, marked as a
+    # gap, * for one taken any number of times, as whether it
+    # was taken is what counts; its count shows on hover, so a
+    # count in the thousands never widens the cell.
     def self.count_cells(counts)
       counts.map do |count|
-        css = count.zero? ? 'count never' : 'count'
-        %(<span class="#{css}" data-count="">#{count}</span>)
+        css, mark = HtmlLabels::MARKS[count.zero?]
+        times = HtmlLabels.times(count)
+        %(<span class="#{css}" data-count="#{times}">#{mark}</span>)
       end.join
     end
 

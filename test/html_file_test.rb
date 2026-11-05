@@ -124,8 +124,9 @@ class HtmlFileTest < Id58TestBase
 
   test 'gae535', %w(
   | a tree opens, for each site, with a row naming its
-  | operator and each path's count, a path never taken marked
-  | as a gap; its operands branch below
+  | operator and for each path 0 or *, whether it was taken,
+  | its count on hover, a path never taken marked as a gap;
+  | its operands branch below
   ) do
     lines = [
       { number: 1, text: '  ok?(id) && new?(id)', status: :gaps,
@@ -134,7 +135,7 @@ class HtmlFileTest < Id58TestBase
     trees = {
       1 => [
         {
-          operator: '&&', counts: [0, 2, 1],
+          operator: '&&', counts: [0, 1284, 1],
           cells: [false, true, false],
           operands: [
             { text: 'ok?(id)', cells: [true, true, false] },
@@ -151,8 +152,14 @@ class HtmlFileTest < Id58TestBase
     assert_equal '&&', text_of(operator)
 
     counts = operator.parent.elements.to_a('*[@data-count]')
-    actual = counts.map { [text_of(_1), _1.attributes['class']] }
-    expected = [['0', 'count never'], %w(2 count), %w(1 count)]
+    actual = counts.map do |count|
+      attributes = count.attributes
+      [text_of(count), attributes['class'], attributes['data-count']]
+    end
+    expected = [
+      ['0', 'count never', '0 times'], ['*', 'count', '1,284 times'],
+      ['*', 'count', '1 time']
+    ]
     assert_equal expected, actual
 
     branches = tree.elements.to_a('.//*[@data-branch]')
