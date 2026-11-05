@@ -410,6 +410,54 @@ class MethodStatementsTest < Id58TestBase
     assert_equal({ 'k.rb:2:2' => 2, 'k.rb:4:2' => 6 }, lasts)
   end
 
+  test 'St3e21', %w(
+  | Example: install, a modifier if, a def of discount, then a
+  | modifier if
+  | Each modifier if is a row at its keyword.
+  | A def inside a def is a statement of its own, a value
+  | with 1 path, as defining it decides nothing.
+  | It is not looked through, as its body runs only when
+  | discount is called: discount's ?: is a row of discount's
+  | card alone.
+  ) do
+    source = <<~RUBY
+      def install(rates)
+        return if rates.empty?
+        def discount(total)
+          total > 20 ? 20 : total
+        end
+        @tiered = true if rates.size > 1
+      end
+    RUBY
+    rows = statements(source).transform_values do |each|
+      each.map { [_1.line, _1.column, _1.top, _1.paths] }
+    end
+    expected = {
+      'k.rb:1:0' => [[2, 9, 'if', 2], [3, 2, 'value', 1],
+                     [6, 17, 'if', 2]],
+      'k.rb:3:2' => [[4, 4, '?:', 2]]
+    }
+    assert_equal expected, rows
+  end
+
+  test 'St3e22', %w(
+  | Example: capper, a write of a lambda holding a ?:, then a
+  | value
+  | A lambda's body runs only when it is called, so it is not
+  | looked through: the write is a row, = with 1 path.
+  ) do
+    source = <<~RUBY
+      def capper(most)
+        cap = ->(total) { total > most ? most : total }
+        cap
+      end
+    RUBY
+    rows = statements(source)['k.rb:1:0'].map do |row|
+      [row.line, row.column, row.top, row.paths]
+    end
+    assert_equal [[2, 2, '=', 1], [3, 2, 'value', 1]], rows
+  end
+
   private
 
   # { def site => its statements' rows } for source, as if it

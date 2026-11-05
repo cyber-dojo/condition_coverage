@@ -34,15 +34,15 @@
   --syn-k: #7E3BA0; --syn-s: #3B7550; --syn-c: #77808F;
   --syn-n: #9E4A78; --syn-t: #4B52A0; --syn-v: #2A7570; --syn-o: #7A6600;
 }
-/* The same colours in the code and in a site's tree, which quotes
-   the code. */
-:is(.src, .tree) .k { color: var(--syn-k); }
-:is(.src, .tree) .s { color: var(--syn-s); }
-:is(.src, .tree) .c { color: var(--syn-c); font-style: italic; }
-:is(.src, .tree) .n { color: var(--syn-n); }
-:is(.src, .tree) .t { color: var(--syn-t); }
-:is(.src, .tree) .v { color: var(--syn-v); }
-:is(.src, .tree) .o { color: var(--syn-o); font-weight: 700; }
+/* The same colours in the code and in a site's tree, fold or card
+   row, which quote the code. */
+:is(.src, .tree, .fold, .prow.site) .k { color: var(--syn-k); }
+:is(.src, .tree, .fold, .prow.site) .s { color: var(--syn-s); }
+:is(.src, .tree, .fold, .prow.site) .c { color: var(--syn-c); font-style: italic; }
+:is(.src, .tree, .fold, .prow.site) .n { color: var(--syn-n); }
+:is(.src, .tree, .fold, .prow.site) .t { color: var(--syn-t); }
+:is(.src, .tree, .fold, .prow.site) .v { color: var(--syn-v); }
+:is(.src, .tree, .fold, .prow.site) .o { color: var(--syn-o); font-weight: 700; }
 /* Everything a site's tree or a method's grid draws has this one
    tint, in either mode; status is only ever the orange or blue of
    an edge. A lit line, on a path being shown, is yellow. */
@@ -327,6 +327,16 @@ body.dragging { cursor: col-resize; user-select: none; }
    lines' code, placed in characters (side.js gives each line its
    def's column), so the code's own layout keeps them aligned. Open,
    a method's stripe thickens. */
+/* Within each method, a method's body is folded under its def line
+   until its def's number opens it, so the page starts as a list of
+   def lines. */
+html[data-mode="methods"] .method-folded { display: none; }
+/* The open method's def line, shifted down by side.js to stay just
+   below the sticky header, covers the body lines passing under it. */
+.def-stuck {
+  position: relative; z-index: 3; background: var(--surface);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
 html[data-mode="methods"] .src.in-method {
   --method-colour: var(--bad); --stripe: 2px;
   --at: calc(var(--def-col) * 1ch - 4px);
@@ -353,16 +363,59 @@ html[data-mode="methods"] .src.def-line {
   border: 1px solid var(--rule); border-radius: 8px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
 }
 .prow { position: absolute; left: 16px; display: flex; gap: 2px; white-space: nowrap; }
+/* A statement card's rows flow down it, 10px above the first and
+   below the last, so a fold open under a row pushes the rows after
+   it down. */
+.statements { padding: 10px 0; }
+.statements .prow { position: static; padding: 0 16px; margin-bottom: 2px; }
+/* A site's fold draws the site's tree as the tree does, in its
+   font, its rows as tall as the card's. Open, it takes its row's
+   place right of the row's arrow and line:col, 88px in (the card's
+   16px padding, the arrow's 16px, the label's 52px and two 2px
+   gaps): its first row, the site's operator and its count on each
+   path, stands where the row's top and counts were, which hide,
+   and its other rows are indented as far, so they stay aligned
+   with the operator. A rule ends it. */
+.fold {
+  position: relative; margin: -26px 0 6px; padding: 0 16px 4px 88px;
+  border-bottom: 1px solid var(--rule);
+  font: 400 13px var(--font-code); line-height: 24px; color: var(--fg);
+}
+.fold .bx { height: 24px; }
+.fold .site > .row:first-child { margin: 0 0 4px; padding: 0 0 2px; cursor: pointer; }
+.statements .prow.site:has(> .fold-arrow[aria-expanded="true"]) > .pcell { visibility: hidden; }
+/* A site row's arrow, left of its line:col, points down while its
+   fold is shut and up while it is open; every other row's label
+   is indented by the arrow's width and the gap after it, so the
+   labels line up. */
+.fold-arrow {
+  flex: none; width: 16px; padding: 0; border: none; background: none;
+  font: inherit; font-size: 10px; line-height: 24px; color: var(--muted); cursor: pointer;
+}
+.fold-arrow::before { content: "\25BC"; }
+.fold-arrow[aria-expanded="true"]::before { content: "\25B2"; }
+.prow.site:hover .fold-arrow, .fold-arrow[aria-expanded="true"] { color: var(--link); }
+.fold-arrow:focus-visible { outline: 3px solid var(--link); outline-offset: 2px; }
+.statements .prow > .plabel:first-child { margin-left: 18px; }
 /* A grid's line labels sit at its left padding, as a tree's labels
    do, their fixed width keeping the cells in columns. */
 .plabel { width: 48px; flex-shrink: 0; text-align: left; padding-right: 8px; color: var(--muted); line-height: 24px; }
 .pcell { width: 24px; flex-shrink: 0; text-align: center; line-height: 24px; border-radius: 3px; }
-/* A statement card's cells hold words, eg return, not T or F. */
-.statements .pcell { width: 56px; cursor: default; }
-.statements .plabel { width: 120px; overflow: hidden; text-overflow: ellipsis; }
+/* A statement card's cells hold words, eg return, not T or F. Its
+   line:col labels are narrow, so each row's top follows close
+   after, left aligned, its paths and taken at the card's right
+   edge; the title row's name is as wide as it needs. */
+.statements .pcell { width: 72px; cursor: default; }
+.statements .plabel { width: 44px; padding-right: 8px; overflow: visible; }
+.statements .prow.calls .plabel { width: auto; }
+.statements .plabel + .pcell { flex: 1; min-width: 56px; text-align: left; }
 .statements .prow.site, .statements .prow.site .pcell { cursor: pointer; }
 .statements .prow.site:hover .pcell, .statements .prow.site:hover .plabel { color: var(--link); }
 .statements .prow.columns .plabel, .statements .prow.columns .pcell { color: var(--muted); }
+/* A card's paths not taken are orange and those taken blue, as a
+   status always is; its column titles are too, as their key. */
+.statements .pcell.not-taken { color: var(--bad); }
+.statements .pcell.was-taken { color: var(--ok); }
 .pcell.ended { background: transparent; }
 .pcell.true, .pcell.false { background: var(--surface); color: var(--fg); }
 .prow.calls .pcell.taken { background: var(--ok-tint); color: var(--ok); }
@@ -376,8 +429,8 @@ html[data-mode="methods"] .src.def-line {
 .pcell.pinned { outline: 3px solid var(--link); outline-offset: -2px; }
 .src.lit { background: var(--cond-tint); }
 mark.chars { background: var(--lit); color: inherit; border-radius: 3px; box-shadow: 0 0 0 2px var(--lit); }
-.tree .row[data-at] { cursor: default; }
-.tree .row[data-at]:hover { background: rgba(255, 255, 255, 0.08); }
+:is(.tree, .fold) .row[data-at] { cursor: default; }
+:is(.tree, .fold) .row[data-at]:hover { background: rgba(255, 255, 255, 0.08); }
 /* A chip shows on a decision's line, beside its button, so it sits
    7px down: the button starts 4px down and is 26px tall, its middle
    17px down, as the 20px chip's is then. */
@@ -420,11 +473,12 @@ html[data-mode="methods"] button.lnum::before { content: none; }
    on the top and left in its status colour, orange for gaps and
    blue for covered, with an arrow pointing left while its grid is
    closed, and none while it is open. */
-/* Its 50px and its 22px right margin take the 72px a plain number
-   takes, so its line's code starts where every other line's does. */
+/* Its 63px and its 9px right margin take the 72px a plain number
+   takes, as a site's button does, so its line's code starts where
+   every other line's does and its digits end where theirs do. */
 html[data-mode="methods"] .lineno.mdef {
-  position: relative; box-sizing: border-box; width: 50px; padding-right: 11px;
-  margin: 4px 22px 4px 0; line-height: 24px; cursor: pointer; pointer-events: auto;
+  position: relative; box-sizing: border-box; width: 63px; padding-right: 11px;
+  margin: 4px 9px 4px 0; line-height: 24px; cursor: pointer; pointer-events: auto;
   font: 600 13px/24px var(--font-code); border: 1px solid transparent;
   border-radius: 6px; background: var(--cond-tint);
   --mdef-status: var(--bad); color: var(--mdef-status);

@@ -1782,12 +1782,52 @@ class KernelTest < Id58TestBase
     assert_equal [false, true], located.call('tree-7', 'data-arm')
   end
 
+  test '6rTS6d', %w(
+  | Example: ship, an if then a value, measured within methods,
+  | called once with a paid order
+  | Its card folds the if's tree under the if's row.
+  | The fold holds the same rows as the if's tree within each
+  | decision: its operator, its 2 path counts, the one never
+  | taken first, and its operands.
+  ) do
+    dir = Dir.mktmpdir('6rTS6d')
+    File.write("#{dir}/ship6d.rb", <<~RUBY)
+      module Ship6rTS6d
+        def self.ship(order)
+          if order[:paid]
+            order[:packed] = true
+          end
+          order
+        end
+      end
+    RUBY
+    exit_report = nil
+    on_exit = ->(&block) { exit_report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+      measure :decisions, :methods
+      report :html
+    end
+    require "#{dir}/ship6d.rb"
+    Ship6rTS6d.ship({ paid: true })
+    exit_report.call
+    page = REXML::Document.new(File.read("#{dir}/files/ship6d.rb.html"))
+    fold = "//div[@class='fold'][@data-site='ship6d.rb:3:4']"
+    site = page.elements["#{fold}/div[@class='site']"]
+    counts = page.elements.to_a("#{fold}//*[@data-count]")
+    assert_equal(%w(0 1), counts.map { text_of(_1) })
+    tree = page.elements["//div[@id='tree-3']/div[@class='site']"]
+    assert_equal tree.to_s, site.to_s
+  end
+
   private
 
   # [label, last cell's text] of each row of the statement card
   # of the def at line first in page.
   def card_taken(page, first)
-    card = page[%r{id="paths-#{first}".*?</div></div>}]
+    card = page[/id="paths-#{first}".*$/]
     card.scan(%r{<div class="prow[^>]*>(.*?)</div>}).map do |(row)|
       texts = row.scan(%r{<span[^>]*>([^<]*)</span>}).flatten
       [texts.first, texts.last]

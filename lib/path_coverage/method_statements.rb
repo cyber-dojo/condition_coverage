@@ -181,13 +181,19 @@ module PathCoverage
 
       # node when it is a site, else the outermost sites in its
       # children, in order; none in a block, whose body is a
-      # context of its own, running once for each of its calls.
+      # context of its own, running once for each of its calls,
+      # or in a def or a lambda, whose body runs only when it is
+      # called, a def's sites rows of its own card.
       def sites_in(node)
         return [node] if site?(node)
-        return [] if node.type == :block_node
+        return [] if SCOPES.include?(node.type)
 
         node.compact_child_nodes.flat_map { |child| sites_in(child) }
       end
+
+      # The nodes whose bodies run in a context of their own, so
+      # are never looked through.
+      SCOPES = %i[block_node def_node lambda_node].freeze
 
       # True when decision mode has a site named where node's
       # site would start.

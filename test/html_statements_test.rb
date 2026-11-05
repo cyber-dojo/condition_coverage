@@ -7,16 +7,21 @@ class HtmlStatementsTest < Id58TestBase
   | Example: ship, an if with only its then taken, then a value
   | Its card is a hidden grid, level with its def, line 1,
   | to its last line, 6.
-  | Its title row has its name, its complexity, then, above
-  | paths, its size, the sum of its rows' paths, and, above
-  | taken, how many of those were taken.
+  | Its title row has its name, its complexity, then how many
+  | of its paths were not taken, a row not known counting as
+  | not taken, and how many were.
   | Its next row titles its columns.
   | A row's column is two digits, eg 2:02, so they line up.
-  | Each row after has its line:column, its top, its paths
-  | and how many were taken, ? when not known.
+  | Each row after has its line:column, its top, how many of
+  | its paths were not taken, and how many were, ? for both
+  | when not known.
+  | Not taken is orange, taken blue, as the cells' classes
+  | have it.
   | It has a gap, as its if's else was never taken.
   | A site's row is marked as one, to open its tree when
   | clicked.
+  | A site's top is coloured as the code it is, as its tree's
+  | operator is, eg if as a keyword.
   ) do
     source = <<~RUBY
       def ship(order)
@@ -35,11 +40,17 @@ class HtmlStatementsTest < Id58TestBase
     assert_includes html, '<div class="prow site" data-line="2">'
     assert_includes html, '<div class="prow" data-line="5">'
     assert_equal [
-      ['ship', '*2', '3', '1'],
-      ['line:col', '', 'paths', 'taken'],
-      ['2:02', 'if', '2', '1'],
-      ['5:02', 'value', '1', '?']
+      ['ship', '*2', '2', '1'],
+      ['line:col', '', 'not taken', 'taken'],
+      ['2:02', 'if', '1', '1'],
+      ['5:02', 'value', '?', '?']
     ], cells(html)
+    counts = '<span class="pcell not-taken">1</span>' \
+             '<span class="pcell was-taken">1</span>'
+    assert_includes html, counts
+    top = '<span class="pcell"><span class="k">if</span></span>'
+    assert_includes html, top
+    assert_includes html, '<span class="pcell">value</span>'
   end
 
   test 'Hs4q02', %w(
@@ -55,6 +66,53 @@ class HtmlStatementsTest < Id58TestBase
     rows = PathCoverage::MethodStatements.of(source, 'k.rb')[site]
     html = card(site, :member?, rows, [3], 1)
     assert_includes html, 'data-status="covered"'
+  end
+
+  test 'Hs4q03', %w(
+  | Example: ship, an if then a value, the if's tree rows given
+  | for the if's site, the only site asked for
+  | The if's row starts with an arrow, left of its line:col,
+  | showing whether its fold is open, as a click on the row
+  | opens or closes it.
+  | Straight after the if's row is its fold, hidden until
+  | then, holding the if's rows as its tree draws them.
+  | The value's row is no site, so it has no arrow and no
+  | fold.
+  ) do
+    source = <<~RUBY
+      def ship(order)
+        if order.paid?
+          order.pack
+        end
+        order
+      end
+    RUBY
+    site = 'k.rb:1:0'
+    rows = PathCoverage::MethodStatements.of(source, 'k.rb')[site]
+    tree = '<div class="row">if</div>'
+    asked = []
+    html = card(site, :ship, rows, [1, nil], 6) do |at|
+      asked << at
+      tree
+    end
+    assert_equal ['k.rb:2:2'], asked
+    order = html.scan(/<div class="(prow[^"]*|fold)"/).flatten
+    expected = ['prow calls', 'prow columns', 'prow site'] +
+               %w(fold prow)
+    assert_equal expected, order
+    row = [
+      '<div class="prow site" data-line="2">',
+      '<button type="button" class="fold-arrow"',
+      ' aria-expanded="false" aria-label="Paths of 2:02">',
+      '</button><span class="plabel">2:02</span>'
+    ].join
+    assert_includes html, row
+    fold = [
+      '<div class="fold" data-site="k.rb:2:2" hidden="hidden">',
+      %(<div class="site" data-site="">#{tree}</div></div>)
+    ].join
+    assert_includes html, fold
+    assert_includes html, '<div class="prow" data-line="5"><span'
   end
 
   private
