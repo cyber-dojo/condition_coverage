@@ -602,6 +602,22 @@ class ManifestTest < Id58TestBase
     assert_equal expected, actual
   end
 
+  test '6asybb', %w(
+  | Example: case x when 1 ... when 2, *more ... end
+  | A splat among a later when's patterns, after a plain one,
+  | makes the case no site, as one in its first when does.
+  ) do
+    source = <<~RUBY
+      def kind(x, more)
+        case x
+        when 1 then :one
+        when 2, *more then :many
+        end
+      end
+    RUBY
+    assert_equal({}, PathCoverage::Manifest.sites(source, 'k.rb'))
+  end
+
   test '6asya9', %w(
   | Example: case x when 1 then :one end
   | With no else, the case has its when arms only.
@@ -732,6 +748,22 @@ class ManifestTest < Id58TestBase
       'id.name unless id.nil?', 'id if id.ok?', 'id.ok? rescue false'
     ]
     assert_equal expected, texts
+  end
+
+  test '6asyba', %w(
+  | Example: a block whose one expression is a ternary, and one
+  | whose one expression is an if ... end
+  | Neither is a modifier: each can be a bare argument.
+  | So neither is noted among its site's commands.
+  ) do
+    source = <<~RUBY
+      def k(ids)
+        ids.count { |id| id.ok? ? id.big? : false }
+        ids.select { |id| if id.ok? then id.big? else false end }
+      end
+    RUBY
+    sites = PathCoverage::Manifest.sites(source, 'k.rb')
+    assert_equal [], sites.values.flat_map(&:commands)
   end
 
   test '6asyb5', %w(

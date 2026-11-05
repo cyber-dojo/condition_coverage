@@ -368,4 +368,28 @@ class SiteTreeTest < Id58TestBase
     }
     assert_equal expected, labels
   end
+
+  test 'EuNs87', %w(
+  | Example: case x when 1 then :one else :other end, each path
+  | taken once
+  | Its else is taken on each path its one when did not match,
+  | and not on the one it did.
+  ) do
+    source = <<~RUBY
+      def kind(x)
+        case x
+        when 1 then :one
+        else :other
+        end
+      end
+    RUBY
+    site = PathCoverage::Manifest.sites(source, 'k.rb').values.first
+    paths = PathCoverage::SitePaths.possible(site).map do |path|
+      { path:, count: 1 }
+    end
+    tree = PathCoverage::SiteTree.of(source, site, paths)
+    arms = tree[:operands].map { [_1[:arm], _1[:cells]] }
+    expected = [[:when, [true, false]], [:else, [false, true]]]
+    assert_equal expected, arms
+  end
 end

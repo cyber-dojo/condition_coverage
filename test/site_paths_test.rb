@@ -205,6 +205,48 @@ class SitePathsTest < Id58TestBase
     assert_equal 9, treated.size
   end
 
+  test 'Sp3x98', %w(
+  | Example: [ids.select { |i| i.odd? }].any? && c, and the same
+  | with two selects in the array, with any? treated as nonempty
+  | The array, not a select, is any?'s receiver, and it has
+  | items whatever the selects keep.
+  | So any? stays true or false on each path, as untreated.
+  ) do
+    sources = [
+      "def k(ids, c) = [ids.select { |i| i.odd? }].any? && c\n",
+      'def k(ids, c) = [ids.select { |i| i.odd? }, ' \
+      "ids.select { |i| i.even? }].any? && c\n"
+    ]
+    same = sources.map do |source|
+      sites = PathCoverage::Manifest.sites(source, 'k.rb', [], [],
+                                           ['any?'])
+      plain = PathCoverage::Manifest.sites(source, 'k.rb')
+      [sites, plain].map do |all|
+        PathCoverage::SitePaths.possible(all.values.last)
+      end.uniq.size
+    end
+    assert_equal [1, 1], same
+  end
+
+  test 'Sp3x99', %w(
+  | Example: ids.any? { |i| i.odd? } && c
+  | The any? is the &&'s first operand, so its path decides
+  | the &&: true exactly when an answer was true.
+  | So c is only evaluated on any?'s true paths.
+  ) do
+    source = "def k(ids, c) = ids.any? { |i| i.odd? } && c\n"
+    sites = PathCoverage::Manifest.sites(source, 'k.rb')
+    expected = [
+      ['0 items', nil, nil],
+      ['1 item', true, true], ['1 item', true, false],
+      ['1 item', false, nil],
+      ['2+ items', true, true], ['2+ items', true, false],
+      ['2+ items', false, nil]
+    ]
+    actual = PathCoverage::SitePaths.possible(sites.values.first)
+    assert_equal expected, actual
+  end
+
   test 'Sp3x95', %w(
   | Example: ids.reject { |i| i.odd? }.any?, and each other
   | block method whose result can have items, over real ids
@@ -223,10 +265,10 @@ class SitePathsTest < Id58TestBase
     }
     actual = told.keys.to_h do |name|
       said = idss.map { |ids| told_and_real(name, ids) }
-      wrong = said.reject { |says, real| says.nil? || says == real }
-      [name, [said.map(&:first), wrong]]
+      filled = said.map { |says, real| says.nil? ? real : says }
+      [name, [said.map(&:first), filled == said.map(&:last)]]
     end
-    expected = told.transform_values { |says| [says, []] }
+    expected = told.transform_values { |says| [says, true] }
     assert_equal expected, actual
   end
 

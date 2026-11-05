@@ -52,8 +52,9 @@ module PathCoverage
         'partition' => ALWAYS,
         'take_while' => lambda do |items, answer|
           next false if items == ITEMS[0]
+          next answer if answer
 
-          answer || (items == ITEMS[1] ? false : nil)
+          items == ITEMS[1] ? false : nil
         end
       }.freeze
 

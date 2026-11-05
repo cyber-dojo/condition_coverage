@@ -54,8 +54,8 @@ module PathCoverage
     # A Collector that has visited each def in source, with
     # sites, or, for nil, those of no settings.
     def self.collect(source, path, sites)
-      known = sites || Manifest.sites(source, path)
-      collector = Collector.new(path, known)
+      sites = Manifest.sites(source, path) if sites.nil?
+      collector = Collector.new(path, sites)
       Prism.parse(source).value.accept(collector)
       collector
     end
@@ -133,7 +133,8 @@ module PathCoverage
 
     # How many of a site row's paths have a count in paths.
     def self.taken_site(row, paths)
-      paths.fetch(row.site).count { |each| each[:count].positive? }
+      counts = paths.fetch(row.site).map { |each| each[:count] }
+      counts.count(&:positive?)
     end
 
     # Collects each def's top-level statements.

@@ -110,10 +110,17 @@ module PathCoverage
       operands.flat_map do |operand|
         case operand
         when Condition then operand.leaves
-        when Arm then operand.body&.leaves || []
+        when Arm then arm_leaves(operand)
         else [operand]
         end
       end
+    end
+
+    # The leaves of arm's body, none for an arm whose body is no
+    # condition.
+    def arm_leaves(arm)
+      body = arm.body
+      body ? body.leaves : []
     end
   end
 end

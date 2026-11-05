@@ -156,7 +156,8 @@ class RecorderTest < Id58TestBase
   end
 
   test '8TuB61', %w(
-  | Example: ids.any? { |id| ok.include?(id) }
+  | Example: ids.any? { |id| ok.include?(id) }, with no ids, one
+  | id ok or not, and two ids, neither ok or the second
   | The call is entered before it runs.
   | It is left after it returns.
   | Each of the block's answers is noted on the way.
@@ -176,20 +177,23 @@ class RecorderTest < Id58TestBase
       end
       recorder.leave(trail, recorder.end_items(site, 0, begun, found))
     end
-    founds = [[[], []], [[:a], [:a]], [%i[a b], []]].map do |ids, ok|
-      any.call(ids, ok)
-    end
-    assert_equal [false, true, false], founds
+    calls = [
+      [[], []], [[:a], [:a]], [[:a], []], [%i[a b], []],
+      [%i[a b], [:b]]
+    ]
+    founds = calls.map { |ids, ok| any.call(ids, ok) }
+    assert_equal [false, true, false, false, true], founds
     expected = {
       site => {
         ['0 items', nil] => 1, ['1 item', true] => 1,
-        ['2+ items', false] => 1
+        ['1 item', false] => 1, ['2+ items', false] => 1,
+        ['2+ items', true] => 1
       }
     }
     assert_equal expected, recorder.site_paths
     counts = {
-      [site, 0] => { truthy: 2, falsy: 1 },
-      [site, 1] => { truthy: 1, falsy: 2 }
+      [site, 0] => { truthy: 4, falsy: 1 },
+      [site, 1] => { truthy: 2, falsy: 4 }
     }
     assert_equal counts, recorder.counts
   end
@@ -213,7 +217,8 @@ class RecorderTest < Id58TestBase
   end
 
   test '8TuB63', %w(
-  | Example: ids.select { |id| id.odd? }
+  | Example: ids.select { |id| id.odd? }, with no ids, one id odd
+  | or not, and two ids, both odd, both even or one each
   | select calls its block with every item.
   | Each answer is noted.
   | The path is how many ids, and whether the answers were
@@ -229,16 +234,18 @@ class RecorderTest < Id58TestBase
       kept = ids.select { |id| recorder.answer_at(site, 0, id.odd?) }
       recorder.leave(trail, recorder.end_items(site, 0, begun, kept))
     end
-    kept = [[], [1], [1, 3], [1, 2]].map { |ids| select.call(ids) }
-    assert_equal [[], [1], [1, 3], [1]], kept
+    idss = [[], [1], [2], [1, 3], [2, 4], [1, 2]]
+    kept = idss.map { |ids| select.call(ids) }
+    assert_equal [[], [1], [], [1, 3], [], [1]], kept
     expected = {
       site => {
         ['0 items', nil] => 1, ['1 item', 'all true'] => 1,
-        ['2+ items', 'all true'] => 1, ['2+ items', 'both'] => 1
+        ['1 item', 'all false'] => 1, ['2+ items', 'all true'] => 1,
+        ['2+ items', 'all false'] => 1, ['2+ items', 'both'] => 1
       }
     }
     assert_equal expected, recorder.site_paths
-    assert_equal({ truthy: 4, falsy: 1 }, recorder.counts[[site, 1]])
+    assert_equal({ truthy: 4, falsy: 4 }, recorder.counts[[site, 1]])
   end
 
   test '8TuB64', %w(

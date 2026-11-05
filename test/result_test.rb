@@ -99,4 +99,26 @@ class ResultTest < Id58TestBase
     expected = { 'k.rb:1:11' => { ['nil'] => 1 } }
     assert_equal expected, result.outside
   end
+
+  test 'DYTY51', %w(
+  | Example: u.name&.size and v.name&.size, name treated as
+  | present, each run once with name nil
+  | The treatment is wrong at both sites, so outside lists
+  | both, each with how many evaluations took its nil path.
+  ) do
+    present = lambda do |range|
+      condition('&.', range, fixed: { range => :present })
+    end
+    sites = { 'k.rb:1:11' => present.call(11...17),
+              'k.rb:2:11' => present.call(31...37) }
+    site_paths = {
+      'k.rb:1:11' => { ['not nil'] => 3, ['nil'] => 1 },
+      'k.rb:2:11' => { ['nil'] => 2 }
+    }
+    result = PathCoverage::Result.new(sites, {}, site_paths)
+    expected = {
+      'k.rb:1:11' => { ['nil'] => 1 }, 'k.rb:2:11' => { ['nil'] => 2 }
+    }
+    assert_equal expected, result.outside
+  end
 end

@@ -627,7 +627,7 @@ class HtmlFileTest < Id58TestBase
     actual = cells.map do |cell|
       %w(prev next).map do |way|
         link = cell.elements["a[@data-#{way}]"]
-        link&.attributes&.[]('href')
+        link&.[]('href')
       end
     end
     expected = [

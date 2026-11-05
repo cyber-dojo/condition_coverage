@@ -49,8 +49,10 @@ module PathCoverage
     # each only when set: runs whose fingerprints differ list
     # their sites' paths differently.
     def fingerprint
-      all = { 'ignored' => @ignored, 'treats' => @treats }
-      all.reject { |_, setting| setting.empty? }
+      print = {}
+      print['ignored'] = @ignored unless @ignored.empty?
+      print['treats'] = @treats unless @treats.empty?
+      print
     end
   end
 end

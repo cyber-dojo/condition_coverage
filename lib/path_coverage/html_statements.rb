@@ -49,8 +49,8 @@ module PathCoverage
     def self.body(rows, taken, &tree)
       rows.zip(taken).map do |row, count|
         site = row.site
-        rows = site && tree&.call(site)
-        row_of(row, count, folds: !rows.nil?) + fold(row, rows)
+        folded = tree&.call(site) if site
+        row_of(row, count, folds: !folded.nil?) + fold(row, folded)
       end.join
     end
 

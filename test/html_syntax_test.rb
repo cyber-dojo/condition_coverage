@@ -115,4 +115,13 @@ class HtmlSyntaxTest < Id58TestBase
                '<span class="s">&quot;b&quot;</span>'
     assert_equal expected, html
   end
+
+  test 'Sx7h18', %w(
+  | Example: name = @user&.name
+  | @user and &. touch, but are of different classes.
+  | So each keeps a range of its own, not joined.
+  ) do
+    ranges = PathCoverage::HtmlSyntax.of("name = @user&.name\n")
+    assert_equal({ 1 => [[7, 12, 'v'], [12, 14, 'o']] }, ranges)
+  end
 end

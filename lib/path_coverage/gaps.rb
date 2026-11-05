@@ -6,12 +6,11 @@ module PathCoverage
   module Gaps
     # The gap lines of operands, paths and outside, as Result
     # gives them, in manifest order; texts is { site => each
-    # leaf's source text }.
+    # leaf's source text }. A site's first leaf runs before any
+    # other, so a site whose first never ran was never reached.
     def self.lines(operands, paths: {}, texts: {}, outside: {})
       operands.flat_map do |site, counts|
-        if counts.all? { |each| never_ran?(each) }
-          next ["#{site} never reached"]
-        end
+        next ["#{site} never reached"] if never_ran?(counts.first)
 
         path_gaps(site, paths.fetch(site, []), texts[site]) +
           ruled_out(site, outside.fetch(site, {}), texts[site])
@@ -29,10 +28,11 @@ module PathCoverage
     end
 
     # The outcome of each leaf path reaches, each named by its
-    # text, eg "`u.name` nil".
+    # text, eg "`u.name` nil". A path's first leaf always has an
+    # outcome, so it always has a step.
     def self.steps(path, texts)
-      path.zip(texts).filter_map do |outcome, text|
-        "#{code(text)} #{outcome}" unless outcome.nil?
+      path.zip(texts).each_with_object([]) do |(outcome, text), all|
+        all << "#{code(text)} #{outcome}" unless outcome.nil?
       end.join(', ')
     end
 
@@ -40,8 +40,11 @@ module PathCoverage
     # them, naming the outcome of each leaf the path reaches,
     # texts being each leaf's source text.
     def self.path_gaps(site, paths, texts)
-      paths.select { |each| each[:count].zero? }.map do |each|
-        "#{site} path never taken: #{steps(each[:path], texts)}"
+      paths.each_with_object([]) do |each, lines|
+        next unless each[:count].zero?
+
+        named = steps(each[:path], texts)
+        lines << "#{site} path never taken: #{named}"
       end
     end
 

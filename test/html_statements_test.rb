@@ -177,6 +177,24 @@ class HtmlStatementsTest < Id58TestBase
     assert_includes html, 'data-site="k.rb:1:31"'
   end
 
+  test 'Hs4q06', %w(
+  | Example: initialize, a def with no statements
+  | Its card has no rows, so no path it could leave untaken: it
+  | is covered, its title row 0 not taken of 0.
+  ) do
+    source = <<~RUBY
+      class Shop
+        def initialize; end
+      end
+    RUBY
+    site = 'k.rb:2:2'
+    rows = PathCoverage::MethodStatements.of(source, 'k.rb')[site]
+    html = card(site, :initialize, rows, [], 2)
+    assert_includes html, 'data-status="covered"'
+    title = cells(html).first
+    assert_equal ['initialize', '*1', '0', '0'], title
+  end
+
   private
 
   # The card HtmlStatements gives for these arguments.
