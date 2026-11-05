@@ -3,17 +3,15 @@ require 'path_coverage/configuration'
 require 'path_coverage/json_writer'
 require 'path_coverage/manifest'
 require 'path_coverage/render'
-require 'tmpdir'
 
 class RenderTest < TidTest
   test 'Rn5d10', %w(
   | rendering from the JSON reports of several runs
   | reports their merged counts, so only the paths that
   | every run left untaken are listed
-  ) do
-    dir = Dir.mktmpdir('Rn5d10')
+  ) do |t|
     source = "def kata?(id) = ok?(id) && id.size == 6\n"
-    File.write("#{dir}/kata.rb", source)
+    t.write(source, 'kata.rb')
     sites = PathCoverage::Manifest.sites(source, 'kata.rb')
     site = sites.keys.first
     leaves = [%w(1:16 1:23), %w(1:27 1:39)]
@@ -24,16 +22,16 @@ class RenderTest < TidTest
     paths = runs.each_with_index.map do |(operands, counts), n|
       taken = [[true, true], [true, false], [false, nil]]
               .zip(counts).map { |path, count| { path:, count: } }
-      file = "#{dir}/run#{n}.json"
+      file = "#{t.dir}/run#{n}.json"
       report = { site => { leaves:, taken: } }
       writer = PathCoverage::JsonWriter
       writer.write({ site => operands }, file, report)
       file
     end
     config = PathCoverage::Configuration.new do
-      root dir
+      root t.dir
       cover '*.rb'
-      coverage_dir dir
+      coverage_dir t.dir
       report :gaps
     end
     gap = "#{site} path never taken: " \
@@ -48,19 +46,18 @@ class RenderTest < TidTest
   | cannot say which paths were taken, so rendering from it
   | reports every path of each site it reached as never
   | taken, rather than claiming any was
-  ) do
-    dir = Dir.mktmpdir('Rn5d20')
+  ) do |t|
     source = "def kata?(id) = ok?(id) && id.size == 6\n"
-    File.write("#{dir}/kata.rb", source)
+    t.write(source, 'kata.rb')
     sites = PathCoverage::Manifest.sites(source, 'kata.rb')
     site = sites.keys.first
     operands = [{ truthy: 1, falsy: 1 }, { truthy: 1, falsy: 0 }]
-    file = "#{dir}/run.json"
+    file = "#{t.dir}/run.json"
     PathCoverage::JsonWriter.write({ site => operands }, file)
     config = PathCoverage::Configuration.new do
-      root dir
+      root t.dir
       cover '*.rb'
-      coverage_dir dir
+      coverage_dir t.dir
       report :gaps
     end
     never = "#{site} path never taken: `ok?(id)`"
@@ -79,22 +76,21 @@ class RenderTest < TidTest
   | one with writes switched off, lists its sites' paths
   | differently, so rendering from it is refused rather than
   | crediting one path's count to another
-  ) do
-    dir = Dir.mktmpdir('Rn5d30')
+  ) do |t|
     source = "def kata?(id) = ok?(id) && id.size == 6\n"
-    File.write("#{dir}/kata.rb", source)
+    t.write(source, 'kata.rb')
     sites = PathCoverage::Manifest.sites(source, 'kata.rb')
     site = sites.keys.first
     operands = [{ truthy: 1, falsy: 1 }, { truthy: 1, falsy: 0 }]
-    file = "#{dir}/run.json"
+    file = "#{t.dir}/run.json"
     PathCoverage::JsonWriter.write({ site => operands }, file)
     json = JSON.parse(File.read(file))
     json['kinds'] -= ['write']
     File.write(file, JSON.generate(json))
     config = PathCoverage::Configuration.new do
-      root dir
+      root t.dir
       cover '*.rb'
-      coverage_dir dir
+      coverage_dir t.dir
       report :gaps
     end
     error = assert_raises(ArgumentError) do
@@ -108,17 +104,16 @@ class RenderTest < TidTest
   | with nothing ignored
   | The render would list the && site's paths, which the run
   | never measured, so rendering from it is refused.
-  ) do
-    dir = Dir.mktmpdir('Rn5d31')
+  ) do |t|
     source = "def kata?(id) = ok?(id) && id.size == 6\n"
-    File.write("#{dir}/kata.rb", source)
-    file = "#{dir}/run.json"
+    t.write(source, 'kata.rb')
+    file = "#{t.dir}/run.json"
     fingerprint = { 'ignored' => ['&&'] }
     PathCoverage::JsonWriter.write({}, file, fingerprint:)
     config = PathCoverage::Configuration.new do
-      root dir
+      root t.dir
       cover '*.rb'
-      coverage_dir dir
+      coverage_dir t.dir
       report :gaps
     end
     error = assert_raises(ArgumentError) do
@@ -132,12 +127,11 @@ class RenderTest < TidTest
   | The summary names the operators ignored after its totals,
   | so a total that leaves out their sites never passes for
   | one that measured them.
-  ) do
-    dir = Dir.mktmpdir('Rn5d32')
+  ) do |t|
     config = PathCoverage::Configuration.new do
-      root dir
+      root t.dir
       cover '*.rb'
-      coverage_dir dir
+      coverage_dir t.dir
       report :summary
       ignore '&&=', '||='
     end
@@ -156,16 +150,15 @@ class RenderTest < TidTest
   | :present, rendered with no treat
   | The run listed no nil path for a name&. receiver, the render
   | would, so rendering from it is refused.
-  ) do
-    dir = Dir.mktmpdir('Rn5d33')
-    File.write("#{dir}/size.rb", "def size(u) = u.name&.size\n")
-    file = "#{dir}/run.json"
+  ) do |t|
+    t.write("def size(u) = u.name&.size\n", 'size.rb')
+    file = "#{t.dir}/run.json"
     fingerprint = { 'treats' => [['name', 'present', nil]] }
     PathCoverage::JsonWriter.write({}, file, fingerprint:)
     config = PathCoverage::Configuration.new do
-      root dir
+      root t.dir
       cover '*.rb'
-      coverage_dir dir
+      coverage_dir t.dir
       report :gaps
     end
     error = assert_raises(ArgumentError) do
@@ -180,11 +173,10 @@ class RenderTest < TidTest
   | value once
   | Their reaches are read back, each statement's the sum of
   | both runs'.
-  ) do
-    dir = Dir.mktmpdir('Rn5d34')
+  ) do |t|
     runs = [{ 'k.rb:2:2' => 2 }, { 'k.rb:2:2' => 1, 'k.rb:3:2' => 1 }]
     files = runs.map.with_index do |reached, i|
-      file = "#{dir}/#{i}.json"
+      file = "#{t.dir}/#{i}.json"
       PathCoverage::JsonWriter.write({}, file, reached:)
       file
     end
@@ -197,8 +189,8 @@ class RenderTest < TidTest
   | Example: a JSON report of a run that did not measure methods
   | It has no reaches, so none are read back, and a render
   | cannot say whether a statement was reached.
-  ) do
-    file = "#{Dir.mktmpdir('Rn5d35')}/run.json"
+  ) do |t|
+    file = "#{t.dir}/run.json"
     PathCoverage::JsonWriter.write({}, file)
     assert_nil PathCoverage::JsonReader.taken([file])[:reached]
   end

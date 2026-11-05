@@ -2,7 +2,6 @@ require_relative 'test_helper'
 require 'path_coverage/kernel'
 require 'json'
 require 'rexml/document'
-require 'tmpdir'
 
 class KernelTest < TidTest
   # Its tests swap the configuration of the one global load
@@ -27,21 +26,15 @@ class KernelTest < TidTest
   | once started with a root and a cover glob,
   | a file matching the glob has its && operands recorded
   | when they run, at sites named relative to the root
-  ) do
-    dir = Dir.mktmpdir('6rTS20')
-    File.write("#{dir}/kata.rb", <<~RUBY)
-      module Kata6rTS20
+  ) do |t|
+    t.write(<<~RUBY, 'kata.rb')
+      module Kata
         def self.ok?(id) = !id.empty?
         def self.kata?(id) = ok?(id) && id.start_with?('N')
       end
     RUBY
-    on_exit = ->(&_report) {} # this test checks the recording only
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-    end
-    require "#{dir}/kata.rb"
-    Kata6rTS20.kata?('N1')
+    t.start # this test checks the recording only
+    t.load('kata.rb')::Kata.kata?('N1')
     site = 'kata.rb:3:23'
     expected = {
       [site, 0] => { truthy: 1, falsy: 0 },
@@ -55,11 +48,11 @@ class KernelTest < TidTest
   test '6rTS30', %w(
   | a file outside the root is left for Ruby
   | to load as normal, uninstrumented
-  ) do
-    covered = Dir.mktmpdir('6rTS30-covered')
-    other = Dir.mktmpdir('6rTS30-other')
-    path = "#{other}/kata.rb"
-    File.write(path, "def kata?(id) = ok?(id) && new?(id)\n")
+  ) do |t|
+    covered = "#{t.dir}/covered"
+    FileUtils.mkdir_p(covered)
+    t.write("def kata?(id) = ok?(id) && new?(id)\n", 'other/kata.rb')
+    path = "#{t.dir}/other/kata.rb"
     config = PathCoverage::Configuration.new do
       root covered
       cover '*.rb'
@@ -70,31 +63,23 @@ class KernelTest < TidTest
   test '6rTS40', %w(
   | the report made as the process exits prints the gaps
   | and writes every operand count as JSON to coverage_dir
-  ) do
-    dir = Dir.mktmpdir('6rTS40')
-    File.write("#{dir}/group.rb", <<~RUBY)
-      module Group6rTS40
+  ) do |t|
+    t.write(<<~RUBY, 'group.rb')
+      module Group
         def self.ok?(id) = !id.empty?
         def self.group?(id) = ok?(id) && id.size == 6
       end
     RUBY
-    report = nil
-    on_exit = ->(&block) { report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-    end
-    require "#{dir}/group.rb"
-    Group6rTS40.group?('Kp9sA2')
+    t.start
+    t.load('group.rb')::Group.group?('Kp9sA2')
     never = 'group.rb:3:24 path never taken: `ok?(id)`'
     expected = [
       "#{never} true, `id.size == 6` false",
       "#{never} false"
     ].join("\n")
-    assert_output("#{expected}\n") { report.call }
+    assert_output("#{expected}\n") { t.report }
 
-    json = JSON.parse(File.read("#{dir}/path_coverage.json"))
+    json = t.json
     expected = {
       'group.rb:3:24' => [
         { 'truthy' => 1, 'falsy' => 0 },
@@ -107,24 +92,16 @@ class KernelTest < TidTest
   test '6rTS42', %w(
   | a ternary's path is recorded as it runs, so one whose
   | predicate was only ever true lists its false path as a gap
-  ) do
-    dir = Dir.mktmpdir('6rTS42')
-    File.write("#{dir}/fee.rb", <<~RUBY)
-      module Fee6rTS42
+  ) do |t|
+    t.write(<<~RUBY, 'fee.rb')
+      module Fee
         def self.fee(member) = member ? 5 : 7
       end
     RUBY
-    report = nil
-    on_exit = ->(&block) { report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-    end
-    require "#{dir}/fee.rb"
-    Fee6rTS42.fee(true)
+    t.start
+    t.load('fee.rb')::Fee.fee(true)
     expected = "fee.rb:2:25 path never taken: `member` false\n"
-    assert_output(expected) { report.call }
+    assert_output(expected) { t.report }
   end
 
   test '6rTS43', %w(
@@ -135,30 +112,22 @@ class KernelTest < TidTest
   | span.
   | Its totals give decisions as [taken, possible]: [1, 3],
   | and methods the same, fee's card being the one ?: row.
-  ) do
-    dir = Dir.mktmpdir('6rTS43')
-    File.write("#{dir}/fee.rb", <<~RUBY)
-      module Fee6rTS43
+  ) do |t|
+    t.write(<<~RUBY, 'fee.rb')
+      module Fee
         def self.fee(user) = user[:member] || user[:vip] ? 5 : 7
       end
     RUBY
-    report = nil
-    on_exit = ->(&block) { report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-    end
-    require "#{dir}/fee.rb"
-    Fee6rTS43.fee({ member: true })
+    t.start
+    t.load('fee.rb')::Fee.fee({ member: true })
     never = 'fee.rb:2:23 path never taken: `user[:member]` false'
     expected = [
       "#{never}, `user[:vip]` true",
       "#{never}, `user[:vip]` false"
     ].join("\n")
-    assert_output("#{expected}\n") { report.call }
+    assert_output("#{expected}\n") { t.report }
 
-    json = JSON.parse(File.read("#{dir}/path_coverage.json"))
+    json = t.json
     expected = {
       'fee.rb:2:23' => {
         'leaves' => [%w(2:23 2:36), %w(2:40 2:50)],
@@ -178,54 +147,38 @@ class KernelTest < TidTest
   | a file loaded during the run is not read again for the
   | exit report: the sites parsed as it loaded are reused,
   | so each covered file is read and parsed at most once
-  ) do
-    dir = Dir.mktmpdir('6rTS45')
-    path = "#{dir}/team.rb"
-    File.write(path, <<~RUBY)
-      module Team6rTS45
+  ) do |t|
+    t.write(<<~RUBY, 'team.rb')
+      module Team
         def self.ok?(id) = !id.empty?
         def self.team?(id) = ok?(id) && id.size == 6
       end
     RUBY
-    report = nil
-    on_exit = ->(&block) { report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-    end
-    require path
-    Team6rTS45.team?('Kp9sA2')
+    t.start
+    t.load('team.rb')::Team.team?('Kp9sA2')
     # A re-read of the file now would find no &&.
-    File.write(path, "module Team6rTS45; end\n")
+    t.write("module Team; end\n", 'team.rb')
     never = 'team.rb:3:23 path never taken: `ok?(id)`'
     expected = [
       "#{never} true, `id.size == 6` false",
       "#{never} false"
     ].join("\n")
-    assert_output("#{expected}\n") { report.call }
+    assert_output("#{expected}\n") { t.report }
   end
 
   test '6rTS47', %w(
   | a covered file the run never loads is parsed for the
   | exit report, so each of its && sites is reported
   | as never reached
-  ) do
-    dir = Dir.mktmpdir('6rTS47')
-    File.write("#{dir}/squad.rb", <<~RUBY)
-      module Squad6rTS47
+  ) do |t|
+    t.write(<<~RUBY, 'squad.rb')
+      module Squad
         def self.ok?(id) = !id.empty?
         def self.squad?(id) = ok?(id) && id.size == 6
       end
     RUBY
-    report = nil
-    on_exit = ->(&block) { report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-    end
-    assert_output("squad.rb:3:24 never reached\n") { report.call }
+    t.start
+    assert_output("squad.rb:3:24 never reached\n") { t.report }
   end
 
   test '6rTS4f', %w(
@@ -236,10 +189,9 @@ class KernelTest < TidTest
   | Within each method: 5 / 8 63%, fee's card: its two
   | 1-path statements reached and one of each if's two, and,
   | in the ifs' thens, member's write reached, big's not.
-  ) do
-    dir = Dir.mktmpdir('6rTS4f')
-    File.write("#{dir}/fee.rb", <<~RUBY)
-      module Fee6rTS4f
+  ) do |t|
+    t.write(<<~RUBY, 'fee.rb')
+      module Fee
         def self.fee(member, big)
           total = 100
           if member
@@ -252,19 +204,11 @@ class KernelTest < TidTest
         end
       end
     RUBY
-    exit_report = nil
-    on_exit = ->(&block) { exit_report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-      report :html
-    end
-    require "#{dir}/fee.rb"
-    Fee6rTS4f.fee(true, false)
-    exit_report.call
+    t.start { report :html }
+    t.load('fee.rb')::Fee.fee(true, false)
+    t.report
 
-    index = REXML::Document.new(File.read("#{dir}/index.html"))
+    index = REXML::Document.new(File.read("#{t.dir}/index.html"))
     total = index.elements.to_a('//tfoot/tr/td')
     expected = ['Total', '2', '2', '/ 4', '50%', '5', '/ 8', '63%']
     assert_equal(expected, total.map { text_of(_1) })
@@ -278,29 +222,27 @@ class KernelTest < TidTest
   | The JSON report's totals have each group's own too: Models
   | took none of crew?'s 3 paths, within its decision or its
   | method.
-  ) do
-    dir = Dir.mktmpdir('6rTS4h')
-    FileUtils.mkdir_p(%W[#{dir}/models #{dir}/lib])
-    File.write("#{dir}/models/crew.rb", "def crew?(a, b) = a && b\n")
-    File.write("#{dir}/lib/zip.rb", "def zip?(a, b) = a || b\n")
+  ) do |t|
+    t.write("def crew?(a, b) = a && b\n", 'models/crew.rb')
+    t.write("def zip?(a, b) = a || b\n", 'lib/zip.rb')
     exit_report = nil
     on_exit = ->(&block) { exit_report = block }
     PathCoverage.start(on_exit:) do
-      root dir
+      root t.dir
       cover '**/*.rb'
-      coverage_dir dir
+      coverage_dir t.dir
       report :html
       group 'Models', 'models/*.rb'
     end
     exit_report.call
 
-    index = REXML::Document.new(File.read("#{dir}/index.html"))
+    index = REXML::Document.new(File.read("#{t.dir}/index.html"))
     tabs = index.elements.to_a("//*[@role='tab']").map { text_of(_1) }
     assert_equal ['All files', 'Models', 'Ungrouped'], tabs
     xpath = "//table[@id='files-1']/tbody/tr/td[1]"
     models = index.elements.to_a(xpath)
     assert_equal(['models/crew.rb'], models.map { text_of(_1) })
-    json = JSON.parse(File.read("#{dir}/path_coverage.json"))
+    json = t.json
     groups = {
       'Models' => { 'decisions' => [0, 3], 'methods' => [0, 3] }
     }
@@ -315,28 +257,26 @@ class KernelTest < TidTest
   | The - is titled no decisions, saying why.
   | The JSON report's Models totals are [0, 0], within
   | decisions and within methods.
-  ) do
-    dir = Dir.mktmpdir('6rTS4n')
-    FileUtils.mkdir_p("#{dir}/lib")
-    File.write("#{dir}/lib/zip.rb", "def zip?(a, b) = a || b\n")
+  ) do |t|
+    t.write("def zip?(a, b) = a || b\n", 'lib/zip.rb')
     exit_report = nil
     on_exit = ->(&block) { exit_report = block }
     PathCoverage.start(on_exit:) do
-      root dir
+      root t.dir
       cover '**/*.rb'
-      coverage_dir dir
+      coverage_dir t.dir
       report :html
       group 'Models', 'models/*.rb'
     end
     exit_report.call
 
-    index = REXML::Document.new(File.read("#{dir}/index.html"))
+    index = REXML::Document.new(File.read("#{t.dir}/index.html"))
     xpath = "//table[@id='files-1']/tfoot/tr/td"
     total = index.elements.to_a(xpath).map { text_of(_1) }
     assert_equal ['Total', '0', '0', '/ 0', '-'], total
     none = index.elements["#{xpath}[5]"].attributes['title']
     assert_equal 'no decisions', none
-    json = JSON.parse(File.read("#{dir}/path_coverage.json"))
+    json = t.json
     groups = {
       'Models' => { 'decisions' => [0, 0], 'methods' => [0, 0] }
     }
@@ -351,28 +291,21 @@ class KernelTest < TidTest
   | [F,T] and [T,F].
   | And each site took every path too.
   | So there are no gaps to print.
-  ) do
-    dir = Dir.mktmpdir('6rTS4p')
-    File.write("#{dir}/items.rb", <<~RUBY)
-      module Items6rTS4p
+  ) do |t|
+    t.write(<<~RUBY, 'items.rb')
+      module Items
         def self.items_of(order)
           order = order[:basket] if order.is_a?(Hash)
           order.is_a?(Array) ? order : []
         end
       end
     RUBY
-    exit_report = nil
-    on_exit = ->(&block) { exit_report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-    end
-    require "#{dir}/items.rb"
+    t.start
+    items_module = t.load('items.rb')::Items
     orders = [nil, { basket: [1] }, [2], { basket: 'x' }]
-    items = orders.map { |order| Items6rTS4p.items_of(order) }
+    items = orders.map { |order| items_module.items_of(order) }
     assert_equal [[], [1], [2], []], items
-    assert_output('', '') { exit_report.call }
+    assert_output('', '') { t.report }
   end
 
   test '6rTS4q', %w(
@@ -384,10 +317,9 @@ class KernelTest < TidTest
   | Within each decision: 2 / 4 50%.
   | Within each method: 5 / 8 63%, member's write in its then
   | reached too.
-  ) do
-    dir = Dir.mktmpdir('6rTS4q')
-    File.write("#{dir}/fee.rb", <<~RUBY)
-      module Fee6rTS4q
+  ) do |t|
+    t.write(<<~RUBY, 'fee.rb')
+      module Fee
         def self.fee(member, big)
           total = 100
           if member
@@ -400,24 +332,23 @@ class KernelTest < TidTest
         end
       end
     RUBY
-    live = "#{dir}/live"
+    live = "#{t.dir}/live"
     exit_report = nil
     on_exit = ->(&block) { exit_report = block }
     PathCoverage.start(on_exit:) do
-      root dir
+      root t.dir
       cover '*.rb'
       coverage_dir live
       report :html
     end
-    require "#{dir}/fee.rb"
-    Fee6rTS4q.fee(true, false)
+    t.load('fee.rb')::Fee.fee(true, false)
     exit_report.call
 
-    later = "#{dir}/later"
+    later = "#{t.dir}/later"
     FileUtils.mkdir_p(later)
     FileUtils.cp("#{live}/path_coverage.json", later)
     config = PathCoverage::Configuration.new do
-      root dir
+      root t.dir
       cover '*.rb'
       coverage_dir later
       report :html
@@ -439,10 +370,9 @@ class KernelTest < TidTest
   | 1-path statements reached, and member's write in its
   | then reached, big's not.
   | Within each method: 6 / 8 75%, not the first report's 5.
-  ) do
-    dir = Dir.mktmpdir('6rTS4r')
-    File.write("#{dir}/fee_runs.rb", <<~RUBY)
-      module Fee6rTS4r
+  ) do |t|
+    t.write(<<~RUBY, 'fee_runs.rb')
+      module Fee
         def self.fee(member, big)
           total = 100
           if member
@@ -455,27 +385,27 @@ class KernelTest < TidTest
         end
       end
     RUBY
-    reports = %w(first second).map { |run| "#{dir}/#{run}" }
+    reports = %w(first second).map { |run| "#{t.dir}/#{run}" }
     exit_reports = reports.map do |out|
       exit_report = nil
       on_exit = ->(&block) { exit_report = block }
       PathCoverage.start(on_exit:) do
-        root dir
+        root t.dir
         cover '*.rb'
         coverage_dir out
       end
       exit_report
     end
-    require "#{dir}/fee_runs.rb"
-    Fee6rTS4r.fee(true, false)
+    fee = t.load('fee_runs.rb')::Fee
+    fee.fee(true, false)
     assert_output(/path never taken/, '') { exit_reports[0].call }
-    Fee6rTS4r.fee(false, false)
+    fee.fee(false, false)
     assert_output(/path never taken/, '') { exit_reports[1].call }
 
-    later = "#{dir}/later"
+    later = "#{t.dir}/later"
     FileUtils.mkdir_p(later)
     config = PathCoverage::Configuration.new do
-      root dir
+      root t.dir
       cover '*.rb'
       coverage_dir later
       report :html
@@ -498,10 +428,9 @@ class KernelTest < TidTest
   | ||= runs it when the target is false, &&= when true.
   | Both paths of each were taken, so there are no gaps.
   | The values are those of the uninstrumented code.
-  ) do
-    dir = Dir.mktmpdir('6rTS4t')
-    File.write("#{dir}/cache_writes.rb", <<~RUBY)
-      module Cache6rTS4t
+  ) do |t|
+    t.write(<<~RUBY, 'cache_writes.rb')
+      module Cache
         def self.fetch(store, key)
           store[key] ||= key.upcase
         end
@@ -511,22 +440,16 @@ class KernelTest < TidTest
         end
       end
     RUBY
-    exit_report = nil
-    on_exit = ->(&block) { exit_report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-    end
-    require "#{dir}/cache_writes.rb"
+    t.start
+    cache = t.load('cache_writes.rb')::Cache
     fetched = [{}, { 'a' => 'B' }].map do |store|
-      Cache6rTS4t.fetch(store, 'a')
+      cache.fetch(store, 'a')
     end
-    trimmed = [' x ', nil].map { |name| Cache6rTS4t.trim(name) }
+    trimmed = [' x ', nil].map { |name| cache.trim(name) }
     assert_equal [%w(A B), ['x', nil]], [fetched, trimmed]
-    assert_output('', '') { exit_report.call }
+    assert_output('', '') { t.report }
 
-    json = JSON.parse(File.read("#{dir}/path_coverage.json"))
+    json = t.json
     taken = %w(cache_writes.rb:3:4 cache_writes.rb:6:4).to_h do |site|
       [site, json['paths'][site]['taken']]
     end
@@ -542,26 +465,18 @@ class KernelTest < TidTest
   | Example: store[:size] ||= 0, called only with an empty store
   | Its target was false each time, so its right side ran.
   | So the path with its target true is a gap.
-  ) do
-    dir = Dir.mktmpdir('6rTS4u')
-    File.write("#{dir}/fill_writes.rb", <<~RUBY)
-      module Fill6rTS4u
+  ) do |t|
+    t.write(<<~RUBY, 'fill_writes.rb')
+      module Fill
         def self.fill(store)
           store[:size] ||= 0
         end
       end
     RUBY
-    exit_report = nil
-    on_exit = ->(&block) { exit_report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-    end
-    require "#{dir}/fill_writes.rb"
-    assert_equal 0, Fill6rTS4u.fill({})
+    t.start
+    assert_equal 0, t.load('fill_writes.rb')::Fill.fill({})
     gap = "fill_writes.rb:3:4 path never taken: `store[:size]` true\n"
-    assert_output(gap, '') { exit_report.call }
+    assert_output(gap, '') { t.report }
   end
 
   test '6rTS4v', %w(
@@ -571,10 +486,9 @@ class KernelTest < TidTest
   | clock and grow, called twice, take both paths of each.
   | LIMIT ||= 6 runs once, as the module loads, so its target
   | true is the one gap.
-  ) do
-    dir = Dir.mktmpdir('6rTS4v')
-    File.write("#{dir}/memo_writes.rb", <<~RUBY)
-      module Memo6rTS4v
+  ) do |t|
+    t.write(<<~RUBY, 'memo_writes.rb')
+      module Memo
         LIMIT ||= 6
         @@count = nil
         class << self
@@ -591,21 +505,15 @@ class KernelTest < TidTest
         end
       end
     RUBY
-    exit_report = nil
-    on_exit = ->(&block) { exit_report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-    end
-    require "#{dir}/memo_writes.rb"
-    clocks = 2.times.map { Memo6rTS4v.clock }
-    grown = [3, 5].map { |n| Memo6rTS4v.grow(n) }
+    t.start
+    memo = t.load('memo_writes.rb')::Memo
+    clocks = 2.times.map { memo.clock }
+    grown = [3, 5].map { |n| memo.grow(n) }
     assert_equal [[Time.at(0)] * 2, [[3, 0, 3]] * 2], [clocks, grown]
     gap = "memo_writes.rb:2:2 path never taken: `LIMIT` true\n"
-    assert_output(gap, '') { exit_report.call }
+    assert_output(gap, '') { t.report }
 
-    json = JSON.parse(File.read("#{dir}/path_coverage.json"))
+    json = t.json
     sites = %w(2:2 8:4 11:4 12:4 13:4).map { "memo_writes.rb:#{_1}" }
     counts = sites.to_h do |site|
       [site, json['paths'][site]['taken'].map { _1['count'] }]
@@ -623,8 +531,7 @@ class KernelTest < TidTest
   | It returns what the same code, uninstrumented, returns.
   | 'x' runs the right side, which rescues to 80; '8080' finds
   | @port set and skips it. So both paths are taken: no gaps.
-  ) do
-    dir = Dir.mktmpdir('6rTS4w')
+  ) do |t|
     source = lambda do |name|
       <<~RUBY
         module #{name}
@@ -634,21 +541,15 @@ class KernelTest < TidTest
         end
       RUBY
     end
-    File.write("#{dir}/port_writes.rb", source.call('Port6rTS4w'))
-    exit_report = nil
-    on_exit = ->(&block) { exit_report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-    end
-    require "#{dir}/port_writes.rb"
+    t.write(source.call('Port'), 'port_writes.rb')
+    t.start
+    port = t.load('port_writes.rb')::Port
     eval(source.call('Plain6rTS4w')) # rubocop:disable Security/Eval
     texts = %w(x 8080)
     plain = texts.map { |text| Plain6rTS4w.port(text) }
-    actual = texts.map { |text| Port6rTS4w.port(text) }
+    actual = texts.map { |text| port.port(text) }
     assert_equal [[80, 80], plain], [actual, actual]
-    assert_output('', '') { exit_report.call }
+    assert_output('', '') { t.report }
   end
 
   test '6rTS4x', %w(
@@ -661,10 +562,9 @@ class KernelTest < TidTest
   | A nil receiver skips the rest of the chain, so the leaves
   | after it are not reached.
   | All three paths are taken, so there are no gaps.
-  ) do
-    dir = Dir.mktmpdir('6rTS4x')
-    File.write("#{dir}/safe_owner.rb", <<~RUBY)
-      module Owner6rTS4x
+  ) do |t|
+    t.write(<<~RUBY, 'safe_owner.rb')
+      module Owner
         User = Struct.new(:account)
         def self.owner(user)
           user&.account&.owner
@@ -672,21 +572,15 @@ class KernelTest < TidTest
         Account = Struct.new(:owner)
       end
     RUBY
-    exit_report = nil
-    on_exit = ->(&block) { exit_report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-    end
-    require "#{dir}/safe_owner.rb"
-    user = Owner6rTS4x::User
-    users = [nil, user.new(nil), user.new(Owner6rTS4x::Account.new('kim'))]
-    owners = users.map { |each| Owner6rTS4x.owner(each) }
+    t.start
+    owner = t.load('safe_owner.rb')::Owner
+    user = owner::User
+    users = [nil, user.new(nil), user.new(owner::Account.new('kim'))]
+    owners = users.map { |each| owner.owner(each) }
     assert_equal [nil, nil, 'kim'], owners
-    assert_output('', '') { exit_report.call }
+    assert_output('', '') { t.report }
 
-    json = JSON.parse(File.read("#{dir}/path_coverage.json"))
+    json = t.json
     expected = [
       { 'path' => ['not nil', 'not nil'], 'count' => 1 },
       { 'path' => ['not nil', 'nil'], 'count' => 1 },
@@ -700,10 +594,9 @@ class KernelTest < TidTest
   | account has an owner
   | Each path with a nil receiver is a gap, naming each
   | receiver it reaches, nil or not nil.
-  ) do
-    dir = Dir.mktmpdir('6rTS4y')
-    File.write("#{dir}/safe_gaps.rb", <<~RUBY)
-      module Gaps6rTS4y
+  ) do |t|
+    t.write(<<~RUBY, 'safe_gaps.rb')
+      module Gaps
         User = Struct.new(:account)
         def self.owner(user)
           user&.account&.owner
@@ -711,22 +604,16 @@ class KernelTest < TidTest
         Account = Struct.new(:owner)
       end
     RUBY
-    exit_report = nil
-    on_exit = ->(&block) { exit_report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-    end
-    require "#{dir}/safe_gaps.rb"
-    account = Gaps6rTS4y::Account.new('kim')
-    assert_equal 'kim', Gaps6rTS4y.owner(Gaps6rTS4y::User.new(account))
+    t.start
+    safe = t.load('safe_gaps.rb')::Gaps
+    account = safe::Account.new('kim')
+    assert_equal 'kim', safe.owner(safe::User.new(account))
     never = 'safe_gaps.rb:4:4 path never taken:'
     gaps = [
       "#{never} `user` not nil, `user&.account` nil",
       "#{never} `user` nil"
     ].map { "#{_1}\n" }.join
-    assert_output(gaps, '') { exit_report.call }
+    assert_output(gaps, '') { t.report }
   end
 
   test '6rTS4z', %w(
@@ -741,10 +628,9 @@ class KernelTest < TidTest
   | admin?, so the &. is not shown twice.
   | user's cells are a disc for not nil and an empty set for nil.
   | Each is titled not nil or nil, for its hover text.
-  ) do
-    dir = Dir.mktmpdir('6rTS4z')
-    File.write("#{dir}/safe_admin.rb", <<~RUBY)
-      module Admin6rTS4z
+  ) do |t|
+    t.write(<<~RUBY, 'safe_admin.rb')
+      module Admin
         User = Struct.new(:role) do
           def admin? = role == :admin
         end
@@ -753,26 +639,19 @@ class KernelTest < TidTest
         end
       end
     RUBY
-    exit_report = nil
-    on_exit = ->(&block) { exit_report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-      report :html
-    end
-    require "#{dir}/safe_admin.rb"
-    user = Admin6rTS4z::User
+    t.start { report :html }
+    admin = t.load('safe_admin.rb')::Admin
+    user = admin::User
     calls = [[false, nil], [true, nil], [true, user.new(:dev)],
              [true, user.new(:admin)]]
-    answers = calls.map { |ok, each| Admin6rTS4z.admin?(ok, each) }
+    answers = calls.map { |ok, each| admin.admin?(ok, each) }
     assert_equal [false, nil, false, true], answers
-    assert_output('', '') { exit_report.call }
+    assert_output('', '') { t.report }
 
-    json = JSON.parse(File.read("#{dir}/path_coverage.json"))
+    json = t.json
     taken = json['paths']['safe_admin.rb:6:4']['taken']
     assert_equal([1, 1, 1, 1], taken.map { _1['count'] })
-    page = File.read("#{dir}/files/safe_admin.rb.html")
+    page = File.read("#{t.dir}/files/safe_admin.rb.html")
     tree = fold_at(page, 'safe_admin.rb:6')
     rows = tree.elements.to_a('.//*[@data-operand]')
     texts = rows.map { text_of(_1.elements['*[@data-text]']) }
@@ -791,10 +670,9 @@ class KernelTest < TidTest
   | The chain folds into the if site as its predicate.
   | So the three calls take its three paths: user nil, and
   | user not nil with admin? true or false.
-  ) do
-    dir = Dir.mktmpdir('6rTS5a')
-    File.write("#{dir}/safe_label.rb", <<~RUBY)
-      module Label6rTS5a
+  ) do |t|
+    t.write(<<~RUBY, 'safe_label.rb')
+      module Label
         User = Struct.new(:role) do
           def admin? = role == :admin
         end
@@ -807,21 +685,15 @@ class KernelTest < TidTest
         end
       end
     RUBY
-    exit_report = nil
-    on_exit = ->(&block) { exit_report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-    end
-    require "#{dir}/safe_label.rb"
-    user = Label6rTS5a::User
+    t.start
+    label = t.load('safe_label.rb')::Label
+    user = label::User
     users = [nil, user.new(:dev), user.new(:admin)]
-    labels = users.map { |each| Label6rTS5a.label(each) }
+    labels = users.map { |each| label.label(each) }
     assert_equal %i[user user admin], labels
-    assert_output('', '') { exit_report.call }
+    assert_output('', '') { t.report }
 
-    json = JSON.parse(File.read("#{dir}/path_coverage.json"))
+    json = t.json
     taken = json['paths']['safe_label.rb:6:4']['taken']
     assert_equal([1, 1, 1], taken.map { _1['count'] })
   end
@@ -833,31 +705,24 @@ class KernelTest < TidTest
   | does not run, yet the target was not found set either.
   | So the write is no site, rather than one reporting its
   | target set when it was never looked at.
-  ) do
-    dir = Dir.mktmpdir('6rTS5b')
-    File.write("#{dir}/safe_write.rb", <<~RUBY)
-      module Fill6rTS5b
+  ) do |t|
+    t.write(<<~RUBY, 'safe_write.rb')
+      module Fill
         Box = Struct.new(:size)
         def self.fill(box)
           box&.size ||= 3
         end
       end
     RUBY
-    exit_report = nil
-    on_exit = ->(&block) { exit_report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-    end
-    require "#{dir}/safe_write.rb"
-    box = Fill6rTS5b::Box
+    t.start
+    fill = t.load('safe_write.rb')::Fill
+    box = fill::Box
     boxes = [nil, box.new(nil), box.new(5)]
-    sizes = boxes.map { Fill6rTS5b.fill(_1) }
+    sizes = boxes.map { fill.fill(_1) }
     assert_equal [nil, 3, 5], sizes
-    assert_output('', '') { exit_report.call }
+    assert_output('', '') { t.report }
 
-    json = JSON.parse(File.read("#{dir}/path_coverage.json"))
+    json = t.json
     assert_equal({}, json.fetch('paths', {}))
   end
 
@@ -866,27 +731,20 @@ class KernelTest < TidTest
   | no ids, one odd, one even, an even then an odd, and two even
   | It is a site of its own, being no part of a larger expression.
   | The five calls take its five paths, so there are no gaps.
-  ) do
-    dir = Dir.mktmpdir('6rTS5d')
-    File.write("#{dir}/found_odd.rb", <<~RUBY)
-      module Found6rTS5d
+  ) do |t|
+    t.write(<<~RUBY, 'found_odd.rb')
+      module Found
         def self.found?(ids)
           ids.any? { |id| id.odd? }
         end
       end
     RUBY
-    exit_report = nil
-    on_exit = ->(&block) { exit_report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-    end
-    require "#{dir}/found_odd.rb"
+    t.start
+    odd = t.load('found_odd.rb')::Found
     calls = [[], [1], [2], [2, 3], [2, 4]]
-    found = calls.map { |ids| Found6rTS5d.found?(ids) }
+    found = calls.map { |ids| odd.found?(ids) }
     assert_equal [false, true, false, true, false], found
-    assert_output('', '') { exit_report.call }
+    assert_output('', '') { t.report }
   end
 
   test '6rTS5e', %w(
@@ -898,29 +756,21 @@ class KernelTest < TidTest
   | the leaf's own row, }.any?, so they read as the code does.
   | The all? is the &&'s operand itself, so the popout shows it
   | as a nested condition, its value following from its path.
-  ) do
-    dir = Dir.mktmpdir('6rTS5e')
-    File.write("#{dir}/both_html.rb", <<~RUBY)
-      module Both6rTS5e
+  ) do |t|
+    t.write(<<~RUBY, 'both_html.rb')
+      module Both
         def self.both?(ids)
           ids.select { |id| id.odd? }.any? && ids.all? { |id| id > 0 }
         end
       end
     RUBY
-    exit_report = nil
-    on_exit = ->(&block) { exit_report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-      report :html
-    end
-    require "#{dir}/both_html.rb"
-    answers = [[1], [2], [1, -1]].map { |ids| Both6rTS5e.both?(ids) }
+    t.start { report :html }
+    both = t.load('both_html.rb')::Both
+    answers = [[1], [2], [1, -1]].map { |ids| both.both?(ids) }
     assert_equal [true, false, false], answers
-    assert_output('', '') { exit_report.call }
+    assert_output('', '') { t.report }
 
-    page = File.read("#{dir}/files/both_html.rb.html")
+    page = File.read("#{t.dir}/files/both_html.rb.html")
     tree = fold_at(page, 'both_html.rb:3')
     operators = tree.elements.to_a('.//*[@data-operator]')
     expected = ['&&', 'select {', 'all?']
@@ -936,10 +786,9 @@ class KernelTest < TidTest
   | with an id found and one not
   | The rewritten code still loads, the command parenthesised.
   | Both paths are taken: lookup(id) nil, and not nil.
-  ) do
-    dir = Dir.mktmpdir('6rTS5c')
-    File.write("#{dir}/safe_rename.rb", <<~RUBY)
-      module Rename6rTS5c
+  ) do |t|
+    t.write(<<~RUBY, 'safe_rename.rb')
+      module Rename
         User = Struct.new(:name) do
           def rename(name)
             self.name = name
@@ -952,19 +801,13 @@ class KernelTest < TidTest
         end
       end
     RUBY
-    exit_report = nil
-    on_exit = ->(&block) { exit_report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-    end
-    require "#{dir}/safe_rename.rb"
-    names = [2, 1].map { |id| Rename6rTS5c.rename(id) }
+    t.start
+    rename = t.load('safe_rename.rb')::Rename
+    names = [2, 1].map { |id| rename.rename(id) }
     assert_equal [nil, 'kim'], names
-    assert_output('', '') { exit_report.call }
+    assert_output('', '') { t.report }
 
-    json = JSON.parse(File.read("#{dir}/path_coverage.json"))
+    json = t.json
     taken = json['paths']['safe_rename.rb:10:4']['taken']
     assert_equal([1, 1], taken.map { _1['count'] })
   end
@@ -978,32 +821,24 @@ class KernelTest < TidTest
   | index.html's Total row shows 1 / 3 33% within each
   | decision, and 2 / 4 50% within each method: ok?'s one row
   | reached, and one of crew?'s && row's three paths taken.
-  ) do
-    dir = Dir.mktmpdir('6rTS48')
-    File.write("#{dir}/crew.rb", <<~RUBY)
-      module Crew6rTS48
+  ) do |t|
+    t.write(<<~RUBY, 'crew.rb')
+      module Crew
         def self.ok?(id) = !id.empty?
         def self.crew?(id) = ok?(id) && id.size == 6
       end
     RUBY
-    exit_report = nil
-    on_exit = ->(&block) { exit_report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-      report :html
-    end
-    require "#{dir}/crew.rb"
-    Crew6rTS48.crew?('Kp9sA2')
+    t.start { report :html }
+    t.load('crew.rb')::Crew.crew?('Kp9sA2')
 
-    assert_output('', '') { exit_report.call }
+    assert_output('', '') { t.report }
 
-    index = REXML::Document.new(File.read("#{dir}/index.html"))
+    index = REXML::Document.new(File.read("#{t.dir}/index.html"))
     total = index.elements.to_a('//tfoot/tr/td')
     expected = ['Total', '1', '1', '/ 3', '33%', '2', '/ 4', '50%']
     assert_equal(expected, total.map { text_of(_1) })
-    page = REXML::Document.new(File.read("#{dir}/files/crew.rb.html"))
+    html = File.read("#{t.dir}/files/crew.rb.html")
+    page = REXML::Document.new(html)
     tree = "//div[@class='fold']//*[@data-count]"
     counts = page.elements.to_a(tree)
     assert_equal(%w(0 0 *), counts.map { |count| text_of(count) })
@@ -1012,19 +847,18 @@ class KernelTest < TidTest
   test '6rTS49', %w(
   | a coverage_dir that does not exist yet is created,
   | parents and all, before the exit report writes into it
-  ) do
-    dir = Dir.mktmpdir('6rTS49')
-    File.write("#{dir}/pair.rb", <<~RUBY)
-      module Pair6rTS49
+  ) do |t|
+    t.write(<<~RUBY, 'pair.rb')
+      module Pair
         def self.ok?(id) = !id.empty?
         def self.pair?(id) = ok?(id) && id.size == 6
       end
     RUBY
-    out = "#{dir}/reports/condition"
+    out = "#{t.dir}/reports/condition"
     exit_report = nil
     on_exit = ->(&block) { exit_report = block }
     PathCoverage.start(on_exit:) do
-      root dir
+      root t.dir
       cover '*.rb'
       coverage_dir out
       report :html
@@ -1039,15 +873,13 @@ class KernelTest < TidTest
   | starting from the environment covers each of its
   | comma-separated globs under its root, writing the JSON
   | report to its dir and POSTing it to its collector
-  ) do
-    dir = Dir.mktmpdir('6rTS4b')
-    FileUtils.mkdir_p(%W[#{dir}/source #{dir}/lib])
-    File.write("#{dir}/source/kata.rb", "def kata?(id) = id\n")
-    File.write("#{dir}/lib/team.rb", "def team?(id) = id\n")
+  ) do |t|
+    t.write("def kata?(id) = id\n", 'source/kata.rb')
+    t.write("def team?(id) = id\n", 'lib/team.rb')
     env = {
-      'PATH_COVERAGE_ROOT' => dir,
+      'PATH_COVERAGE_ROOT' => t.dir,
       'PATH_COVERAGE_COVER' => 'source/*.rb,lib/*.rb',
-      'PATH_COVERAGE_DIR' => "#{dir}/condition",
+      'PATH_COVERAGE_DIR' => "#{t.dir}/condition",
       'PATH_COVERAGE_COLLECTOR' => 'http://10.0.0.7:4570/runs'
     }
     on_exit = ->(&_report) {} # this test checks the settings only
@@ -1059,8 +891,8 @@ class KernelTest < TidTest
       config.collector_url, config.reporters
     ]
     expected = [
-      ["#{dir}/lib/team.rb", "#{dir}/source/kata.rb"],
-      "#{dir}/condition/path_coverage.json",
+      ["#{t.dir}/lib/team.rb", "#{t.dir}/source/kata.rb"],
+      "#{t.dir}/condition/path_coverage.json",
       'http://10.0.0.7:4570/runs', [:post]
     ]
     assert_equal expected, actual
@@ -1071,57 +903,55 @@ class KernelTest < TidTest
   | Starting from the environment skips each of its
   | comma-separated skip globs.
   | So only source/kata.rb is covered of the three files.
-  ) do
-    dir = Dir.mktmpdir('6rTS4g')
-    FileUtils.mkdir_p(%W[#{dir}/source/vendor #{dir}/lib])
-    File.write("#{dir}/source/kata.rb", "def kata?(id) = id\n")
-    File.write("#{dir}/source/vendor/zip.rb", "def zip?(id) = id\n")
-    File.write("#{dir}/lib/gen.rb", "def gen?(id) = id\n")
+  ) do |t|
+    t.write("def kata?(id) = id\n", 'source/kata.rb')
+    t.write("def zip?(id) = id\n", 'source/vendor/zip.rb')
+    t.write("def gen?(id) = id\n", 'lib/gen.rb')
     env = {
-      'PATH_COVERAGE_ROOT' => dir,
+      'PATH_COVERAGE_ROOT' => t.dir,
       'PATH_COVERAGE_COVER' => 'source/**/*.rb,lib/*.rb',
       'PATH_COVERAGE_SKIP' => 'source/vendor/**/*.rb,lib/gen.rb',
-      'PATH_COVERAGE_DIR' => "#{dir}/condition",
+      'PATH_COVERAGE_DIR' => "#{t.dir}/condition",
       'PATH_COVERAGE_COLLECTOR' => 'http://10.0.0.7:4570/runs'
     }
     on_exit = ->(&_report) {} # this test checks the settings only
     PathCoverage.start_from_env(env, on_exit:)
-    assert_equal ["#{dir}/source/kata.rb"], PathCoverage.config.files
+    kata = "#{t.dir}/source/kata.rb"
+    assert_equal [kata], PathCoverage.config.files
   end
 
   test '6rTS4a', %w(
   | the pages rendered later from the JSON report alone,
   | by a render that recorded nothing, are the very pages
   | the recording run wrote, fixed leaves and gaps and all
-  ) do
-    dir = Dir.mktmpdir('6rTS4a')
-    File.write("#{dir}/gang.rb", <<~RUBY)
-      module Gang6rTS4a
+  ) do |t|
+    t.write(<<~RUBY, 'gang.rb')
+      module Gang
         LIMIT = 6
         def self.ok?(id) = !id.empty?
         def self.gang?(id) = ok?(id) && id.size == LIMIT
         def self.limit(n) = n || 6
       end
     RUBY
-    live = "#{dir}/live"
+    live = "#{t.dir}/live"
     exit_report = nil
     on_exit = ->(&block) { exit_report = block }
     PathCoverage.start(on_exit:) do
-      root dir
+      root t.dir
       cover '*.rb'
       coverage_dir live
       report :html
     end
-    require "#{dir}/gang.rb"
-    Gang6rTS4a.gang?('Kp9sA2')
-    Gang6rTS4a.limit(nil)
+    gang = t.load('gang.rb')::Gang
+    gang.gang?('Kp9sA2')
+    gang.limit(nil)
     exit_report.call
 
-    later = "#{dir}/later"
+    later = "#{t.dir}/later"
     FileUtils.mkdir_p(later)
     FileUtils.cp("#{live}/path_coverage.json", later)
     config = PathCoverage::Configuration.new do
-      root dir
+      root t.dir
       cover '*.rb'
       coverage_dir later
       report :html
@@ -1140,35 +970,34 @@ class KernelTest < TidTest
   | The render writes crew.rb's page only.
   | gen.rb's page, from the run before, is removed.
   | So the files dir holds a page for each covered file alone.
-  ) do
-    dir = Dir.mktmpdir('6rTS4m')
-    File.write("#{dir}/crew.rb", <<~RUBY)
-      module Crew6rTS4m
+  ) do |t|
+    t.write(<<~RUBY, 'crew.rb')
+      module Crew
         def self.crew?(id) = !id.empty? && id.size == 6
       end
     RUBY
-    File.write("#{dir}/gen.rb", <<~RUBY)
-      module Gen6rTS4m
+    t.write(<<~RUBY, 'gen.rb')
+      module Gen
         def self.gen?(id) = id.nil? || id.empty?
       end
     RUBY
-    out = "#{dir}/reports"
+    out = "#{t.dir}/reports"
     exit_report = nil
     on_exit = ->(&block) { exit_report = block }
     PathCoverage.start(on_exit:) do
-      root dir
+      root t.dir
       cover '*.rb'
       coverage_dir out
       report :html
     end
-    require "#{dir}/crew.rb"
-    require "#{dir}/gen.rb"
-    Crew6rTS4m.crew?('Kp9sA2')
-    Gen6rTS4m.gen?('Kp9sA2')
+    crew = t.load('crew.rb')::Crew
+    gen = t.load('gen.rb')::Gen
+    crew.crew?('Kp9sA2')
+    gen.gen?('Kp9sA2')
     exit_report.call
 
     config = PathCoverage::Configuration.new do
-      root dir
+      root t.dir
       cover '*.rb'
       skip 'gen.rb'
       coverage_dir out
@@ -1191,10 +1020,9 @@ class KernelTest < TidTest
   | methods [5, 8], fee's card: its two 1-path statements
   | reached, one of each if's two, and, in the ifs' thens,
   | member's write reached, big's not.
-  ) do
-    dir = Dir.mktmpdir('6rTS41')
-    File.write("#{dir}/fee.rb", <<~RUBY)
-      module Fee6rTS41
+  ) do |t|
+    t.write(<<~RUBY, 'fee.rb')
+      module Fee
         def self.fee(member, big)
           total = 100
           if member
@@ -1207,23 +1035,15 @@ class KernelTest < TidTest
         end
       end
     RUBY
-    report = nil
-    on_exit = ->(&block) { report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-    end
-    require "#{dir}/fee.rb"
-    assert_equal 95, Fee6rTS41.fee(true, false)
+    t.start
+    assert_equal 95, t.load('fee.rb')::Fee.fee(true, false)
     expected = [
       'fee.rb:4:4 path never taken: `member` false',
       'fee.rb:7:4 path never taken: `big` true'
     ].join("\n")
-    assert_output("#{expected}\n") { report.call }
-    json = JSON.parse(File.read("#{dir}/path_coverage.json"))
+    assert_output("#{expected}\n") { t.report }
     totals = { 'decisions' => [2, 4], 'methods' => [5, 8] }
-    assert_equal totals, json['totals']
+    assert_equal totals, t.json['totals']
   end
 
   test '6rTS4c', %w(
@@ -1232,10 +1052,9 @@ class KernelTest < TidTest
   | The covered case still picks :small and :other.
   | The exit report prints each path its patterns never took.
   | Eg `1` true, as 1 was never passed.
-  ) do
-    dir = Dir.mktmpdir('6rTS4c')
-    File.write("#{dir}/kind.rb", <<~RUBY)
-      module Kind6rTS4c
+  ) do |t|
+    t.write(<<~RUBY, 'kind.rb')
+      module Kind
         def self.kind(x)
           case x
           when 1, 2 then :small
@@ -1245,22 +1064,16 @@ class KernelTest < TidTest
         end
       end
     RUBY
-    report = nil
-    on_exit = ->(&block) { report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-    end
-    require "#{dir}/kind.rb"
-    actual = [Kind6rTS4c.kind(2), Kind6rTS4c.kind(:k)]
+    t.start
+    kind = t.load('kind.rb')::Kind
+    actual = [kind.kind(2), kind.kind(:k)]
     assert_equal %i[small other], actual
     never = 'kind.rb:3:4 path never taken:'
     expected = [
       "#{never} `1` true",
       "#{never} `1` false, `2` false, `String` true"
     ].join("\n")
-    assert_output("#{expected}\n") { report.call }
+    assert_output("#{expected}\n") { t.report }
   end
 
   test '6rTS4d', %w(
@@ -1271,10 +1084,9 @@ class KernelTest < TidTest
   | It still returns :not, :led, :not.
   | The exit report prints the paths each site never took.
   | Eg the if never had `ids` 1 item with the block false.
-  ) do
-    dir = Dir.mktmpdir('6rTS4d')
-    File.write("#{dir}/led.rb", <<~RUBY)
-      module Team6rTS4d
+  ) do |t|
+    t.write(<<~RUBY, 'led.rb')
+      module Team
         def self.led?(ids)
           if ids.any? { |id| id.start_with?('L') && id.size > 1 }
             :led
@@ -1284,15 +1096,9 @@ class KernelTest < TidTest
         end
       end
     RUBY
-    report = nil
-    on_exit = ->(&block) { report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-    end
-    require "#{dir}/led.rb"
-    led = [[], ['Lx'], %w(ab cd)].map { |ids| Team6rTS4d.led?(ids) }
+    t.start
+    team = t.load('led.rb')::Team
+    led = [[], ['Lx'], %w(ab cd)].map { |ids| team.led?(ids) }
     assert_equal %i[not led not], led
     block = "`id.start_with?('L') && id.size > 1`"
     expected = [
@@ -1301,7 +1107,7 @@ class KernelTest < TidTest
       'led.rb:3:23 path never taken: ' \
       "`id.start_with?('L')` true, `id.size > 1` false"
     ].join("\n")
-    assert_output("#{expected}\n") { report.call }
+    assert_output("#{expected}\n") { t.report }
   end
 
   test '6rTS4j', %w(
@@ -1309,10 +1115,9 @@ class KernelTest < TidTest
   | The block's one expression is a modifier unless.
   | The covered file still loads, and filter_map still keeps
   | ["n1", "n2"] of [1, nil, 2].
-  ) do
-    dir = Dir.mktmpdir('6rTS4j')
-    File.write("#{dir}/names.rb", <<~'RUBY')
-      module Names6rTS4j
+  ) do |t|
+    t.write(<<~'RUBY', 'names.rb')
+      module Names
         def self.names(ns)
           ns.filter_map do |n|
             "n#{n}" unless n.nil?
@@ -1320,14 +1125,9 @@ class KernelTest < TidTest
         end
       end
     RUBY
-    on_exit = ->(&_report) {}
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-    end
-    require "#{dir}/names.rb"
-    assert_equal %w(n1 n2), Names6rTS4j.names([1, nil, 2])
+    t.start
+    names = t.load('names.rb')::Names
+    assert_equal %w(n1 n2), names.names([1, nil, 2])
   end
 
   test '6rTS4k', %w(
@@ -1338,10 +1138,9 @@ class KernelTest < TidTest
   | Within decisions: 2 / 4, one of each if's two paths.
   | Within methods: 5 / 8, fee's card, member's write in its
   | then reached, big's not.
-  ) do
-    dir = Dir.mktmpdir('6rTS4k')
-    File.write("#{dir}/fee.rb", <<~RUBY)
-      module Fee6rTS4k
+  ) do |t|
+    t.write(<<~RUBY, 'fee.rb')
+      module Fee
         def self.fee(member, big)
           total = 100
           if member
@@ -1354,17 +1153,9 @@ class KernelTest < TidTest
         end
       end
     RUBY
-    exit_report = nil
-    on_exit = ->(&block) { exit_report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-      report :summary
-    end
-    require "#{dir}/fee.rb"
-    Fee6rTS4k.fee(true, false)
-    printed = capture_io { exit_report.call }.first
+    t.start { report :summary }
+    t.load('fee.rb')::Fee.fee(true, false)
+    printed = capture_io { t.report }.first
     decisions = "Path coverage within decisions: 2 / 4 (50.00%)\n"
     methods = "Path coverage within methods: 5 / 8 (62.50%)\n"
     assert_equal decisions + methods, printed
@@ -1376,22 +1167,15 @@ class KernelTest < TidTest
   | The covered select still keeps [], [1], and [1].
   | The exit report prints the paths never taken.
   | Eg `ns` 2+ items, `n.odd?` all true.
-  ) do
-    dir = Dir.mktmpdir('6rTS4e')
-    File.write("#{dir}/odds.rb", <<~RUBY)
-      module Odds6rTS4e
+  ) do |t|
+    t.write(<<~RUBY, 'odds.rb')
+      module Odds
         def self.odds(ns) = ns.select { |n| n.odd? }
       end
     RUBY
-    report = nil
-    on_exit = ->(&block) { report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-    end
-    require "#{dir}/odds.rb"
-    odds = [[], [1], [1, 2]].map { |ns| Odds6rTS4e.odds(ns) }
+    t.start
+    odd = t.load('odds.rb')::Odds
+    odds = [[], [1], [1, 2]].map { |ns| odd.odds(ns) }
     assert_equal [[], [1], [1]], odds
     never = 'odds.rb:2:25 path never taken: `ns`'
     expected = [
@@ -1399,7 +1183,7 @@ class KernelTest < TidTest
       "#{never} 2+ items, `n.odd?` all true",
       "#{never} 2+ items, `n.odd?` all false"
     ].join("\n")
-    assert_output("#{expected}\n") { report.call }
+    assert_output("#{expected}\n") { t.report }
   end
 
   test '6rTS50', %w(
@@ -1418,27 +1202,24 @@ class KernelTest < TidTest
   | Its JSON report names ||= as ignored.
   | A render from it, ignoring ||= too, prints the gaps the
   | run printed: those of the && alone.
-  ) do
-    dir = Dir.mktmpdir('6rTS51')
-    File.write("#{dir}/memo.rb", <<~RUBY)
-      module Memo6rTS51
+  ) do |t|
+    t.write(<<~RUBY, 'memo.rb')
+      module Memo
         def self.m(a, b) = (@m ||= a && b)
       end
     RUBY
     report = nil
     on_exit = ->(&block) { report = block }
     settings = proc do
-      root dir
+      root t.dir
       cover '*.rb'
-      coverage_dir dir
+      coverage_dir t.dir
       ignore '||='
     end
     PathCoverage.start(on_exit:, &settings)
-    require "#{dir}/memo.rb"
-    Memo6rTS51.m(true, true)
+    t.load('memo.rb')::Memo.m(true, true)
     live, = capture_io { report.call }
-    json = JSON.parse(File.read("#{dir}/path_coverage.json"))
-    assert_equal ['||='], json['ignored']
+    assert_equal ['||='], t.json['ignored']
     config = PathCoverage::Configuration.new(&settings)
     later, = capture_io { PathCoverage::Render.from_json(config) }
     never = 'memo.rb:2:29 path never taken: `a`'
@@ -1452,30 +1233,22 @@ class KernelTest < TidTest
   | The treatment was wrong: name was nil.
   | The exit report says so, naming the path it ruled out,
   | rather than dropping that path unseen.
-  ) do
-    dir = Dir.mktmpdir('6rTS52')
-    File.write("#{dir}/size.rb", <<~RUBY)
-      module Size6rTS52
+  ) do |t|
+    t.write(<<~RUBY, 'size.rb')
+      module Size
         def self.of(u) = u.name&.size
       end
     RUBY
-    report = nil
-    on_exit = ->(&block) { report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-      treat 'name', as: :present
-    end
-    require "#{dir}/size.rb"
+    t.start { treat 'name', as: :present }
+    size = t.load('size.rb')::Size
     named = Struct.new(:name)
     sizes = [named.new('kim'), named.new(nil)].map do |u|
-      Size6rTS52.of(u)
+      size.of(u)
     end
     assert_equal [3, nil], sizes
     expected = 'size.rb:2:19 path taken that a treatment rules ' \
                "out: `u.name` nil\n"
-    assert_output(expected) { report.call }
+    assert_output(expected) { t.report }
   end
 
   test '6rTS53', %w(
@@ -1483,32 +1256,31 @@ class KernelTest < TidTest
   | name nil in each of two runs
   | Each JSON report holds the path the treatment ruled out.
   | A render from both says so, rather than dropping it.
-  ) do
-    dir = Dir.mktmpdir('6rTS53')
-    File.write("#{dir}/size.rb", <<~RUBY)
-      module Size6rTS53
+  ) do |t|
+    t.write(<<~RUBY, 'size.rb')
+      module Size
         def self.of(u) = u.name&.size
       end
     RUBY
     settings = proc do |out|
       proc do
-        root dir
+        root t.dir
         cover '*.rb'
         coverage_dir out
         treat 'name', as: :present
       end
     end
-    outs = %w(first second).map { |run| "#{dir}/#{run}" }
+    outs = %w(first second).map { |run| "#{t.dir}/#{run}" }
     reports = outs.map do |out|
       report = nil
       on_exit = ->(&block) { report = block }
       PathCoverage.start(on_exit:, &settings.call(out))
       report
     end
-    require "#{dir}/size.rb"
+    size = t.load('size.rb')::Size
     nameless = Struct.new(:name).new(nil)
     reports.each do |report|
-      Size6rTS53.of(nameless)
+      size.of(nameless)
       capture_io { report.call }
     end
     jsons = outs.map { |out| "#{out}/path_coverage.json" }
@@ -1517,7 +1289,7 @@ class KernelTest < TidTest
       all.map { _1['path'] }
     end
     assert_equal({ 'size.rb:2:19' => [['nil']] }, ruled_out)
-    config = PathCoverage::Configuration.new(&settings.call(dir))
+    config = PathCoverage::Configuration.new(&settings.call(t.dir))
     later, = capture_io { PathCoverage::Render.from_json(config, jsons) }
     line = 'size.rb:2:19 path taken that a treatment rules out: ' \
            "`u.name` nil\n"
@@ -1530,29 +1302,21 @@ class KernelTest < TidTest
   | any? true with select keeping nothing can never happen.
   | So no such path is listed as never taken.
   | Every possible path was taken, so nothing is printed.
-  ) do
-    dir = Dir.mktmpdir('6rTS54')
-    File.write("#{dir}/odds.rb", <<~RUBY)
-      module Odds6rTS54
+  ) do |t|
+    t.write(<<~RUBY, 'odds.rb')
+      module Odds
         def self.k(ids, c) = ids.select { |i| i.odd? }.any? && c
       end
     RUBY
-    report = nil
-    on_exit = ->(&block) { report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-      treat 'any?', as: :nonempty
-    end
-    require "#{dir}/odds.rb"
+    t.start { treat 'any?', as: :nonempty }
+    odds = t.load('odds.rb')::Odds
     calls = [
       [[], true], [[1], true], [[1], false], [[2], true],
       [[1, 3], true], [[1, 3], false], [[2, 4], true],
       [[1, 2], true], [[1, 2], false]
     ]
-    calls.each { |ids, c| Odds6rTS54.k(ids, c) }
-    assert_output('') { report.call }
+    calls.each { |ids, c| odds.k(ids, c) }
+    assert_output('') { t.report }
   end
 
   test '6rTS55', %w(
@@ -1561,28 +1325,20 @@ class KernelTest < TidTest
   | The popout shows the chain's rows as user, account, then
   | owner, so they read as the code does.
   | owner is ticked on the one path that called it.
-  ) do
-    dir = Dir.mktmpdir('6rTS55')
-    File.write("#{dir}/owner.rb", <<~RUBY)
-      module Owner6rTS55
+  ) do |t|
+    t.write(<<~RUBY, 'owner.rb')
+      module Owner
         def self.of(user) = user&.account&.owner
       end
     RUBY
-    exit_report = nil
-    on_exit = ->(&block) { exit_report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-      report :html
-    end
-    require "#{dir}/owner.rb"
+    t.start { report :html }
+    owner = t.load('owner.rb')::Owner
     account = Struct.new(:owner).new('kim')
     users = [nil, Struct.new(:account).new(account)]
-    assert_equal([nil, 'kim'], users.map { Owner6rTS55.of(_1) })
-    exit_report.call
+    assert_equal([nil, 'kim'], users.map { owner.of(_1) })
+    t.report
 
-    page = File.read("#{dir}/files/owner.rb.html")
+    page = File.read("#{t.dir}/files/owner.rb.html")
     tree = fold_at(page, 'owner.rb:2')
     rows = tree.elements.to_a('.//*[@data-operand]')
     texts = rows.map { text_of(_1.elements['*[@data-text]']) }
@@ -1599,8 +1355,7 @@ class KernelTest < TidTest
   | runs, by its name.
   | Each method returns what the same code, uninstrumented,
   | returns.
-  ) do
-    dir = Dir.mktmpdir('6rTS6a')
+  ) do |t|
     source = lambda do |name|
       <<~RUBY
         module #{name}
@@ -1612,19 +1367,13 @@ class KernelTest < TidTest
         end
       RUBY
     end
-    File.write("#{dir}/ship6a.rb", source.call('Ship6rTS6a'))
-    exit_report = nil
-    on_exit = ->(&block) { exit_report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-    end
-    require "#{dir}/ship6a.rb"
+    t.write(source.call('Ship'), 'ship6a.rb')
+    t.start
+    ship = t.load('ship6a.rb')::Ship
     eval(source.call('Plain6rTS6a')) # rubocop:disable Security/Eval
     calls = ->(mod) { [mod.ship(3), mod.ship(4), mod.zero] }
     plain = calls.call(Plain6rTS6a)
-    actual = calls.call(Ship6rTS6a)
+    actual = calls.call(ship)
     assert_equal [[6, 8, 0], plain], [actual, actual]
     reached = PathCoverage.recorder.reached.select do |name, _|
       name.start_with?('ship6a.rb:')
@@ -1634,7 +1383,7 @@ class KernelTest < TidTest
       'ship6a.rb:6:18' => 1
     }
     assert_equal expected, reached
-    assert_output('', '') { exit_report.call }
+    assert_output('', '') { t.report }
   end
 
   test '6rTS6b', %w(
@@ -1644,10 +1393,9 @@ class KernelTest < TidTest
   | its JSON report holds each statement's reaches.
   | The write and the value were reached, so each has its 1
   | path taken; the if's then never ran, so it has 1 of 2.
-  ) do
-    dir = Dir.mktmpdir('6rTS6b')
-    File.write("#{dir}/ship6b.rb", <<~RUBY)
-      module Ship6rTS6b
+  ) do |t|
+    t.write(<<~RUBY, 'ship6b.rb')
+      module Ship
         def self.ship(order)
           box = order * 2
           return 0 if box.zero?
@@ -1655,24 +1403,16 @@ class KernelTest < TidTest
         end
       end
     RUBY
-    exit_report = nil
-    on_exit = ->(&block) { exit_report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-      report :html
-    end
-    require "#{dir}/ship6b.rb"
-    Ship6rTS6b.ship(3)
-    exit_report.call
-    page = File.read("#{dir}/files/ship6b.rb.html")
+    t.start { report :html }
+    t.load('ship6b.rb')::Ship.ship(3)
+    t.report
+    page = File.read("#{t.dir}/files/ship6b.rb.html")
     expected = [
       %w(ship 3), %w(line:col taken),
       %w(3:04 1), %w(4:13 1), %w(5:04 1)
     ]
     assert_equal expected, card_taken(page, 2)
-    json = JSON.parse(File.read("#{dir}/path_coverage.json"))
+    json = t.json
     reached = json['reached'].select { _1.start_with?('ship6b.rb:') }
     expected = { 'ship6b.rb:3:4' => 1, 'ship6b.rb:5:4' => 1 }
     assert_equal expected, reached
@@ -1685,10 +1425,9 @@ class KernelTest < TidTest
   | data-at, but the empty then arm, as it has no code.
   | The && in label's then arm is located too, its operands
   | with it.
-  ) do
-    dir = Dir.mktmpdir('6rTS6c')
-    File.write("#{dir}/label6c.rb", <<~RUBY)
-      module Label6rTS6c
+  ) do |t|
+    t.write(<<~RUBY, 'label6c.rb')
+      module Label
         def self.label(sale, cheap)
           sale ? (cheap && 'bargain') : 'full price'
         end
@@ -1702,19 +1441,12 @@ class KernelTest < TidTest
         end
       end
     RUBY
-    exit_report = nil
-    on_exit = ->(&block) { exit_report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-      report :html
-    end
-    require "#{dir}/label6c.rb"
-    Label6rTS6c.label(true, true)
-    Label6rTS6c.mark(false)
-    exit_report.call
-    page = File.read("#{dir}/files/label6c.rb.html")
+    t.start { report :html }
+    label = t.load('label6c.rb')::Label
+    label.label(true, true)
+    label.mark(false)
+    t.report
+    page = File.read("#{t.dir}/files/label6c.rb.html")
     located = lambda do |line, kind|
       fold = fold_at(page, "label6c.rb:#{line}")
       fold.elements.to_a(".//*[@#{kind}]").map do |row|
@@ -1732,10 +1464,9 @@ class KernelTest < TidTest
   | Its card folds the if's tree under the if's row: its
   | operator, a mark for each of its 2 paths, the one never
   | taken first, and its operands.
-  ) do
-    dir = Dir.mktmpdir('6rTS6d')
-    File.write("#{dir}/ship6d.rb", <<~RUBY)
-      module Ship6rTS6d
+  ) do |t|
+    t.write(<<~RUBY, 'ship6d.rb')
+      module Ship
         def self.ship(order)
           if order[:paid]
             order[:packed] = true
@@ -1744,18 +1475,11 @@ class KernelTest < TidTest
         end
       end
     RUBY
-    exit_report = nil
-    on_exit = ->(&block) { exit_report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-      report :html
-    end
-    require "#{dir}/ship6d.rb"
-    Ship6rTS6d.ship({ paid: true })
-    exit_report.call
-    page = REXML::Document.new(File.read("#{dir}/files/ship6d.rb.html"))
+    t.start { report :html }
+    t.load('ship6d.rb')::Ship.ship({ paid: true })
+    t.report
+    html = File.read("#{t.dir}/files/ship6d.rb.html")
+    page = REXML::Document.new(html)
     fold = "//div[@class='fold'][@data-site='ship6d.rb:3:4']"
     counts = page.elements.to_a("#{fold}//*[@data-count]")
     assert_equal(%w(0 *), counts.map { text_of(_1) })
@@ -1771,52 +1495,34 @@ class KernelTest < TidTest
   | its paths are in the methods total as they are: 1 of 2.
   | So the methods total is fee's card's 1 of 2 and the top
   | level's 1 of 2: [2, 4].
-  ) do
-    dir = Dir.mktmpdir('6rTS6e')
-    File.write("#{dir}/rate.rb", <<~RUBY)
-      RATE6rTS6e = ENV.key?('RATE6rTS6e') ? 2 : 1
-      module Fee6rTS6e
+  ) do |t|
+    t.write(<<~RUBY, 'rate.rb')
+      RATE = ENV.key?('RATE6rTS6e') ? 2 : 1
+      module Fee
         def self.fee(big) = big ? 10 : 5
       end
     RUBY
-    exit_report = nil
-    on_exit = ->(&block) { exit_report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-      report :html
-    end
-    require "#{dir}/rate.rb"
-    Fee6rTS6e.fee(true)
-    exit_report.call
-    json = JSON.parse(File.read("#{dir}/path_coverage.json"))
-    assert_equal [2, 4], json['totals']['methods']
+    t.start { report :html }
+    t.load('rate.rb')::Fee.fee(true)
+    t.report
+    assert_equal [2, 4], t.json['totals']['methods']
   end
 
   test '6rTS6f', %w(
   | Example: rate.rb, a ?: at its top level, with no RATE set
   | Its page has a top card for line 1, as a method has a card,
   | titled file, its scope: one ?: row, 1 of its 2 paths taken.
-  ) do
-    dir = Dir.mktmpdir('6rTS6f')
-    File.write("#{dir}/rate.rb", <<~RUBY)
-      RATE6rTS6f = ENV.key?('RATE6rTS6f') ? 2 : 1
+  ) do |t|
+    t.write(<<~RUBY, 'rate.rb')
+      RATE = ENV.key?('RATE6rTS6f') ? 2 : 1
     RUBY
-    exit_report = nil
-    on_exit = ->(&block) { exit_report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-      report :html
-    end
-    require "#{dir}/rate.rb"
-    exit_report.call
-    page = File.read("#{dir}/files/rate.rb.html")
+    t.start { report :html }
+    t.load('rate.rb')
+    t.report
+    page = File.read("#{t.dir}/files/rate.rb.html")
     top = '<div class="pathgrid statements top-level" id="paths-1"'
     assert_includes page, top
-    expected = [%w(file 1), %w(line:col taken), %w(1:13 1)]
+    expected = [%w(file 1), %w(line:col taken), %w(1:07 1)]
     assert_equal expected, card_taken(page, 1)
   end
 
@@ -1825,25 +1531,17 @@ class KernelTest < TidTest
   | method, with no RATE set
   | Its card is titled Rate, its scope, as a method's card is
   | titled by its method.
-  ) do
-    dir = Dir.mktmpdir('6rTS6g')
-    File.write("#{dir}/rate.rb", <<~RUBY)
-      module Rate6rTS6g
+  ) do |t|
+    t.write(<<~RUBY, 'rate.rb')
+      module Rate
         RATE = ENV.key?('RATE6rTS6g') ? 2 : 1
       end
     RUBY
-    exit_report = nil
-    on_exit = ->(&block) { exit_report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-      report :html
-    end
-    require "#{dir}/rate.rb"
-    exit_report.call
-    page = File.read("#{dir}/files/rate.rb.html")
-    expected = [%w(Rate6rTS6g 1), %w(line:col taken), %w(2:09 1)]
+    t.start { report :html }
+    t.load('rate.rb')
+    t.report
+    page = File.read("#{t.dir}/files/rate.rb.html")
+    expected = [%w(Rate 1), %w(line:col taken), %w(2:09 1)]
     assert_equal expected, card_taken(page, 2)
   end
 
@@ -1851,25 +1549,17 @@ class KernelTest < TidTest
   | Example: rate.rb, class Rate holding a ?: outside any
   | method, with no RATE set
   | Its card is titled Rate, its scope, as a module's is.
-  ) do
-    dir = Dir.mktmpdir('6rTS6h')
-    File.write("#{dir}/rate.rb", <<~RUBY)
-      class Rate6rTS6h
+  ) do |t|
+    t.write(<<~RUBY, 'rate.rb')
+      class Rate
         RATE = ENV.key?('RATE6rTS6h') ? 2 : 1
       end
     RUBY
-    exit_report = nil
-    on_exit = ->(&block) { exit_report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-      report :html
-    end
-    require "#{dir}/rate.rb"
-    exit_report.call
-    page = File.read("#{dir}/files/rate.rb.html")
-    expected = [%w(Rate6rTS6h 1), %w(line:col taken), %w(2:09 1)]
+    t.start { report :html }
+    t.load('rate.rb')
+    t.report
+    page = File.read("#{t.dir}/files/rate.rb.html")
+    expected = [%w(Rate 1), %w(line:col taken), %w(2:09 1)]
     assert_equal expected, card_taken(page, 2)
   end
 
@@ -1907,34 +1597,25 @@ class KernelTest < TidTest
   | The JSON report lists its top card too, under the site of
   | its first line's start, titled Rate, its scope, as its page
   | draws it, so a reader finds a gap outside every def too.
-  ) do
-    dir = Dir.mktmpdir('6rTS6k')
-    File.write("#{dir}/rate.rb", <<~RUBY)
-      module Rate6rTS6k
+  ) do |t|
+    t.write(<<~RUBY, 'rate.rb')
+      module Rate
         RATE = ENV.key?('RATE6rTS6k') ? 2 : 1
       end
     RUBY
-    exit_report = nil
-    on_exit = ->(&block) { exit_report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-      report :html
-    end
-    require "#{dir}/rate.rb"
-    exit_report.call
-    json = JSON.parse(File.read("#{dir}/path_coverage.json"))
+    t.start { report :html }
+    t.load('rate.rb')
+    t.report
     expected = {
       'rate.rb:2:0' => {
-        'name' => 'Rate6rTS6k', 'first' => 2, 'last' => 2,
+        'name' => 'Rate', 'first' => 2, 'last' => 2,
         'rows' => [
           { 'at' => '2:09', 'top' => '?:', 'paths' => 2, 'taken' => 1,
             'site' => 'rate.rb:2:9' }
         ]
       }
     }
-    assert_equal expected, json['cards']
+    assert_equal expected, t.json['cards']
   end
 
   test '6rTS6m', %w(
@@ -1943,24 +1624,24 @@ class KernelTest < TidTest
   | each evaluated once, with no RATE set
   | Each start records afresh, so the second run's report counts
   | its own one evaluation, not the first run's too.
-  ) do
-    dirs = %w(first second).map { |run| Dir.mktmpdir("6rTS6m#{run}") }
-    jsons = dirs.map.with_index do |dir, index|
-      File.write("#{dir}/rate.rb", <<~RUBY)
-        RATE6rTS6m#{index} = ENV.key?('RATE6rTS6m') ? 2 : 1
+  ) do |t|
+    jsons = %w(first second).map do |run|
+      t.write(<<~RUBY, "#{run}/rate.rb")
+        RATE = ENV.key?('RATE6rTS6m') ? 2 : 1
       RUBY
+      run_dir = "#{t.dir}/#{run}"
       exit_report = nil
       on_exit = ->(&block) { exit_report = block }
       PathCoverage.start(on_exit:) do
-        root dir
+        root run_dir
         cover '*.rb'
-        coverage_dir dir
+        coverage_dir run_dir
       end
-      require "#{dir}/rate.rb"
-      gap = 'rate.rb:1:14 path never taken: ' \
+      t.load("#{run}/rate.rb")
+      gap = 'rate.rb:1:7 path never taken: ' \
             "`ENV.key?('RATE6rTS6m')` true\n"
       assert_output(gap) { exit_report.call }
-      JSON.parse(File.read("#{dir}/path_coverage.json"))
+      JSON.parse(File.read("#{run_dir}/path_coverage.json"))
     end
     taken = jsons.last['paths'].values.first['taken']
     assert_equal([0, 1], taken.map { _1['count'] })

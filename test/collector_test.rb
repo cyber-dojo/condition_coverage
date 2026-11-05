@@ -4,7 +4,6 @@ require 'path_coverage/post'
 require 'json'
 require 'open3'
 require 'socket'
-require 'tmpdir'
 
 class CollectorTest < TidTest
   # Its tests listen on ports and spawn a collector, which
@@ -15,8 +14,8 @@ class CollectorTest < TidTest
   | the collector saves each JSON report POSTed to it as a
   | file of its own, numbered in the order they arrive,
   | ready to be merged and rendered once every run is done
-  ) do
-    dir = Dir.mktmpdir('Cl4k10')
+  ) do |t|
+    dir = t.dir
     server = TCPServer.new('127.0.0.1', 0)
     url = "http://127.0.0.1:#{server.addr[1]}/runs"
     collector = PathCoverage::Collector
@@ -41,8 +40,8 @@ class CollectorTest < TidTest
   test 'Cl4k15', %w(
   | a connection that sends no request, eg a check that the
   | collector is up, saves nothing and uses up no number
-  ) do
-    dir = Dir.mktmpdir('Cl4k15')
+  ) do |t|
+    dir = t.dir
     server = TCPServer.new('127.0.0.1', 0)
     port = server.addr[1]
     collector = PathCoverage::Collector
@@ -64,8 +63,8 @@ class CollectorTest < TidTest
   | So the reply to its POST is 500, not 200.
   | A 200 means the report is already saved.
   | The collector says it saved nothing.
-  ) do
-    dir = "#{Dir.mktmpdir('Cl4k16')}/missing"
+  ) do |t|
+    dir = "#{t.dir}/missing"
     server = TCPServer.new('127.0.0.1', 0)
     url = "http://127.0.0.1:#{server.addr[1]}/runs"
     collector = PathCoverage::Collector
@@ -89,8 +88,8 @@ class CollectorTest < TidTest
   | The body is cut short, so it is not a whole report.
   | Nothing is saved.
   | The reply is 400, not 200.
-  ) do
-    dir = Dir.mktmpdir('Cl4k17')
+  ) do |t|
+    dir = t.dir
     server = TCPServer.new('127.0.0.1', 0)
     collector = PathCoverage::Collector
     serving = Thread.new { collector.serve(server, dir) }
@@ -111,8 +110,8 @@ class CollectorTest < TidTest
   | The GET is answered 200, with no body.
   | Nothing is saved for it.
   | It uses up no run number, so the report is run-0001.json.
-  ) do
-    dir = Dir.mktmpdir('Cl4k18')
+  ) do |t|
+    dir = t.dir
     server = TCPServer.new('127.0.0.1', 0)
     port = server.addr[1]
     collector = PathCoverage::Collector
@@ -131,8 +130,8 @@ class CollectorTest < TidTest
   | Example: GET /ready to a collector whose dir does not exist
   | It cannot save a report.
   | So it is not ready, and the reply is 503.
-  ) do
-    dir = "#{Dir.mktmpdir('Cl4k19')}/missing"
+  ) do |t|
+    dir = "#{t.dir}/missing"
     server = TCPServer.new('127.0.0.1', 0)
     collector = PathCoverage::Collector
     serving = Thread.new { collector.serve(server, dir) }
@@ -149,8 +148,8 @@ class CollectorTest < TidTest
   | It can save a report.
   | So it is ready, and the reply is 200.
   | Nothing is saved for it.
-  ) do
-    dir = Dir.mktmpdir('Cl4k1a')
+  ) do |t|
+    dir = t.dir
     server = TCPServer.new('127.0.0.1', 0)
     collector = PathCoverage::Collector
     serving = Thread.new { collector.serve(server, dir) }
@@ -166,8 +165,8 @@ class CollectorTest < TidTest
   | is then closed
   | serve returns.
   | It does not raise.
-  ) do
-    dir = Dir.mktmpdir('Cl4k1b')
+  ) do |t|
+    dir = t.dir
     server = TCPServer.new('127.0.0.1', 0)
     collector = PathCoverage::Collector
     serving = Thread.new { collector.serve(server, dir) }
@@ -197,13 +196,12 @@ class CollectorTest < TidTest
   | It creates DIR.
   | It saves the report in DIR as run-0001.json.
   | On TERM it exits 0, printing nothing.
-  ) do
-    tmp = Dir.mktmpdir('Cl4k30')
-    dir = "#{tmp}/runs"
+  ) do |t|
+    dir = "#{t.dir}/runs"
     probe = TCPServer.new('127.0.0.1', 0)
     port = probe.addr[1]
     probe.close
-    err = "#{tmp}/stderr"
+    err = "#{t.dir}/stderr"
     pid = Process.spawn(*command(port.to_s, dir), err:)
     wait_until_listening(port)
     operands = { 'source/kata.rb:3:23' => [{ truthy: 1, falsy: 1 }] }
@@ -223,8 +221,8 @@ class CollectorTest < TidTest
   | It still finishes the report in hand.
   | The report is saved and answered 200.
   | Then the command exits 0.
-  ) do
-    dir = Dir.mktmpdir('Cl4k31')
+  ) do |t|
+    dir = t.dir
     probe = TCPServer.new('127.0.0.1', 0)
     port = probe.addr[1]
     probe.close

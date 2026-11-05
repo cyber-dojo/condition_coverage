@@ -2,7 +2,6 @@ require_relative 'test_helper'
 require 'path_coverage/kernel'
 require 'path_coverage/manifest'
 require 'path_coverage/site_paths'
-require 'tmpdir'
 
 class FoldMatrixTest < TidTest
   # Its test swaps the configuration of the one global load
@@ -47,8 +46,7 @@ class FoldMatrixTest < TidTest
   | wherever they sit.
   | The rewritten code returns what the uninstrumented code does.
   | Every path recorded is one of the site's possible paths.
-  ) do
-    dir = Dir.mktmpdir('Fm7k01')
+  ) do |t|
     named = Struct.new(:name)
     users = [nil, named.new('kim')]
     cases = KINDS.flat_map do |kind, expression|
@@ -57,23 +55,18 @@ class FoldMatrixTest < TidTest
       end
     end
     cases.each_with_index do |(_, _, body), index|
-      File.write("#{dir}/m#{index}.rb", source("Fm7k#{index}", body))
+      t.write(source('M', body), "m#{index}.rb")
     end
-    on_exit = ->(&_report) {} # this test reads the recorder
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-    end
+    t.start # this test reads the recorder
     inputs = VALUES.product(VALUES, VALUES, IDS, users)
     actual = cases.each_with_index.map do |(kind, position, body), i|
       file = "m#{i}.rb"
-      require "#{dir}/#{file}"
+      covered = t.load(file)::M
       plain = source("Plain#{i}", body)
       eval(plain, TOPLEVEL_BINDING) # rubocop:disable Security/Eval
-      same = inputs.map { call("Fm7k#{i}", _1) } ==
+      same = inputs.map { covered.m(*_1) } ==
              inputs.map { call("Plain#{i}", _1) }
-      mine = source("Fm7k#{i}", body)
+      mine = source('M', body)
       sites = PathCoverage::Manifest.sites(mine, file)
       impossible = sites.flat_map do |site, condition|
         PathCoverage.recorder.site_paths[site].keys -
@@ -95,8 +88,7 @@ class FoldMatrixTest < TidTest
   | nested in it.
   | The rewritten code returns what the uninstrumented code does.
   | Every path recorded is one of the site's possible paths.
-  ) do
-    dir = Dir.mktmpdir('Fm7k02')
+  ) do |t|
     named = Struct.new(:name)
     users = [nil, named.new('kim')]
     cases = KINDS.flat_map do |kind, expression|
@@ -106,22 +98,21 @@ class FoldMatrixTest < TidTest
     end
     inputs = VALUES.product(VALUES, VALUES, IDS, users)
     actual = cases.each_with_index.map do |(kind, position, body), i|
-      name = "Fm7kIg#{i}"
       file = "ig#{i}.rb"
-      File.write("#{dir}/#{file}", source(name, body))
+      t.write(source('M', body), file)
       on_exit = ->(&_report) {} # this test reads the recorder
       PathCoverage.start(on_exit:) do
-        root dir
+        root t.dir
         cover file
-        coverage_dir dir
+        coverage_dir t.dir
         ignore kind
       end
-      require "#{dir}/#{file}"
+      covered = t.load(file)::M
       plain = source("PlainIg#{i}", body)
       eval(plain, TOPLEVEL_BINDING) # rubocop:disable Security/Eval
-      same = inputs.map { call(name, _1) } ==
+      same = inputs.map { covered.m(*_1) } ==
              inputs.map { call("PlainIg#{i}", _1) }
-      sites = PathCoverage::Manifest.sites(source(name, body), file,
+      sites = PathCoverage::Manifest.sites(source('M', body), file,
                                            [kind])
       # a Condition's inspect shows its own and every nested one's
       shown = sites.values.inspect

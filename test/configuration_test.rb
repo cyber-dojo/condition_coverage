@@ -48,19 +48,17 @@ class ConfigurationTest < TidTest
   | glob matches it too.
   | So it is neither among the files reported nor instrumented.
   | Every other covered file still is.
-  ) do
-    dir = Dir.mktmpdir('A9MJ40')
-    FileUtils.mkdir_p("#{dir}/source/vendor")
-    File.write("#{dir}/source/kata.rb", "ok = 1\n")
-    File.write("#{dir}/source/vendor/zip.rb", "ok = 2\n")
+  ) do |t|
+    t.write("ok = 1\n", 'source/kata.rb')
+    t.write("ok = 2\n", 'source/vendor/zip.rb')
     config = PathCoverage::Configuration.new do
-      root dir
+      root t.dir
       cover 'source/**/*.rb'
       skip 'source/vendor/**/*.rb'
     end
-    assert_equal ["#{dir}/source/kata.rb"], config.files
+    assert_equal ["#{t.dir}/source/kata.rb"], config.files
     covered = %w(kata.rb vendor/zip.rb).map do |name|
-      config.covers?("#{dir}/source/#{name}")
+      config.covers?("#{t.dir}/source/#{name}")
     end
     assert_equal [true, false], covered
   end
@@ -70,9 +68,10 @@ class ConfigurationTest < TidTest
   | With no files under source, there are no files.
   | With kata.rb, it is skipped, so there are none.
   | With kata.rb and team.rb, both are skipped, so there are none.
-  ) do
-    actual = [[], %w(kata.rb), %w(kata.rb team.rb)].map do |names|
-      dir = Dir.mktmpdir('A9MJ60')
+  ) do |t|
+    runs = [[], %w(kata.rb), %w(kata.rb team.rb)]
+    actual = runs.map.with_index do |names, n|
+      dir = "#{t.dir}/#{n}"
       FileUtils.mkdir_p("#{dir}/source")
       names.each do |name|
         File.write("#{dir}/source/#{name}", "ok = 1\n")

@@ -14,7 +14,7 @@ class PostTest < TidTest
   | with report :post the operands are POSTed as the JSON
   | report to the collector url, printing nothing, so a run
   | whose stdout and stderr are checked exactly is unchanged
-  ) do
+  ) do |t|
     server = TCPServer.new('127.0.0.1', 0)
     port = server.addr[1]
     received = Thread.new { request_body(server.accept) }
@@ -24,7 +24,7 @@ class PostTest < TidTest
         { truthy: 1, falsy: 0, only: :truthy }
       ]
     }
-    config = post_config('Pq3s10', "http://127.0.0.1:#{port}/runs")
+    config = post_config(t.dir, "http://127.0.0.1:#{port}/runs")
     assert_output('', '') do
       PathCoverage::Render.run(operands, {}, config)
     end
@@ -44,7 +44,7 @@ class PostTest < TidTest
   | the site paths are POSTed in the JSON report too, each
   | leaf's span with them, so a collector's render shows
   | every path each site took
-  ) do
+  ) do |t|
     server = TCPServer.new('127.0.0.1', 0)
     port = server.addr[1]
     received = Thread.new { request_body(server.accept) }
@@ -60,7 +60,7 @@ class PostTest < TidTest
         { path: [true], count: 1 }, { path: [false], count: 1 }
       ]
     }
-    config = post_config('Pq3s11', "http://127.0.0.1:#{port}/runs")
+    config = post_config(t.dir, "http://127.0.0.1:#{port}/runs")
     render = PathCoverage::Render
     assert_output('', '') do
       render.run(operands, files, config, site_paths:)
@@ -82,15 +82,14 @@ class PostTest < TidTest
   | Example: a run with ignore '&&=' and report :post
   | The POSTed report names &&= as ignored, so a collector's
   | render refuses to merge it with a run measuring &&= writes.
-  ) do
+  ) do |t|
     server = TCPServer.new('127.0.0.1', 0)
     port = server.addr[1]
     received = Thread.new { request_body(server.accept) }
-    dir = Dir.mktmpdir('Pq3s12')
     config = PathCoverage::Configuration.new do
-      root dir
+      root t.dir
       cover '*.rb'
-      coverage_dir dir
+      coverage_dir t.dir
       collector "http://127.0.0.1:#{port}/runs"
       report :post
       ignore '&&='
@@ -107,15 +106,14 @@ class PostTest < TidTest
   | Example: report :gaps, :post
   | The gaps are printed and the report is POSTed too, as each
   | reporter chosen runs.
-  ) do
+  ) do |t|
     server = TCPServer.new('127.0.0.1', 0)
     port = server.addr[1]
     received = Thread.new { request_body(server.accept) }
-    dir = Dir.mktmpdir('Pq3s13')
     config = PathCoverage::Configuration.new do
-      root dir
+      root t.dir
       cover '*.rb'
-      coverage_dir dir
+      coverage_dir t.dir
       collector "http://127.0.0.1:#{port}/runs"
       report :gaps, :post
     end
@@ -130,11 +128,11 @@ class PostTest < TidTest
   test 'Pq3s20', %w(
   | a collector that cannot be reached is passed over in
   | silence, so a run without one still exits as it would
-  ) do
+  ) do |t|
     server = TCPServer.new('127.0.0.1', 0)
     port = server.addr[1]
     server.close
-    config = post_config('Pq3s20', "http://127.0.0.1:#{port}/runs")
+    config = post_config(t.dir, "http://127.0.0.1:#{port}/runs")
     operands = { 'source/kata.rb:3:23' => [{ truthy: 1, falsy: 0 }] }
     assert_output('', '') do
       PathCoverage::Render.run(operands, {}, config)
@@ -145,10 +143,10 @@ class PostTest < TidTest
   | a collector that accepts the connection but never
   | answers is given up on within two seconds, so it
   | cannot hang the run that is exiting
-  ) do
+  ) do |t|
     server = TCPServer.new('127.0.0.1', 0)
     port = server.addr[1]
-    config = post_config('Pq3s30', "http://127.0.0.1:#{port}/runs")
+    config = post_config(t.dir, "http://127.0.0.1:#{port}/runs")
     operands = { 'source/kata.rb:3:23' => [{ truthy: 1, falsy: 0 }] }
     started = now
     assert_output('', '') do
@@ -163,7 +161,7 @@ class PostTest < TidTest
   | an http_proxy in the environment, as a docker build
   | often has, is not used, since the collector is local
   | to the build and a proxy would not reach it
-  ) do
+  ) do |t|
     dead = TCPServer.new('127.0.0.1', 0)
     dead_port = dead.addr[1]
     dead.close
@@ -172,7 +170,7 @@ class PostTest < TidTest
     server = TCPServer.new(host, 0)
     port = server.addr[1]
     received = Thread.new { request_body(server.accept) }
-    config = post_config('Pq3s40', "http://#{host}:#{port}/runs")
+    config = post_config(t.dir, "http://#{host}:#{port}/runs")
     operands = { 'source/kata.rb:3:23' => [{ truthy: 1, falsy: 0 }] }
     with_env('http_proxy', "http://127.0.0.1:#{dead_port}") do
       PathCoverage::Render.run(operands, {}, config)
@@ -196,9 +194,9 @@ class PostTest < TidTest
     ENV[name] = saved
   end
 
-  # A configuration choosing only :post, to url.
-  def post_config(id, url)
-    dir = Dir.mktmpdir(id)
+  # A configuration choosing only :post, to url, rooted and
+  # reporting in dir.
+  def post_config(dir, url)
     PathCoverage::Configuration.new do
       root dir
       cover '*.rb'

@@ -29,16 +29,14 @@ class AutoTest < TidTest
   | with the settings in the environment, covers a script
   | that exits 42 and POSTs its counts to the collector,
   | leaving its stdout, stderr and exit status unchanged
-  ) do
-    dir = Dir.mktmpdir('Au7x10')
+  ) do |t|
     source = <<~RUBY
       module KataAu7x10
         def self.kata?(id) = !id.empty? && id.start_with?('K')
       end
     RUBY
-    FileUtils.mkdir_p("#{dir}/source")
-    File.write("#{dir}/source/kata.rb", source)
-    File.write("#{dir}/run.rb", <<~RUBY)
+    t.write(source, 'source/kata.rb')
+    t.write(<<~RUBY, 'run.rb')
       require_relative 'source/kata'
       KataAu7x10.kata?('Kp9sA2')
       exit 42
@@ -47,14 +45,14 @@ class AutoTest < TidTest
     port = server.addr[1]
     received = Thread.new { request_body(server.accept) }
     env = {
-      'PATH_COVERAGE_ROOT' => dir,
+      'PATH_COVERAGE_ROOT' => t.dir,
       'PATH_COVERAGE_COVER' => 'source/**/*.rb',
-      'PATH_COVERAGE_DIR' => "#{dir}/condition",
+      'PATH_COVERAGE_DIR' => "#{t.dir}/condition",
       'PATH_COVERAGE_COLLECTOR' => "http://127.0.0.1:#{port}/runs"
     }
     lib = File.expand_path('../lib', __dir__)
     auto = '-rpath_coverage/auto'
-    command = ['ruby', "-I#{lib}", auto, "#{dir}/run.rb"]
+    command = ['ruby', "-I#{lib}", auto, "#{t.dir}/run.rb"]
     stdout, stderr, status = Open3.capture3(env, *command)
     assert_equal ['', '', 42], [stdout, stderr, status.exitstatus]
 

@@ -52,13 +52,13 @@ class TestHelperTest < TidTest
 
   test 'Fb7B20', %w(
   | Example: t.write of module Fee holding fee, then t.load
-  | t.write writes the source to t.file, named for the tid, in
-  | t.dir. t.load loads it wrapped in a module of its own, which
-  | it returns, so a fixture's constants never meet another's.
+  | t.write writes the source to t.file, fixture.rb, in t.dir.
+  | t.load loads it wrapped in a module of its own, which it
+  | returns, so a fixture's constants never meet another's.
   ) do |t|
     source = "module Fee\n  def self.fee = 5\nend\n"
     t.write(source)
-    assert_equal 'Fb7B20.rb', t.file
+    assert_equal 'fixture.rb', t.file
     assert_equal source, File.read("#{t.dir}/#{t.file}")
     wrap = t.load
     assert_equal 5, wrap::Fee.fee
@@ -80,6 +80,31 @@ class TestHelperTest < TidTest
     taken = t.json['paths']["#{t.file}:1:7"]['taken']
     assert_equal([0, 1], taken.map { _1['count'] })
     assert File.exist?("#{t.dir}/index.html")
+  end
+
+  test 'Fb7B40', %w(
+  | Example: t.write of module Kata as source/kata.rb, then
+  | t.load of it
+  | A named file keeps its name, in its folder, made as it is
+  | written, so a test can lay out a tree of files.
+  ) do |t|
+    source = "module Kata\n  def self.ok? = true\nend\n"
+    t.write(source, 'source/kata.rb')
+    assert File.exist?("#{t.dir}/source/kata.rb")
+    assert t.load('source/kata.rb')::Kata.ok?
+  end
+
+  test 'Fb7B50', %w(
+  | Example: t.start with no block, then t.report, with nothing
+  | loaded
+  | With no more settings, path_coverage covers t.dir's .rb files,
+  | prints its gaps, of which there are none, and writes its JSON
+  | report into t.dir.
+  ) do |t|
+    t.write("RATE = 1\n")
+    t.start
+    assert_output('', '') { t.report }
+    assert_nil t.json['paths']
   end
 
   test 'Fb7A15', %w(

@@ -2,7 +2,6 @@ require_relative 'test_helper'
 require 'path_coverage/json_writer'
 require 'path_coverage/result'
 require 'json'
-require 'tmpdir'
 
 class JsonWriterTest < TidTest
   test 'wdt910', %w(
@@ -10,11 +9,11 @@ class JsonWriterTest < TidTest
   | the base every other reporter reads, with the names of
   | the kinds of site measured under "kinds", so runs that
   | measured different kinds are never merged
-  ) do
+  ) do |t|
     sites = { 'k.rb:2:2' => condition('&&', 16...23, 27...35) }
     counts = { ['k.rb:2:2', 0] => { truthy: 1, falsy: 1 } }
     operands = PathCoverage::Result.new(sites, counts).operands
-    path = "#{Dir.mktmpdir('wdt910')}/path_coverage.json"
+    path = "#{t.dir}/path_coverage.json"
     PathCoverage::JsonWriter.write(operands, path)
     expected = {
       'sites' => {
@@ -33,11 +32,11 @@ class JsonWriterTest < TidTest
   | Example: a run with ignore '&&='
   | The operators ignored are written under "ignored", so its
   | report is never merged with one that measured &&= writes.
-  ) do
+  ) do |t|
     sites = { 'k.rb:2:2' => condition('&&', 16...23, 27...35) }
     counts = { ['k.rb:2:2', 0] => { truthy: 1, falsy: 1 } }
     operands = PathCoverage::Result.new(sites, counts).operands
-    path = "#{Dir.mktmpdir('wdt911')}/path_coverage.json"
+    path = "#{t.dir}/path_coverage.json"
     fingerprint = { 'ignored' => ['&&='] }
     PathCoverage::JsonWriter.write(operands, path, fingerprint:)
     actual = JSON.parse(File.read(path))
@@ -50,12 +49,11 @@ class JsonWriterTest < TidTest
   | Each statement's reaches are written under "reached".
   | One that reached nothing still writes it, empty, so a
   | render knows its statements were never reached.
-  ) do
+  ) do |t|
     sites = { 'k.rb:2:2' => condition('&&', 16...23, 27...35) }
     operands = PathCoverage::Result.new(sites, {}).operands
-    dir = Dir.mktmpdir('wdt912')
     written = [{ 'k.rb:3:4' => 2 }, {}].map.with_index do |reached, i|
-      path = "#{dir}/#{i}.json"
+      path = "#{t.dir}/#{i}.json"
       PathCoverage::JsonWriter.write(operands, path, reached:)
       JSON.parse(File.read(path))['reached']
     end
