@@ -1,26 +1,20 @@
 module PathCoverage
-  # The toggle at the top of every HTML page, picking which paths
-  # the pages show: those within each decision, or those within
-  # each method. Pages show one or the other, never both.
+  # Which paths an HTML page shows: those within each method, when
+  # methods are measured, else those within each decision. A page
+  # shows one or the other, never both, and there is no toggle.
   module HtmlMode
-    # Each mode and its button's label, the first the mode a page
-    # starts in.
+    # Each mode and its label, the index's column groups' titles,
+    # within each decision first.
     MODES = [
       ['decisions', 'Within each decision'],
       ['methods', 'Within each method']
     ].freeze
 
-    # The toggle, a button per mode, the first pressed; empty when
-    # methods are not measured, as there is then one mode only.
-    def self.toggle(methods)
-      return '' unless methods
-
-      buttons = MODES.each_with_index.map do |(mode, label), i|
-        %(<button type="button" data-mode="#{mode}") +
-          %( aria-pressed="#{i.zero?}">#{label}</button>)
-      end
-      nav = '<nav class="modes" aria-label="Paths shown">'
-      "#{nav}#{buttons.join}</nav>"
+    # The html element's attribute naming the mode a page shows:
+    # within each method when methods are measured; none when not,
+    # as a page with none named shows within each decision.
+    def self.attribute(methods)
+      methods ? ' data-mode="methods"' : ''
     end
   end
 end

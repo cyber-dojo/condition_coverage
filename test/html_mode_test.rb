@@ -1,34 +1,23 @@
 require_relative 'test_helper'
 require 'path_coverage/html_mode'
-require 'rexml/document'
 
 class HtmlModeTest < Id58TestBase
   test 'Tg9e10', %w(
-  | Example: the toggle of a run measuring methods
-  | It has two buttons, one for each mode.
-  | Within each decision comes first, and is pressed.
-  | Within each method comes second.
-  | Each names its mode in data-mode.
+  | Example: the html element's attribute of a run measuring
+  | methods
+  | It names the one mode its pages show, within each method,
+  | as there is no toggle.
   ) do
-    toggle = PathCoverage::HtmlMode.toggle(true)
-    html = REXML::Document.new(toggle)
-    buttons = html.elements.to_a('//button').map do |button|
-      attributes = button.attributes
-      [attributes['data-mode'], attributes['aria-pressed'],
-       text_of(button)]
-    end
-    expected = [
-      ['decisions', 'true', 'Within each decision'],
-      ['methods', 'false', 'Within each method']
-    ]
-    assert_equal expected, buttons
+    actual = PathCoverage::HtmlMode.attribute(true)
+    assert_equal ' data-mode="methods"', actual
   end
 
   test 'Tg9e11', %w(
-  | Example: the toggle of a run not measuring methods
-  | There is one mode only, so there is nothing to toggle.
-  | So there is no toggle.
+  | Example: the html element's attribute of a run not
+  | measuring methods
+  | Its pages show within each decision, the mode a page with
+  | none named shows, so it names none.
   ) do
-    assert_equal '', PathCoverage::HtmlMode.toggle(false)
+    assert_equal '', PathCoverage::HtmlMode.attribute(false)
   end
 end

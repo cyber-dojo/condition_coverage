@@ -13,12 +13,12 @@ module PathCoverage
     # The whole page for the file at path (relative to root),
     # written at files/<path>.html, so it links back to the
     # index one folder up for each folder in that. Measuring
-    # methods, its header holds the mode toggle.
+    # methods, its html element names that mode.
     def self.page(path, lines, trees, grids = '', methods: false)
       HtmlTemplate.page(
         'file.html',
         'path' => CGI.escapeHTML(path),
-        'modes' => HtmlMode.toggle(methods),
+        'mode' => HtmlMode.attribute(methods),
         'index' => "#{'../' * (path.count('/') + 1)}index.html",
         'script' => script,
         'grids' => grids,
@@ -27,10 +27,10 @@ module PathCoverage
       )
     end
 
-    # The page's script: its side rails, then its settings, its
-    # mode toggle and its theme button.
+    # The page's script: its side rails, then its settings and
+    # its theme button.
     def self.script
-      %w[side.js settings.js mode.js theme.js].map do |name|
+      %w[side.js settings.js theme.js].map do |name|
         HtmlTemplate.asset(name)
       end.join
     end

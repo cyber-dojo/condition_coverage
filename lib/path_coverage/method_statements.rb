@@ -151,11 +151,12 @@ module PathCoverage
       # Example: if a then x = 1 end gives the if, then the write.
       # The nodes statements' rows are for, flat, in the order
       # they are written: each statement's tops, each followed by
-      # the rows of its arms' statements, when it has any.
+      # the sites of their own inside it, then the rows of its
+      # arms' statements, when it has any.
       def rows_in(statements)
         statements.flat_map do |statement|
           tops = top_nodes(statement).flat_map do |top|
-            [top, *rows_in(arms_of(top))]
+            [top, *inner_sites(top), *rows_in(arms_of(top))]
           end
           tops + body_rows(statement)
         end
@@ -187,19 +188,14 @@ module PathCoverage
       end
 
       # node when it is a site, else the outermost sites in its
-      # children, in order; none in a block or a begin, whose
-      # statements are rows of their own, after the statement
-      # holding it, nor in a def or a lambda, whose body runs only
-      # when it is called, a def's sites rows of its own card.
+      # children, in order; none in a body or a def, as UNSEEN
+      # has them.
       def sites_in(node)
         return [node] if site?(node)
         return [] if UNSEEN.include?(node.type)
 
         node.compact_child_nodes.flat_map { |child| sites_in(child) }
       end
-
-      # The nodes a statement's sites are never looked for in.
-      UNSEEN = %i[block_node begin_node def_node lambda_node].freeze
 
       # True when decision mode has a site named where node's
       # site would start.
@@ -210,7 +206,12 @@ module PathCoverage
       # Decision mode's Condition for the site named where
       # node's site would start; nil when it has none there.
       def site_at(node)
-        @sites[Site.at(@path, site_loc(node))]
+        @sites[site_name(node)]
+      end
+
+      # The name node's site would have, by where it would start.
+      def site_name(node)
+        Site.at(@path, site_loc(node))
       end
 
       TOPS = {

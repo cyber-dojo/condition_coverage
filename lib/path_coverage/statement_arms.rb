@@ -2,8 +2,42 @@ module PathCoverage
   # The lists of statements a method's card has rows for: a def's
   # body, the arms of each site in it whose arms are statements,
   # and the body of each block in it, as the card lays them out
-  # flat. It relies on its includer's rows_in.
+  # flat. It relies on its includer's rows_in, site? and
+  # site_name.
   module StatementArms
+    # The nodes a statement's sites are never looked for in: a
+    # block's, a lambda's and a begin's statements are rows of
+    # their own, after the statement holding them, and a def's
+    # body runs only when it is called, its sites rows of its own
+    # card.
+    UNSEEN = %i[block_node begin_node def_node lambda_node].freeze
+
+    # Example: return a ? 1 : 2 if x gives the ?:.
+    # The sites inside site that are sites of their own, in the
+    # order they are written: in its leaves, eg a modifier if's
+    # arm or a &. call's receiver; not in its arms of statements,
+    # nor in a body, which have rows of their own. A site is
+    # named where it starts, so a node starting where a site
+    # does, eg a ?:'s predicate, names that site: each is kept
+    # once, and site itself not at all. None for a top that is no
+    # site, eg a def inside a def, whose sites are on its own card.
+    def inner_sites(site)
+      return [] unless site?(site)
+
+      found = heads(site).flat_map { sites_within(_1) }
+      named = found.to_h { [site_name(_1), _1] }
+      named.except(site_name(site)).values
+    end
+
+    # node when it is a site, then each site within it, in
+    # order; none in a body or a def.
+    def sites_within(node)
+      return [] if UNSEEN.include?(node.type)
+
+      own = site?(node) ? [node] : []
+      own + heads(node).flat_map { sites_within(_1) }
+    end
+
     # Example: items.map { |i| i.price } gives the price row.
     # The rows of the bodies in statement: of each block's and
     # lambda's statements, a block method's included,

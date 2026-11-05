@@ -54,7 +54,8 @@ class HtmlIndexTest < Id58TestBase
   | The index page is a table with a sort button heading each
   | of its columns, in one heading row.
   | Each total has three columns: taken, / of, and the percent.
-  | The mode toggle names the total shown, so no heading does.
+  | The page's mode decides which total shows, so no heading
+  | names it.
   | It has one row per covered file.
   | Its footer is the Total row, which sorting leaves last.
   ) do
@@ -87,8 +88,9 @@ class HtmlIndexTest < Id58TestBase
   test 'zr0H80', %w(
   | Example: the index pages of runs measuring methods, and not
   | The page starts with a header holding its title.
-  | Measuring methods, the mode toggle is on the title's line.
-  | Not measuring methods, there is one mode only, so no toggle.
+  | There is no mode toggle: measuring methods, the html
+  | element names the one mode the page shows, within each
+  | method; not measuring them, it names none.
   ) do
     row = { path: 'source/fee.rb', sites: 3, decisions: [2, 4],
             methods: [1, 4] }
@@ -97,8 +99,8 @@ class HtmlIndexTest < Id58TestBase
       PathCoverage::HtmlIndex.page([row], total)
     )
     top = '//header/div[@class="top"]'
-    modes = measured.elements.to_a("#{top}/nav[@class=\"modes\"]")
-    assert_equal 1, modes.size
+    assert_equal 'methods', measured.root.attributes['data-mode']
+    assert_empty measured.elements.to_a('//nav[@class="modes"]')
     title = measured.elements.to_a("#{top}/h1")
     assert_equal(['Path coverage'], title.map { |h1| text_of(h1) })
 
@@ -107,6 +109,7 @@ class HtmlIndexTest < Id58TestBase
         [row.merge(methods: nil)], total.merge(methods: nil)
       )
     )
+    assert_nil unmeasured.root.attributes['data-mode']
     assert_empty unmeasured.elements.to_a('//nav[@class="modes"]')
   end
 
@@ -130,17 +133,6 @@ class HtmlIndexTest < Id58TestBase
     assert_equal [nil, nil] + parts, modes.call('//thead/tr/th')
     assert_equal [nil, nil] + parts, modes.call('//tbody/tr/td')
     assert_equal [nil, nil] + parts, modes.call('//tfoot/tr/td')
-  end
-
-  test 'zr0H82', %w(
-  | Example: the index page of a run measuring methods
-  | Its script switches the mode as its toggle is pressed.
-  ) do
-    row = { path: 'source/fee.rb', sites: 3, decisions: [2, 4],
-            methods: [1, 4] }
-    total = row.merge(path: 'Total')
-    page = PathCoverage::HtmlIndex.page([row], total)
-    assert_includes page, '// Shows the paths of one mode only'
   end
 
   test 'zr0H83', %w(

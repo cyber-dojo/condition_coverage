@@ -671,11 +671,67 @@ class MethodStatementsTest < Id58TestBase
     assert_equal expected, rows
   end
 
+  test 'St3e30', %w(
+  | Example: every Ruby file of the gem's lib and test, and of
+  | its demo's source
+  | Every site decision mode finds in a file is on some card,
+  | a row of a def that holds it, or is outside every def,
+  | where its own line opens its tree: no site is on no card.
+  ) do
+    root = File.expand_path('..', __dir__)
+    globs = %w(lib/**/*.rb test/*.rb demo/source/*.rb)
+    files = globs.flat_map { Dir.glob(_1, base: root) }.sort
+    unseen = files.flat_map do |file|
+      sites = unseen_sites(File.read("#{root}/#{file}"))
+      sites.map { "#{file} #{_1}" }
+    end
+    assert_equal [], unseen
+  end
+
+  test 'St3e31', %w(
+  | Example: label, returning a ?:'s value if node, then a &.
+  | call on a ?:'s value
+  | A site inside another site that is a site of its own, as
+  | a modifier if's arm and a &. receiver are, is a row too,
+  | after the site holding it.
+  ) do
+    source = <<~RUBY
+      def label(node, kind)
+        return kind ? 'a' : 'b' if node
+        (node.ok? ? node : kind)&.name
+      end
+    RUBY
+    rows = statements(source)['k.rb:1:0'].map do |row|
+      [row.line, row.column, row.top]
+    end
+    expected = [
+      [2, 26, 'if'], [2, 9, '?:'], [3, 2, '&.'], [3, 3, '?:']
+    ]
+    assert_equal expected, rows
+  end
+
   private
 
   # { def site => its statements' rows } for source, as if it
   # were k.rb.
   def statements(source)
     PathCoverage::MethodStatements.of(source, 'k.rb')
+  end
+
+  # The sites decision mode finds in source that are on no
+  # card: those on a line inside a def, from its def line to its
+  # last, but no row's site.
+  def unseen_sites(source)
+    rows = statements(source).values.flatten.filter_map(&:site)
+    lasts = PathCoverage::MethodStatements.lasts(source, 'k.rb')
+    lines = lasts.flat_map { |site, last| [*line_of(site)..last] }
+    sites = PathCoverage::Manifest.sites(source, 'k.rb').keys
+    by_line = sites.group_by { line_of(_1) }
+    lines.uniq.flat_map { by_line.fetch(_1, []) } - rows
+  end
+
+  # The line of site, eg 4 for "k.rb:4:2".
+  def line_of(site)
+    Integer(site.split(':')[-2])
   end
 end

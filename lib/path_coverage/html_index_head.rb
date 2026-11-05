@@ -3,8 +3,8 @@ require_relative 'html_mode'
 module PathCoverage
   # The heading row of the HTML index's files tables: File and
   # Sites, then each mode's total's taken, / of and % columns,
-  # every column sortable. The mode toggle names the total the
-  # page shows, so no heading names it.
+  # every column sortable. The page's mode decides which total
+  # shows, so no heading names it.
   module HtmlIndexHead
     # The class and label of each of a total's three columns.
     PARTS = [%w[taken taken], ['of', '/ of'], %w[percent %]].freeze

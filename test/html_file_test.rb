@@ -724,8 +724,10 @@ class HtmlFileTest < Id58TestBase
   | runs measuring methods, and not
   | Its header's top line is the Path coverage title, linking
   | to the index.
-  | Measuring methods, the mode toggle is on that line too.
-  | Not measuring methods, there is one mode only, so no toggle.
+  | There is no mode toggle: measuring methods, the html
+  | element names the one mode the page shows, within each
+  | method; not measuring them, it names none, so the page
+  | shows within each decision.
   ) do
     lines = [
       { number: 1, text: "require 'json'", status: nil, span: nil }
@@ -738,9 +740,11 @@ class HtmlFileTest < Id58TestBase
     end
     modes = lambda do |methods|
       html = html_of.call(methods)
-      html.elements.to_a("#{top}/nav[@class=\"modes\"]").size
+      [html.root.attributes['data-mode'],
+       html.elements.to_a('//nav[@class="modes"]').size]
     end
-    assert_equal [1, 0], [modes.call(true), modes.call(false)]
+    assert_equal [['methods', 0], [nil, 0]],
+                 [modes.call(true), modes.call(false)]
     link = html_of.call(true).elements["#{top}/p[@class=\"title\"]/a"]
     actual = [text_of(link), link.attributes['href']]
     assert_equal ['Path coverage', '../../index.html'], actual
@@ -766,8 +770,7 @@ class HtmlFileTest < Id58TestBase
   | Example: the page of source/json.rb, in a run measuring
   | methods
   | Its header's top line holds, in order, the Path coverage
-  | title, the mode toggle, the file's path, then the theme
-  | button.
+  | title, the file's path, then the theme button.
   ) do
     lines = [
       { number: 1, text: "require 'json'", status: nil, span: nil }
@@ -778,8 +781,7 @@ class HtmlFileTest < Id58TestBase
     parts = top.elements.to_a.map do |part|
       [part.name, part.attributes['class']]
     end
-    expected = [%w(p title), %w(nav modes), %w(h1 path),
-                %w(button theme)]
+    expected = [%w(p title), %w(h1 path), %w(button theme)]
     assert_equal expected, parts
   end
 
@@ -817,19 +819,6 @@ class HtmlFileTest < Id58TestBase
     end
     assert_equal [%w(k def), %w(k true), ['c', '# yes']], spans
     assert_equal 'def ok? = true # yes', text_of(code)
-  end
-
-  test 'gae561', %w(
-  | Example: the page of a file holding require 'json' only, in
-  | a run measuring methods
-  | Its script switches the mode as its toggle is pressed.
-  ) do
-    lines = [
-      { number: 1, text: "require 'json'", status: nil, span: nil }
-    ]
-    page = PathCoverage::HtmlFile.page('source/json.rb', lines, {},
-                                       methods: true)
-    assert_includes page, '// Shows the paths of one mode only'
   end
 
   test 'gae551', %w(

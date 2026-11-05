@@ -13,13 +13,13 @@ module PathCoverage
     # each group, each given a tab after All files; with none
     # there is no tab bar, just the one table. Any operators
     # ignored are named after the tables. Measuring methods, its
-    # header holds the mode toggle.
+    # html element names that mode.
     def self.page(rows, total, groups = [], ignored: [])
       tables = [['All files', rows, total], *groups]
       names = tables.map(&:first)
       HtmlTemplate.page(
         'index.html',
-        'modes' => HtmlMode.toggle(!total[:methods].nil?),
+        'mode' => HtmlMode.attribute(!total[:methods].nil?),
         'script' => script(groups),
         'tabs' => groups.empty? ? '' : HtmlTabs.bar(names),
         'tables' => tables_of(tables),
@@ -45,11 +45,10 @@ module PathCoverage
     end
 
     # The page's script: its column sorting, with groups its tab
-    # switching, then its settings, its mode toggle and its theme
-    # button.
+    # switching, then its settings and its theme button.
     def self.script(groups)
       names = ['sort.js', *('tabs.js' unless groups.empty?),
-               'settings.js', 'mode.js', 'theme.js']
+               'settings.js', 'theme.js']
       names.map { |name| HtmlTemplate.asset(name) }.join
     end
 
