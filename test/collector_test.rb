@@ -160,6 +160,28 @@ class CollectorTest < TidTest
     assert_equal [ok, []], [reply, Dir.children(dir)]
   end
 
+  test 'Cl4k1c', %w(
+  | Example: GET /ready to a collector whose dir exists but is
+  | read-only
+  | It cannot save a report.
+  | So it is not ready, and the reply is 503.
+  ) do |t|
+    dir = "#{t.dir}/read_only"
+    FileUtils.mkdir_p(dir)
+    File.chmod(0o555, dir)
+    server = TCPServer.new('127.0.0.1', 0)
+    collector = PathCoverage::Collector
+    serving = Thread.new { collector.serve(server, dir) }
+    reply = exchange(server.addr[1], "GET /ready HTTP/1.1\r\n\r\n")
+    serving.kill
+    server.close
+    unready = "HTTP/1.1 503 Service Unavailable\r\n" \
+              "Content-Length: 0\r\n\r\n"
+    assert_equal unready, reply
+  ensure
+    File.chmod(0o755, dir)
+  end
+
   test 'Cl4k1b', %w(
   | Example: a collector waiting for a connection, whose server
   | is then closed
