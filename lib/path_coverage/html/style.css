@@ -198,9 +198,11 @@ a.jump:focus-visible, .nav a:focus-visible { outline: 3px solid var(--link); out
 }
 /* A site's button, its 9px right margin included, takes the 72px a
    plain number takes, so its lines' code starts where every other
-   line's does. */
+   line's does. Its 63px includes its borders, so at any zoom, where
+   a border is rounded to whole screen pixels, its width holds. */
 button.lnum {
   position: relative; display: flex; flex-direction: column; flex-shrink: 0;
+  box-sizing: border-box; width: 63px;
   margin: 4px 9px 4px 0; padding: 0;
   border: 1px solid transparent; border-radius: 6px; cursor: pointer;
   font: 600 13px/24px var(--font-code); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
