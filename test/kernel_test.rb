@@ -40,9 +40,7 @@ class KernelTest < TidTest
       [site, 0] => { truthy: 1, falsy: 0 },
       [site, 1] => { truthy: 1, falsy: 0 }
     }
-    counts = PathCoverage.recorder.counts
-    actual = counts.select { |(s, _), _| s == site }
-    assert_equal expected, actual
+    assert_equal expected, PathCoverage.recorder.counts
   end
 
   test '6rTS30', %w(
@@ -1375,14 +1373,11 @@ class KernelTest < TidTest
     plain = calls.call(Plain6rTS6a)
     actual = calls.call(ship)
     assert_equal [[6, 8, 0], plain], [actual, actual]
-    reached = PathCoverage.recorder.reached.select do |name, _|
-      name.start_with?('ship6a.rb:')
-    end
     expected = {
       'ship6a.rb:3:4' => 2, 'ship6a.rb:4:4' => 2,
       'ship6a.rb:6:18' => 1
     }
-    assert_equal expected, reached
+    assert_equal expected, PathCoverage.recorder.reached
     assert_output('', '') { t.report }
   end
 
@@ -1412,10 +1407,8 @@ class KernelTest < TidTest
       %w(3:04 1), %w(4:13 1), %w(5:04 1)
     ]
     assert_equal expected, card_taken(page, 2)
-    json = t.json
-    reached = json['reached'].select { _1.start_with?('ship6b.rb:') }
     expected = { 'ship6b.rb:3:4' => 1, 'ship6b.rb:5:4' => 1 }
-    assert_equal expected, reached
+    assert_equal expected, t.json['reached']
   end
 
   test '6rTS6c', %w(

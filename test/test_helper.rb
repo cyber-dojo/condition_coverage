@@ -63,7 +63,7 @@ class TidTest < Minitest::Test
 
   # True when no tids were given, or one is in tid.
   def self.selected?(tid)
-    args.empty? || args.any? { |arg| tid.include?(arg) }
+    args.empty? || tid.match?(Regexp.union(args))
   end
 
   # The name Minitest reports, tid and words included.
@@ -78,10 +78,10 @@ class TidTest < Minitest::Test
     a b c d e f g h j k l m n p q r s t u v w x y z
   ).join.freeze
 
-  # True when every character of str is in TID_ALPHABET.
+  # True when str is a string of TID_ALPHABET's characters only.
+  # An empty one is refused before this is asked.
   def self.tid?(str)
-    str.is_a?(String) &&
-      str.chars.all? { |char| TID_ALPHABET.include?(char) }
+    str.is_a?(String) && str.match?(/\A[#{TID_ALPHABET}]+\z/)
   end
 
   # Returns tid, or raises naming what is wrong with it or with

@@ -201,6 +201,17 @@ class TestHelperTest < TidTest
     assert_equal expected, error.message
   end
 
+  test 'Fb7A31', %w(
+  | Example: a test whose tid is the number 7105
+  | A tid that is not a string is refused, as no number or
+  | symbol can be a tid.
+  ) do
+    error = assert_raises(RuntimeError) do
+      Class.new(TidTest) { test(7105, %w(| kata exists), &NO_OP) }
+    end
+    assert_includes error.message, '!not a tid'
+  end
+
   test 'Fb7A35', %w(
   | a description not written as bar lines is refused,
   | so every failure report shows its lines as written
@@ -254,6 +265,24 @@ class TestHelperTest < TidTest
       test('Fb7Ax5', %w(| kata exists), &NO_OP)
     end
     assert_equal [], klass.public_instance_methods(false)
+  end
+
+  test 'Fb7A51', %w(
+  | Example: runs narrowed to Fb7, to Kp9 and Fb7, and to Kp9
+  | and Zz9, each with a test whose tid starts Fb7
+  | A test is defined when one of the args is part of its tid,
+  | however many args there are, and not when none is.
+  ) do
+    cases = { 'Fb7Ay1' => %w(Fb7), 'Fb7Ay2' => %w(Kp9 Fb7),
+              'Fb7Ay3' => %w(Kp9 Zz9) }
+    defined = cases.map do |tid, args|
+      klass = Class.new(TidTest) do
+        define_singleton_method(:args) { args }
+        test(tid, %w(| kata exists), &NO_OP)
+      end
+      klass.public_instance_methods(false).size
+    end
+    assert_equal [1, 1, 0], defined
   end
 
   test 'Fb7A60', %w(
