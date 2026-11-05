@@ -1796,8 +1796,8 @@ class KernelTest < Id58TestBase
 
   test '6rTS6f', %w(
   | Example: rate.rb, a ?: at its top level, with no RATE set
-  | Its page has a top card for line 1, as a method has a card:
-  | one ?: row, 1 of its 2 paths taken.
+  | Its page has a top card for line 1, as a method has a card,
+  | titled file, its scope: one ?: row, 1 of its 2 paths taken.
   ) do
     dir = Dir.mktmpdir('6rTS6f')
     File.write("#{dir}/rate.rb", <<~RUBY)
@@ -1816,8 +1816,61 @@ class KernelTest < Id58TestBase
     page = File.read("#{dir}/files/rate.rb.html")
     top = '<div class="pathgrid statements top-level" id="paths-1"'
     assert_includes page, top
-    expected = [['line 1', '1'], %w(line:col taken), %w(1:13 1)]
+    expected = [%w(file 1), %w(line:col taken), %w(1:13 1)]
     assert_equal expected, card_taken(page, 1)
+  end
+
+  test '6rTS6g', %w(
+  | Example: rate.rb, module Rate holding a ?: outside any
+  | method, with no RATE set
+  | Its card is titled Rate, its scope, as a method's card is
+  | titled by its method.
+  ) do
+    dir = Dir.mktmpdir('6rTS6g')
+    File.write("#{dir}/rate.rb", <<~RUBY)
+      module Rate6rTS6g
+        RATE = ENV.key?('RATE6rTS6g') ? 2 : 1
+      end
+    RUBY
+    exit_report = nil
+    on_exit = ->(&block) { exit_report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+      report :html
+    end
+    require "#{dir}/rate.rb"
+    exit_report.call
+    page = File.read("#{dir}/files/rate.rb.html")
+    expected = [%w(Rate6rTS6g 1), %w(line:col taken), %w(2:09 1)]
+    assert_equal expected, card_taken(page, 2)
+  end
+
+  test '6rTS6h', %w(
+  | Example: rate.rb, class Rate holding a ?: outside any
+  | method, with no RATE set
+  | Its card is titled Rate, its scope, as a module's is.
+  ) do
+    dir = Dir.mktmpdir('6rTS6h')
+    File.write("#{dir}/rate.rb", <<~RUBY)
+      class Rate6rTS6h
+        RATE = ENV.key?('RATE6rTS6h') ? 2 : 1
+      end
+    RUBY
+    exit_report = nil
+    on_exit = ->(&block) { exit_report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+      report :html
+    end
+    require "#{dir}/rate.rb"
+    exit_report.call
+    page = File.read("#{dir}/files/rate.rb.html")
+    expected = [%w(Rate6rTS6h 1), %w(line:col taken), %w(2:09 1)]
+    assert_equal expected, card_taken(page, 2)
   end
 
   private

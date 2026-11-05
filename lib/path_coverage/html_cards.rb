@@ -32,11 +32,48 @@ module PathCoverage
     def self.tops(path, parsed, lines, site_paths)
       source, sites = parsed.values_at(:source, :sites)
       tree = ->(at) { fold(source, sites, site_paths, at) }
+      scopes = scopes(source)
       spans(path, parsed, lines).map do |span, rows|
-        taken = MethodStatements.taken(rows, site_paths)
-        site = "#{path}:#{span.begin}:0"
-        HtmlStatements.top_card(site, rows, taken, span.end, &tree)
+        top(path, span, rows, site_paths, scopes[span.begin], &tree)
       end.join("\n")
+    end
+
+    # The top card of the span of lines of the file at path,
+    # holding rows, titled scope.
+    def self.top(path, span, rows, site_paths, scope, &)
+      taken = MethodStatements.taken(rows, site_paths)
+      site = "#{path}:#{span.begin}:0"
+      HtmlStatements.top_card(site, scope, rows, taken, span.end, &)
+    end
+
+    # A lambda giving the scope of a line of source, as scope
+    # gives it, its modules and classes found once.
+    def self.scopes(source)
+      holders = holders_in(Prism.parse(source).value)
+      ->(line) { scope(holders, line) }
+    end
+
+    # Example: line 2, inside module Shop on lines 1 to 9, gives
+    # Shop.
+    # The name of the innermost of holders, modules and classes,
+    # whose lines hold line, a top card's scope, as a def is a
+    # method card's; file for a line in none.
+    def self.scope(holders, line)
+      holding = holders.select do |node|
+        location = node.location
+        (location.start_line..location.end_line).cover?(line)
+      end
+      holding.empty? ? 'file' : holding.last.name.to_s
+    end
+
+    # The kinds of node that are a top card's scope.
+    HOLDERS = [Prism::ModuleNode, Prism::ClassNode].freeze
+
+    # Every module and class node in the tree at node, each
+    # before those nested in it.
+    def self.holders_in(node)
+      own = HOLDERS.include?(node.class) ? [node] : []
+      own + node.compact_child_nodes.flat_map { holders_in(_1) }
     end
 
     # { span => its top-level rows } of the file at path, each

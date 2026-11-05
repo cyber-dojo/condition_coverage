@@ -152,7 +152,7 @@ class HtmlStatementsTest < Id58TestBase
   test 'Hs4q05', %w(
   | Example: a top-level line, FEE = two ?:s, the first's then
   | taken, the second's else
-  | Its card is a top card, titled line 1, level with that
+  | Its card is a top card, titled file, its scope, level with that
   | line and ending there, its rows a ?: each, as a method's
   | card's rows are, each with its fold.
   | It is marked top-level, a class no other part of the page
@@ -163,13 +163,13 @@ class HtmlStatementsTest < Id58TestBase
     RUBY
     rows = PathCoverage::MethodStatements.top_rows(source, 'k.rb')
     html = PathCoverage::HtmlStatements.top_card(
-      'k.rb:1:0', rows, [1, 1], 1
+      'k.rb:1:0', 'file', rows, [1, 1], 1
     ) { |at| %(<div class="row">#{at}</div>) }
     open = '<div class="pathgrid statements top-level" id="paths-1"'
     assert_includes html, open
     assert_includes html, 'data-first="1" data-col="0" data-last="1"'
     assert_equal [
-      ['line 1', '*4', '2', '2'],
+      ['file', '*4', '2', '2'],
       ['line:col', '', 'not taken', 'taken'],
       ['1:07', '?:', '1', '1'],
       ['1:31', '?:', '1', '1']

@@ -10,6 +10,9 @@ if VERBOSE && $stdout.tty?
 end
 
 module Shop
+  # A condition at the module's top level, outside any method.
+  LIMIT = ENV.key?('LIMIT') ? Integer(ENV.fetch('LIMIT')) : 10
+
   # Endless methods, each a condition and nothing else.
   def self.member?(user) = user[:member] && !user[:banned]
   def self.vip?(user) = member?(user) && (user[:spend] > 1000 || user[:invited])
