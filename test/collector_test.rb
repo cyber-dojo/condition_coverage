@@ -10,7 +10,7 @@ class CollectorTest < TidTest
   # must not take each other's connections.
   serial!
 
-  test 'Cl4k10', %w(
+  test 'CL4k10', %w(
   | the collector saves each JSON report POSTed to it as a
   | file of its own, numbered in the order they arrive,
   | ready to be merged and rendered once every run is done
@@ -37,7 +37,7 @@ class CollectorTest < TidTest
     assert_equal expected, actual
   end
 
-  test 'Cl4k15', %w(
+  test 'CL4k15', %w(
   | a connection that sends no request, eg a check that the
   | collector is up, saves nothing and uses up no number
   ) do |t|
@@ -57,7 +57,7 @@ class CollectorTest < TidTest
     assert_equal({ 'run-0001.json' => report(2, 0) }, actual)
   end
 
-  test 'Cl4k16', %w(
+  test 'CL4k16', %w(
   | Example: a collector saving into a dir that does not exist
   | A report it cannot save is not acknowledged.
   | So the reply to its POST is 500, not 200.
@@ -82,7 +82,7 @@ class CollectorTest < TidTest
     assert_equal ['500', false], [reply.code, saved]
   end
 
-  test 'Cl4k17', %w(
+  test 'CL4k17', %w(
   | Example: a POST with Content-Length 120 whose sender stops
   | after 10 bytes, as when it dies mid-send
   | The body is cut short, so it is not a whole report.
@@ -105,7 +105,7 @@ class CollectorTest < TidTest
     assert_equal [bad, []], [reply, Dir.children(dir)]
   end
 
-  test 'Cl4k18', %w(
+  test 'CL4k18', %w(
   | Example: GET /alive, then a POST of a report
   | The GET is answered 200, with no body.
   | Nothing is saved for it.
@@ -126,7 +126,7 @@ class CollectorTest < TidTest
     assert_equal [ok, ['run-0001.json']], [reply, saved]
   end
 
-  test 'Cl4k19', %w(
+  test 'CL4k19', %w(
   | Example: GET /ready to a collector whose dir does not exist
   | It cannot save a report.
   | So it is not ready, and the reply is 503.
@@ -143,7 +143,7 @@ class CollectorTest < TidTest
     assert_equal unready, reply
   end
 
-  test 'Cl4k1a', %w(
+  test 'CL4k1a', %w(
   | Example: GET /ready to a collector whose dir is writable
   | It can save a report.
   | So it is ready, and the reply is 200.
@@ -160,7 +160,7 @@ class CollectorTest < TidTest
     assert_equal [ok, []], [reply, Dir.children(dir)]
   end
 
-  test 'Cl4k1c', %w(
+  test 'CL4k1c', %w(
   | Example: GET /ready to a collector whose dir exists but is
   | read-only
   | It cannot save a report.
@@ -182,7 +182,7 @@ class CollectorTest < TidTest
     File.chmod(0o755, dir)
   end
 
-  test 'Cl4k1b', %w(
+  test 'CL4k1b', %w(
   | Example: a collector waiting for a connection, whose server
   | is then closed
   | serve returns.
@@ -201,7 +201,7 @@ class CollectorTest < TidTest
     assert_same serving, serving.join(5)
   end
 
-  test 'Cl4k20', %w(
+  test 'CL4k20', %w(
   | the collector command's -h prints its usage, with an
   | example, and exits 0
   ) do
@@ -212,7 +212,7 @@ class CollectorTest < TidTest
     assert_includes stdout, "#{name} 4570 "
   end
 
-  test 'Cl4k30', %w(
+  test 'CL4k30', %w(
   | Example: path_coverage_collector PORT DIR, sent one report,
   | then TERM while waiting for the next
   | It creates DIR.
@@ -236,7 +236,7 @@ class CollectorTest < TidTest
     assert_equal [report(1, 1), 0, ''], actual
   end
 
-  test 'Cl4k31', %w(
+  test 'CL4k31', %w(
   | Example: the collector command is sent TERM while half of
   | a report's body has arrived
   | It stops accepting new connections.

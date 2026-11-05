@@ -201,6 +201,17 @@ class TestHelperTest < TidTest
     assert_equal expected, error.message
   end
 
+  test 'Fb7A32', %w(
+  | a tid using a lowercase l, which reads too like 1, is
+  | refused
+  ) do
+    assert_raises(RuntimeError) do
+      Class.new(TidTest) do
+        test('Fb7Al1', %w(| kata exists), &NO_OP)
+      end
+    end
+  end
+
   test 'Fb7A31', %w(
   | Example: a test whose tid is the number 7105
   | A tid that is not a string is refused, as no number or
