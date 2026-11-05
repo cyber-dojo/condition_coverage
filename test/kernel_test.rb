@@ -1794,6 +1794,32 @@ class KernelTest < Id58TestBase
     assert_equal [2, 4], json['totals']['methods']
   end
 
+  test '6rTS6f', %w(
+  | Example: rate.rb, a ?: at its top level, with no RATE set
+  | Its page has a top card for line 1, as a method has a card:
+  | one ?: row, 1 of its 2 paths taken.
+  ) do
+    dir = Dir.mktmpdir('6rTS6f')
+    File.write("#{dir}/rate.rb", <<~RUBY)
+      RATE6rTS6f = ENV.key?('RATE6rTS6f') ? 2 : 1
+    RUBY
+    exit_report = nil
+    on_exit = ->(&block) { exit_report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+      report :html
+    end
+    require "#{dir}/rate.rb"
+    exit_report.call
+    page = File.read("#{dir}/files/rate.rb.html")
+    top = '<div class="pathgrid statements top-level" id="paths-1"'
+    assert_includes page, top
+    expected = [['line 1', '1'], %w(line:col taken), %w(1:13 1)]
+    assert_equal expected, card_taken(page, 1)
+  end
+
   private
 
   # [label, last cell's text] of each row of the statement card

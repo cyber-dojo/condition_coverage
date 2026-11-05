@@ -449,10 +449,9 @@ html[data-mode="methods"] table.files [data-mode="decisions"] { display: none; }
 html:not([data-mode="methods"]) .jump-list[data-jumps="methods"],
 html[data-mode="methods"] .jump-list[data-jumps="decisions"] { display: none; }
 .jump-list[data-empty] { visibility: hidden; }
-/* The other mode's rail shares the column but shows nothing; within
-   each method, the trees' rail shows a loose site's tree, open. */
+/* The other mode's rail shares the column but shows nothing. */
 html:not([data-mode="methods"]) .rail.pc,
-html[data-mode="methods"] body:not([data-open="cc"]) .rail.cc { visibility: hidden; }
+html[data-mode="methods"] .rail.cc { visibility: hidden; }
 /* Within each method, a line holding a decision in a method is a
    plain line: its number opens nothing and has no status, as its
    method's card holds it. A loose one, outside every method, keeps

@@ -748,6 +748,34 @@ class MethodStatementsTest < Id58TestBase
     assert_equal [1, 2], statements.top_level(source, 'k.rb', paths)
   end
 
+  test 'St3e34', %w(
+  | Example: fee, two ?:s on one top-level line, an elsif at
+  | the top level, and big?, a def of an &&
+  | Each site on no card, outside every def, is a row of its
+  | own, for its line's card: where it is named, its operator,
+  | an elsif's elsif, and its paths, in the order written.
+  | big?'s && is on big?'s card, so is not among them.
+  ) do
+    source = <<~RUBY
+      FEE = (ENV['BIG'] ? 10 : 0) + (ENV['VIP'] ? 5 : 0)
+      if FEE > 10
+        warn 'big'
+      elsif FEE > 5
+        warn 'some'
+      end
+      def big?(a, b) = a && b
+    RUBY
+    rows = PathCoverage::MethodStatements.top_rows(source, 'k.rb')
+    actual = rows.map do |row|
+      [row.line, row.column, row.top, row.paths, row.site]
+    end
+    expected = [
+      [1, 7, '?:', 2, 'k.rb:1:7'], [1, 31, '?:', 2, 'k.rb:1:31'],
+      [2, 0, 'if', 2, 'k.rb:2:0'], [4, 0, 'elsif', 2, 'k.rb:4:0']
+    ]
+    assert_equal expected, actual
+  end
+
   private
 
   # { def site => its statements' rows } for source, as if it

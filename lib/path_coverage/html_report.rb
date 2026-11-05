@@ -1,10 +1,8 @@
 require 'fileutils'
+require_relative 'html_cards'
 require_relative 'html_file'
 require_relative 'html_index'
-require_relative 'html_statements'
 require_relative 'html_syntax'
-require_relative 'html_tree'
-require_relative 'method_statements'
 require_relative 'site_tree'
 require_relative 'source_lines'
 require_relative 'summary'
@@ -37,7 +35,7 @@ module PathCoverage
     def self.write_pages(operands, files, config, recorded)
       files.each do |full_path, parsed|
         path = config.relative(full_path)
-        grids = cards(path, parsed, recorded)
+        grids = HtmlCards.methods(path, parsed, recorded)
         out = "#{config.output_dir}/files/#{path}.html"
         write_page(out, path, parsed, [operands, recorded[0]], grids)
       end
@@ -58,43 +56,18 @@ module PathCoverage
       HtmlIndex.page(rows, Summary.total(rows), tabs, ignored:)
     end
 
-    # simplecov:disable
-    # SPIKE: the hidden statement cards of one file's methods,
-    # site_paths as Result#paths gives them, reached as
-    # Recorder#reached does; each site's row with its tree
-    # folded under it.
-    def self.cards(path, parsed, (site_paths, reached))
-      source, sites = parsed.values_at(:source, :sites)
-      names = MethodStatements.names(source, path, sites)
-      lasts = MethodStatements.lasts(source, path, sites)
-      tree = ->(at) { fold(source, sites, site_paths, at) }
-      MethodStatements.of(source, path, sites).map do |site, rows|
-        taken = MethodStatements.taken(rows, site_paths, reached)
-        HtmlStatements.card(site, names[site], rows, taken,
-                            lasts[site], &tree)
-      end.join("\n")
-    end
-
-    # SPIKE: the rows of site's tree, as a file's page draws them
-    # within each decision, for its row's fold in a card.
-    def self.fold(source, sites, site_paths, site)
-      condition = sites.fetch(site)
-      tree = SiteTree.of(source, condition, site_paths.fetch(site))
-      HtmlTree.site_rows(located(source, condition, tree)).join
-    end
-    # simplecov:enable
-
     # Writes one file's page to out, from its sites' operand
-    # counts and paths, and grids, its methods' path grids, nil
-    # when methods are not measured.
+    # counts and paths, with grids, its methods' cards, then a
+    # card for each span of its sites at the top level.
     def self.write_page(out, path, parsed,
                         (operands, site_paths), grids)
       source, sites = parsed.values_at(:source, :sites)
       plain = SourceLines.of(source, sites, operands)
       lines = coloured(source, plain)
       trees = trees(source, sites, lines, site_paths)
-      page = HtmlFile.page(path, lines, trees, grids.to_s,
-                           methods: !grids.nil?)
+      tops = HtmlCards.tops(path, parsed, lines, site_paths)
+      page = HtmlFile.page(path, lines, trees, "#{grids}\n#{tops}",
+                           methods: true)
       FileUtils.mkdir_p(File.dirname(out))
       File.write(out, page)
     end

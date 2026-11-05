@@ -23,8 +23,25 @@ module PathCoverage
         %(data-status="#{status(rows, taken)}" hidden="hidden")
       ].join(' ')
       head = title_row(first, name, rows, taken) + columns_row
-      %(<div class="pathgrid statements" #{attrs}>) +
+      %(<div class="#{GRID}" #{attrs}>) +
         %(#{head}#{body(rows, taken, &)}</div>)
+    end
+
+    # The classes of every card.
+    GRID = 'pathgrid statements'.freeze
+
+    # Example: FEE = (a ? 1 : 0) + (b ? 2 : 0) on line 1 gives a
+    # card titled line 1, a ?: row each.
+    # The card of the sites at the top level whose lines start at
+    # site, as card gives it, last its lines' last; titled by
+    # its line, and marked top-level, as it is no method's: a
+    # class no other part of the page has, so no style of
+    # another's, eg the header's top line's display, shows it
+    # when it is hidden.
+    def self.top_card(site, rows, taken, last, &)
+      first = site.split(':')[-2]
+      card(site, "line #{first}", rows, taken, last, &)
+        .sub(%(class="#{GRID}"), %(class="#{GRID} top-level"))
     end
 
     # Each statement's row, a site's with the rows tree gives

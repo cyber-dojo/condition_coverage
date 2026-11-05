@@ -4,6 +4,7 @@ require_relative 'manifest_chains'
 require_relative 'manifest_choices'
 require_relative 'site'
 require_relative 'site_paths'
+require_relative 'site_tree'
 require_relative 'statement_arms'
 require_relative 'totals'
 
@@ -62,12 +63,33 @@ module PathCoverage
     # Example: RATE = x ? 2 : 1 at the top level, its then
     # taken, gives [1, 2].
     # [taken, possible] of the paths of the sites in source on
-    # no card, outside every def, each opening its tree from its
-    # own line; paths as Result#paths gives them.
+    # no method's card, outside every def, as top_rows gives
+    # them; paths as Result#paths gives them.
     def self.top_level(source, path, paths, sites = nil)
+      names = top_rows(source, path, sites).map(&:site)
+      Totals.decisions(paths.slice(*names))
+    end
+
+    # Example: RATE = x ? 2 : 1 gives a ?: row at 1:9.
+    # A Statement row for each site in source on no method's
+    # card, outside every def, for the card of its own lines, in
+    # the order written: where decision mode names it, its
+    # operator, an elsif's elsif, and its paths.
+    def self.top_rows(source, path, sites = nil)
       collector = collect(source, path, sites)
       carded = collector.methods.values.flatten.map(&:site)
-      Totals.decisions(paths.slice(*(collector.sites.keys - carded)))
+      loose = collector.sites.except(*carded)
+      rows = loose.map { |name, site| top_row(source, name, site) }
+      rows.sort_by { [_1.line, _1.column] }
+    end
+
+    # The Statement row of the site named name, its Condition
+    # site, at the top level of source.
+    def self.top_row(source, name, site)
+      line, column = name.split(':').last(2).map { Integer(_1) }
+      top = SiteTree.elsif?(source, site) ? 'elsif' : site.operator
+      paths = SitePaths.possible(site).size
+      Statement.new(line:, column:, top:, paths:, site: name, name:)
     end
 
     # Example: { "k.rb:1:0" => [2, 4] }, 2 of ship's 4 taken.
