@@ -8,7 +8,6 @@ if ENV.fetch('CONDITIONS') == 'on'
     root __dir__
     cover 'source/**/*.rb'
     coverage_dir ENV.fetch('COVERAGE_DIR')
-    measure :decisions, :methods
   end
 end
 

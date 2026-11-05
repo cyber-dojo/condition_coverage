@@ -133,8 +133,8 @@ class KernelTest < Id58TestBase
   | Each path never taken is printed as a gap.
   | The JSON report has every path's count, and each leaf's
   | span.
-  | Its totals give decisions as [taken, possible]: [1, 3].
-  | It has no methods total, as :methods is not measured.
+  | Its totals give decisions as [taken, possible]: [1, 3],
+  | and methods the same, fee's card being the one ?: row.
   ) do
     dir = Dir.mktmpdir('6rTS43')
     File.write("#{dir}/fee.rb", <<~RUBY)
@@ -170,7 +170,8 @@ class KernelTest < Id58TestBase
       }
     }
     assert_equal expected, json['paths']
-    assert_equal({ 'decisions' => [1, 3] }, json['totals'])
+    totals = { 'decisions' => [1, 3], 'methods' => [1, 3] }
+    assert_equal totals, json['totals']
   end
 
   test '6rTS45', %w(
@@ -258,7 +259,6 @@ class KernelTest < Id58TestBase
       cover '*.rb'
       coverage_dir dir
       report :html
-      measure :decisions, :methods
     end
     require "#{dir}/fee.rb"
     Fee6rTS4f.fee(true, false)
@@ -276,7 +276,8 @@ class KernelTest < Id58TestBase
   | index.html has a tab for All files, Models, and Ungrouped.
   | The Models tab's table lists models/crew.rb alone.
   | The JSON report's totals have each group's own too: Models
-  | took none of crew?'s 3 paths.
+  | took none of crew?'s 3 paths, within its decision or its
+  | method.
   ) do
     dir = Dir.mktmpdir('6rTS4h')
     FileUtils.mkdir_p(%W[#{dir}/models #{dir}/lib])
@@ -300,7 +301,9 @@ class KernelTest < Id58TestBase
     models = index.elements.to_a(xpath)
     assert_equal(['models/crew.rb'], models.map { text_of(_1) })
     json = JSON.parse(File.read("#{dir}/path_coverage.json"))
-    groups = { 'Models' => { 'decisions' => [0, 3] } }
+    groups = {
+      'Models' => { 'decisions' => [0, 3], 'methods' => [0, 3] }
+    }
     assert_equal groups, json['totals']['groups']
   end
 
@@ -310,7 +313,8 @@ class KernelTest < Id58TestBase
   | No covered file is in the Models group.
   | So the Models tab's Total row shows 0 sites and - paths.
   | The - is titled no decisions, saying why.
-  | The JSON report's Models totals are [0, 0].
+  | The JSON report's Models totals are [0, 0], within
+  | decisions and within methods.
   ) do
     dir = Dir.mktmpdir('6rTS4n')
     FileUtils.mkdir_p("#{dir}/lib")
@@ -333,7 +337,9 @@ class KernelTest < Id58TestBase
     none = index.elements["#{xpath}[5]"].attributes['title']
     assert_equal 'no decisions', none
     json = JSON.parse(File.read("#{dir}/path_coverage.json"))
-    groups = { 'Models' => { 'decisions' => [0, 0] } }
+    groups = {
+      'Models' => { 'decisions' => [0, 0], 'methods' => [0, 0] }
+    }
     assert_equal groups, json['totals']['groups']
   end
 
@@ -361,7 +367,6 @@ class KernelTest < Id58TestBase
       root dir
       cover '*.rb'
       coverage_dir dir
-      measure :decisions, :methods
     end
     require "#{dir}/items.rb"
     orders = [nil, { basket: [1] }, [2], { basket: 'x' }]
@@ -403,7 +408,6 @@ class KernelTest < Id58TestBase
       cover '*.rb'
       coverage_dir live
       report :html
-      measure :decisions, :methods
     end
     require "#{dir}/fee.rb"
     Fee6rTS4q.fee(true, false)
@@ -417,7 +421,6 @@ class KernelTest < Id58TestBase
       cover '*.rb'
       coverage_dir later
       report :html
-      measure :decisions, :methods
     end
     PathCoverage::Render.from_json(config)
 
@@ -460,7 +463,6 @@ class KernelTest < Id58TestBase
         root dir
         cover '*.rb'
         coverage_dir out
-        measure :decisions, :methods
       end
       exit_report
     end
@@ -477,7 +479,6 @@ class KernelTest < Id58TestBase
       cover '*.rb'
       coverage_dir later
       report :html
-      measure :decisions, :methods
     end
     jsons = reports.map { |out| "#{out}/path_coverage.json" }
     PathCoverage::Render.from_json(config, jsons)
@@ -486,61 +487,6 @@ class KernelTest < Id58TestBase
     total = index.elements.to_a('//tfoot/tr/td')
     methods = total.map { text_of(_1) }.last(3).join(' ')
     assert_equal '6 / 8 75%', methods
-  end
-
-  test '6rTS4s', %w(
-  | Example: a run of fee with two ifs that measures :decisions
-  | alone, then a render of its report that measures :methods too
-  | The report holds no reaches, so it cannot say whether
-  | fee's 1-path statements ran, its ifs' writes among them:
-  | the render claims they did not. Its ifs' paths it does
-  | hold, one of each's two.
-  | So within each method: 2 / 8 25%.
-  ) do
-    dir = Dir.mktmpdir('6rTS4s')
-    File.write("#{dir}/fee_plain.rb", <<~RUBY)
-      module Fee6rTS4s
-        def self.fee(member, big)
-          total = 100
-          if member
-            total -= 5
-          end
-          if big
-            total -= 10
-          end
-          total
-        end
-      end
-    RUBY
-    live = "#{dir}/live"
-    exit_report = nil
-    on_exit = ->(&block) { exit_report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir live
-      report :html
-    end
-    require "#{dir}/fee_plain.rb"
-    Fee6rTS4s.fee(true, false)
-    exit_report.call
-
-    later = "#{dir}/later"
-    FileUtils.mkdir_p(later)
-    FileUtils.cp("#{live}/path_coverage.json", later)
-    config = PathCoverage::Configuration.new do
-      root dir
-      cover '*.rb'
-      coverage_dir later
-      report :html
-      measure :decisions, :methods
-    end
-    PathCoverage::Render.from_json(config)
-
-    index = REXML::Document.new(File.read("#{later}/index.html"))
-    total = index.elements.to_a('//tfoot/tr/td')
-    methods = total.map { text_of(_1) }.last(3).join(' ')
-    assert_equal '2 / 8 25%', methods
   end
 
   test '6rTS4t', %w(
@@ -1031,7 +977,8 @@ class KernelTest < Id58TestBase
   | Each site on the page counts the paths it took.
   | It prints no gaps, since :gaps was not chosen.
   | index.html's Total row shows 1 / 3 33% within each
-  | decision, and no methods cells, as methods are not measured.
+  | decision, and 2 / 4 50% within each method: ok?'s one row
+  | reached, and one of crew?'s && row's three paths taken.
   ) do
     dir = Dir.mktmpdir('6rTS48')
     File.write("#{dir}/crew.rb", <<~RUBY)
@@ -1055,10 +1002,11 @@ class KernelTest < Id58TestBase
 
     index = REXML::Document.new(File.read("#{dir}/index.html"))
     total = index.elements.to_a('//tfoot/tr/td')
-    expected = ['Total', '1', '1', '/ 3', '33%']
+    expected = ['Total', '1', '1', '/ 3', '33%', '2', '/ 4', '50%']
     assert_equal(expected, total.map { text_of(_1) })
     page = REXML::Document.new(File.read("#{dir}/files/crew.rb.html"))
-    counts = page.elements.to_a('//*[@data-count]')
+    tree = "//div[@class='tree']//*[@data-count]"
+    counts = page.elements.to_a(tree)
     assert_equal(%w(0 0 1), counts.map { |count| text_of(count) })
   end
 
@@ -1266,7 +1214,6 @@ class KernelTest < Id58TestBase
       root dir
       cover '*.rb'
       coverage_dir dir
-      measure :decisions, :methods
     end
     require "#{dir}/fee.rb"
     assert_equal 95, Fee6rTS41.fee(true, false)
@@ -1386,50 +1333,42 @@ class KernelTest < Id58TestBase
 
   test '6rTS4k', %w(
   | Example: report :summary, fee with two ifs called once with
-  | true then false, measuring decisions, then decisions and
-  | methods
+  | true then false
   | At exit it prints a line per total, as SimpleCov prints its
   | line and branch coverage.
   | Within decisions: 2 / 4, one of each if's two paths.
-  | Within methods, only when methods are measured: 5 / 8,
-  | fee's card, member's write in its then reached, big's
-  | not.
+  | Within methods: 5 / 8, fee's card, member's write in its
+  | then reached, big's not.
   ) do
-    # Each measure covers a file and module of its own, so neither
-    # run redefines the other's fee.
-    measures = { 'D' => %i[decisions], 'M' => %i[decisions methods] }
-    printed = measures.map do |tag, names|
-      dir = Dir.mktmpdir("6rTS4k#{tag}")
-      File.write("#{dir}/fee.rb", <<~RUBY)
-        module Fee6rTS4k#{tag}
-          def self.fee(member, big)
-            total = 100
-            if member
-              total -= 5
-            end
-            if big
-              total -= 10
-            end
-            total
+    dir = Dir.mktmpdir('6rTS4k')
+    File.write("#{dir}/fee.rb", <<~RUBY)
+      module Fee6rTS4k
+        def self.fee(member, big)
+          total = 100
+          if member
+            total -= 5
           end
+          if big
+            total -= 10
+          end
+          total
         end
-      RUBY
-      exit_report = nil
-      on_exit = ->(&block) { exit_report = block }
-      PathCoverage.start(on_exit:) do
-        root dir
-        cover '*.rb'
-        coverage_dir dir
-        report :summary
-        measure(*names)
       end
-      require "#{dir}/fee.rb"
-      Object.const_get("Fee6rTS4k#{tag}").fee(true, false)
-      capture_io { exit_report.call }.first
+    RUBY
+    exit_report = nil
+    on_exit = ->(&block) { exit_report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+      report :summary
     end
+    require "#{dir}/fee.rb"
+    Fee6rTS4k.fee(true, false)
+    printed = capture_io { exit_report.call }.first
     decisions = "Path coverage within decisions: 2 / 4 (50.00%)\n"
     methods = "Path coverage within methods: 5 / 8 (62.50%)\n"
-    assert_equal [decisions, decisions + methods], printed
+    assert_equal decisions + methods, printed
   end
 
   test '6rTS4e', %w(
@@ -1681,7 +1620,6 @@ class KernelTest < Id58TestBase
       root dir
       cover '*.rb'
       coverage_dir dir
-      measure :decisions, :methods
     end
     require "#{dir}/ship6a.rb"
     eval(source.call('Plain6rTS6a')) # rubocop:disable Security/Eval
@@ -1724,7 +1662,6 @@ class KernelTest < Id58TestBase
       root dir
       cover '*.rb'
       coverage_dir dir
-      measure :decisions, :methods
       report :html
     end
     require "#{dir}/ship6b.rb"
@@ -1813,7 +1750,6 @@ class KernelTest < Id58TestBase
       root dir
       cover '*.rb'
       coverage_dir dir
-      measure :decisions, :methods
       report :html
     end
     require "#{dir}/ship6d.rb"

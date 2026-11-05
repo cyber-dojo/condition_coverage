@@ -7,7 +7,6 @@ PathCoverage.start do
   cover 'source/**/*.rb'
   coverage_dir ENV.fetch('COVERAGE_DIR')
   report :gaps, :html
-  measure :decisions, :methods
 end
 
 require_relative 'source/kata'

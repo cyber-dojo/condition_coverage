@@ -16,7 +16,7 @@ class ConfigurationTest < Id58TestBase
     expected = [
       'unknown setting covr in PathCoverage.start',
       'the settings are: ' \
-      'collector, cover, coverage_dir, group, ignore, measure, ' \
+      'collector, cover, coverage_dir, group, ignore, ' \
       'report, root, skip, treat'
     ].join("\n")
     assert_equal expected, error.message
@@ -136,33 +136,21 @@ class ConfigurationTest < Id58TestBase
   end
 
   test 'A9MJ30', %w(
-  | Example: a start block with no measure
-  | Paths within each decision are measured.
-  | Example: measure :decisions, :methods
-  | Paths within each method are measured too.
-  ) do
-    config = PathCoverage::Configuration.new { root '/app' }
-    assert_equal [:decisions], config.measures
-    config = PathCoverage::Configuration.new do
-      root '/app'
-      measure :decisions, :methods
-    end
-    assert_equal %i[decisions methods], config.measures
-  end
-
-  test 'A9MJ31', %w(
-  | an unknown measure in the start block is refused,
-  | naming it and listing the measures there are
+  | Example: measure :decisions, :methods in the start block
+  | Paths are one measure, so there is nothing to choose: it
+  | is refused as an unknown setting, listing those there are.
   ) do
     error = assert_raises(PathCoverage::ConfigurationError) do
       PathCoverage::Configuration.new do
         root '/app'
-        measure :decisions, :method
+        measure :decisions, :methods
       end
     end
     expected = [
-      'unknown measure method in PathCoverage.start',
-      'the measures are: decisions, methods'
+      'unknown setting measure in PathCoverage.start',
+      'the settings are: ' \
+      'collector, cover, coverage_dir, group, ignore, ' \
+      'report, root, skip, treat'
     ].join("\n")
     assert_equal expected, error.message
   end

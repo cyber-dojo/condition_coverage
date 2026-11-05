@@ -90,15 +90,9 @@ module PathCoverage
 
     parsed = @parsed[path] = Manifest.parse(path, config)
     source = parsed[:source]
-    reaches = WithinMethods.reaches(path, source, config)
+    reaches = WithinMethods.reaches(path, parsed, config)
     rewritten = Rewriter.rewrite(source, parsed[:sites], reaches)
     RubyVM::InstructionSequence.compile(rewritten, path, path)
-  end
-
-  # The statements' reaches recorded, as Recorder#reached gives
-  # them, when config measures methods; nil when not.
-  def self.reached(config)
-    @recorder.reached if config.measures.include?(:methods)
   end
 
   # Writes the JSON report, then runs the chosen reporters, for
@@ -108,7 +102,7 @@ module PathCoverage
     files = parsed_files(config)
     result = collect(files, config)
     Render.run(result.operands, files, config,
-               **result.taken, reached: reached(config))
+               **result.taken, reached: @recorder.reached)
   end
 
   # The Result of every covered file, with the counts and site
@@ -124,27 +118,23 @@ module PathCoverage
 
   # Writes result as the JSON report at config's json_path: its
   # operands, site paths, paths a treatment rules out, and
-  # totals, and, when config measures methods, the statements
-  # the recorder reached, so a render from the JSON alone has
-  # them, and config's fingerprint.
+  # totals, the statements the recorder reached, so a render
+  # from the JSON alone has them, and config's fingerprint.
   def self.write_json(result, files, config)
     report = PathsReport.of(result.paths, files)
     parts = {
       totals: totals(result, files, config), outside: result.outside,
-      fingerprint: config.fingerprint
+      fingerprint: config.fingerprint, reached: @recorder.reached
     }
-    reached = reached(config)
-    parts[:reached] = reached if reached
     path = config.json_path
     JsonWriter.write(result.operands, path, report, **parts)
   end
 
   # The JSON report's totals, each [taken, possible] paths:
-  # within each decision, and, when config measures methods,
-  # within each method too; with groups configured, each group's
-  # own too, under groups.
+  # within each decision, and within each method; with groups
+  # configured, each group's own too, under groups.
   def self.totals(result, files, config)
-    reached = reached(config)
+    reached = @recorder.reached
     cards = WithinMethods.cards(files, config, result.paths, reached)
     totals = ConsoleSummary.totals(result.paths, cards)
     groups = config.groups

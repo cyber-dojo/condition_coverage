@@ -33,14 +33,11 @@ module PathCoverage
     end
 
     # Writes each covered file's page, recorded as write has it,
-    # with its methods' cards when config measures methods.
+    # with its methods' cards.
     def self.write_pages(operands, files, config, recorded)
-      measured = config.measures.include?(:methods)
       files.each do |full_path, parsed|
         path = config.relative(full_path)
-        # simplecov:disable
-        grids = measured ? cards(path, parsed, recorded) : nil
-        # simplecov:enable
+        grids = cards(path, parsed, recorded)
         out = "#{config.output_dir}/files/#{path}.html"
         write_page(out, path, parsed, [operands, recorded[0]], grids)
       end
@@ -67,11 +64,11 @@ module PathCoverage
     # Recorder#reached does; each site's row with its tree
     # folded under it.
     def self.cards(path, parsed, (site_paths, reached))
-      source = parsed[:source]
-      names = MethodStatements.names(source, path)
-      lasts = MethodStatements.lasts(source, path)
-      tree = ->(at) { fold(source, parsed[:sites], site_paths, at) }
-      MethodStatements.of(source, path).map do |site, rows|
+      source, sites = parsed.values_at(:source, :sites)
+      names = MethodStatements.names(source, path, sites)
+      lasts = MethodStatements.lasts(source, path, sites)
+      tree = ->(at) { fold(source, sites, site_paths, at) }
+      MethodStatements.of(source, path, sites).map do |site, rows|
         taken = MethodStatements.taken(rows, site_paths, reached)
         HtmlStatements.card(site, names[site], rows, taken,
                             lasts[site], &tree)

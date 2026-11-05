@@ -143,6 +143,7 @@ class RenderTest < Id58TestBase
     end
     expected = [
       'Path coverage within decisions: 0 / 0 (-)',
+      'Path coverage within methods: 0 / 0 (-)',
       'Path coverage ignores: &&=, ||='
     ].join("\n")
     assert_output("#{expected}\n", '') do

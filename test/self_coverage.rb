@@ -34,7 +34,6 @@ module SelfCoverage
     cover 'test/**/*.rb'
     skip 'test/projects/**/*.rb'
     coverage_dir '/reports/paths'
-    measure :decisions, :methods
     report :html
     group 'code', 'lib/**/*.rb'
     group 'test', 'test/**/*.rb'

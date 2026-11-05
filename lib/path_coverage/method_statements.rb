@@ -17,22 +17,27 @@ module PathCoverage
   # Finds, without running it, the top-level statements of each
   # method in source, one row each in its method-mode popout.
   module MethodStatements
+    # Each function below takes sites, { site => Condition }, the
+    # sites the run has in source, as Manifest.parse gives them
+    # with the run's ignore and treat settings; nil for those of
+    # no settings.
+
     # { def site => [Statement, ...] } for each def in source.
     # Example: def f; x = 1; x; end gives = and value rows.
-    def self.of(source, path)
-      collect(source, path).methods
+    def self.of(source, path, sites = nil)
+      collect(source, path, sites).methods
     end
 
     # { def site => its name } for each def in source, eg
     # { "k.rb:4:2" => :ship }, each its card's title.
-    def self.names(source, path)
-      collect(source, path).names
+    def self.names(source, path, sites = nil)
+      collect(source, path, sites).names
     end
 
     # { def site => its last line } for each def in source, eg
     # { "k.rb:4:2" => 6 }, where its card ends.
-    def self.lasts(source, path)
-      collect(source, path).lasts
+    def self.lasts(source, path, sites = nil)
+      collect(source, path, sites).lasts
     end
 
     # Example: { "k.rb:2:2" => 18 } for a write at byte 18.
@@ -40,13 +45,15 @@ module PathCoverage
     # site, in every def in source, by the row's name, where it
     # starts: its byte offset, or, in an endless def, whose body
     # is one expression, its byte range, to be wrapped.
-    def self.reaches(source, path)
-      collect(source, path).reaches
+    def self.reaches(source, path, sites = nil)
+      collect(source, path, sites).reaches
     end
 
-    # A Collector that has visited each def in source.
-    def self.collect(source, path)
-      collector = Collector.new(path, Manifest.sites(source, path))
+    # A Collector that has visited each def in source, with
+    # sites, or, for nil, those of no settings.
+    def self.collect(source, path, sites)
+      known = sites || Manifest.sites(source, path)
+      collector = Collector.new(path, known)
       Prism.parse(source).value.accept(collector)
       collector
     end
@@ -55,8 +62,8 @@ module PathCoverage
     # Each def's card total in source, [taken, size], its rows'
     # taken as taken gives them from paths and reached; a row
     # not known counts as not taken, never more than it ran.
-    def self.totals(source, path, paths, reached)
-      of(source, path).transform_values do |rows|
+    def self.totals(source, path, paths, reached, sites = nil)
+      of(source, path, sites).transform_values do |rows|
         [taken(rows, paths, reached).compact.sum, size(rows)]
       end
     end

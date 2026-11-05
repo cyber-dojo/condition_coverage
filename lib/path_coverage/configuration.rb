@@ -10,11 +10,10 @@ module PathCoverage
 
     GLOB_FLAGS = File::FNM_PATHNAME | File::FNM_EXTGLOB
     SETTINGS = %w[
-      collector cover coverage_dir group ignore measure report root
+      collector cover coverage_dir group ignore report root
       skip treat
     ].freeze
     REPORTERS = %w[gaps html post summary].freeze
-    MEASURES = %w[decisions methods].freeze
 
     # Evaluates the settings block against a new configuration.
     def initialize(&)
@@ -22,7 +21,6 @@ module PathCoverage
       @skips = []
       @groups = {}
       @reporters = [:gaps]
-      @measures = [:decisions]
       @ignored = []
       @treats = []
       instance_eval(&)
@@ -30,20 +28,6 @@ module PathCoverage
 
     # The reporters chosen with report, :gaps when none were.
     attr_reader :reporters
-
-    # What is measured, chosen with measure.
-    # :decisions, the paths within each decision, when nothing
-    # was chosen.
-    attr_reader :measures
-
-    # Chooses what is measured.
-    # Eg measure :decisions, :methods also measures the paths
-    # within each method, through its decisions.
-    # Refuses a name there is no measure for.
-    def measure(*names)
-      check('measure', names, MEASURES)
-      @measures = names.map(&:to_sym)
-    end
 
     # The dir the reports are written to.
     def output_dir

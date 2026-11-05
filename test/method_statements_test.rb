@@ -710,6 +710,23 @@ class MethodStatementsTest < Id58TestBase
     assert_equal expected, rows
   end
 
+  test 'St3e32', %w(
+  | Example: memo, @m ||= a && b, in a run ignoring ||=
+  | A card's rows are of the sites the run has, as given: here
+  | the ||= is no site, so the write is looked through, and its
+  | row is the && inside it.
+  ) do
+    source = <<~RUBY
+      def memo(a, b)
+        @m ||= a && b
+      end
+    RUBY
+    sites = PathCoverage::Manifest.sites(source, 'k.rb', ['||='])
+    rows = PathCoverage::MethodStatements.of(source, 'k.rb', sites)
+    tops = rows['k.rb:1:0'].map { [_1.line, _1.column, _1.top] }
+    assert_equal [[2, 9, '&&']], tops
+  end
+
   private
 
   # { def site => its statements' rows } for source, as if it
