@@ -13,13 +13,22 @@ module PathCoverage
     # an arm { arm:, text:, cells:, body: } whether the column
     # took it, body being its condition's tree, nil for a plain
     # arm. Texts are cut from source at the manifest's ranges.
+    # An elsif's tree is labelled elsif, as it is written.
     def self.of(source, condition, paths)
       columns = paths.sort_by.with_index do |taken, i|
         [taken[:count].zero? ? 0 : 1, i]
       end
       outcomes = columns.map { |taken| taken[:path] }
       tree = node(source, condition, outcomes, (0..).each)
+      tree = tree.merge(label: 'elsif') if elsif?(source, condition)
       tree.merge(counts: columns.map { |taken| taken[:count] })
+    end
+
+    # True for an if site written as an elsif: an if's extent
+    # starts at its keyword.
+    def self.elsif?(source, condition)
+      condition.operator == 'if' &&
+        source.byteslice(condition.extent.begin, 5) == 'elsif'
     end
 
     # The tree of condition, as its kind builds it, each leaf

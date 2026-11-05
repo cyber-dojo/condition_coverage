@@ -142,10 +142,7 @@ class SiteTreeTest < Id58TestBase
         end
       end
     RUBY
-    both = condition('&&', 20...30, 34...44)
-    site = condition(
-      'if', both, arm(:then, 49...50), arm(:else, 62...63)
-    )
+    site = PathCoverage::Manifest.sites(source, 'k.rb').values.first
     paths = [
       { path: [true, true], count: 1 },
       { path: [true, false], count: 0 },
@@ -187,7 +184,7 @@ class SiteTreeTest < Id58TestBase
         end
       end
     RUBY
-    site = condition('if', 14...15, arm(:then, nil))
+    site = PathCoverage::Manifest.sites(source, 'k.rb').values.first
     paths = [
       { path: [true], count: 1 },
       { path: [false], count: 0 }
@@ -340,5 +337,35 @@ class SiteTreeTest < Id58TestBase
     assert_equal %w(user account owner), texts
     assert_equal [true, [true, false, false]],
                  [owner[:called], owner[:cells]]
+  end
+
+  test 'EuNs86', %w(
+  | Example: if member ... elsif big ... end
+  | The elsif is an if site of its own, its tree labelled
+  | elsif, as it is written, though its operator is if.
+  | The first if's tree has no label, its operator if
+  | naming it.
+  ) do
+    source = <<~RUBY
+      def fee(member, big)
+        if member
+          5
+        elsif big
+          10
+        end
+      end
+    RUBY
+    sites = PathCoverage::Manifest.sites(source, 'k.rb')
+    trees = sites.transform_values do |site|
+      paths = PathCoverage::SitePaths.possible(site).map do |path|
+        { path:, count: 0 }
+      end
+      PathCoverage::SiteTree.of(source, site, paths)
+    end
+    labels = trees.transform_values { [_1[:operator], _1[:label]] }
+    expected = {
+      'k.rb:2:2' => ['if', nil], 'k.rb:4:2' => %w(if elsif)
+    }
+    assert_equal expected, labels
   end
 end

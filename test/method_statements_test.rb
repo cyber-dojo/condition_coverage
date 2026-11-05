@@ -65,6 +65,7 @@ class MethodStatementsTest < Id58TestBase
   | Example: ship, an if statement then a value
   | The if is a site, so its row is named by its operator,
   | if, as decision mode names it.
+  | The call in its then is a row too, straight after it.
   ) do
     source = <<~RUBY
       def ship(order)
@@ -77,7 +78,7 @@ class MethodStatementsTest < Id58TestBase
     rows = statements(source)['k.rb:1:0'].map do |row|
       [row.line, row.column, row.top]
     end
-    assert_equal [[2, 2, 'if'], [5, 2, 'value']], rows
+    assert_equal [[2, 2, 'if'], [3, 4, '()'], [5, 2, 'value']], rows
   end
 
   test 'St3e05', %w(
@@ -135,10 +136,11 @@ class MethodStatementsTest < Id58TestBase
   end
 
   test 'St3e08', %w(
-  | Example: ship, writing an and chain, an if, then a value
+  | Example: ship, writing an and chain, an if calling
+  | send_off, then a value
   | A site's row has as many paths as decision mode gives
   | the site: an and of two operands 3, an if 2.
-  | Any other row has 1.
+  | Any other row has 1, eg the call in the if's then.
   ) do
     source = <<~RUBY
       def ship(order)
@@ -152,7 +154,8 @@ class MethodStatementsTest < Id58TestBase
     rows = statements(source)['k.rb:1:0'].map do |row|
       [row.top, row.paths]
     end
-    assert_equal [['&&', 3], ['if', 2], ['value', 1]], rows
+    expected = [['&&', 3], ['if', 2], ['()', 1], ['value', 1]]
+    assert_equal expected, rows
   end
 
   test 'St3e09', %w(
@@ -181,12 +184,13 @@ class MethodStatementsTest < Id58TestBase
   end
 
   test 'St3e10', %w(
-  | Example: ship, an if then a value, its if's then taken
-  | twice and its else never
+  | Example: ship, an if calling pack, then a value, its if's
+  | then taken twice and its else never
   | A site's row names its site, so its taken is how many
   | of the site's paths were taken, 1 of 2 here.
-  | Any other row names no site, and its taken is nil, not
-  | known, as only sites' paths are recorded.
+  | Any other row, the call and the value, names no site,
+  | and its taken is nil, not known, as only sites' paths
+  | are given.
   ) do
     source = <<~RUBY
       def ship(order)
@@ -202,40 +206,36 @@ class MethodStatementsTest < Id58TestBase
         { path: [true], count: 2 }, { path: [false], count: 0 }
       ]
     }
-    assert_equal ['k.rb:2:2', nil], rows.map(&:site)
+    assert_equal ['k.rb:2:2', nil, nil], rows.map(&:site)
     taken = PathCoverage::MethodStatements.taken(rows, paths)
-    assert_equal [1, nil], taken
+    assert_equal [1, nil, nil], taken
   end
 
   test 'St3e11', %w(
-  | Example: labels, mapping its items through an if
-  | A block's body runs once for each item, so it is a
-  | context of its own: it is not looked through, and the
-  | if inside it is no row of labels. The map is a call.
+  | Example: ship, sending each order inside an if's then
+  | The block is in the if's arm, so its row comes once,
+  | after the call holding it, among the arm's rows: not
+  | again as a block of the if's statement.
   ) do
     source = <<~RUBY
-      def labels(items)
-        items.map do |item|
-          if item[:sale]
-            'sale'
-          else
-            'full price'
-          end
+      def ship(orders, rush)
+        if rush
+          orders.each { |order| order.send_off }
         end
       end
     RUBY
     rows = statements(source)['k.rb:1:0'].map do |row|
       [row.line, row.column, row.top]
     end
-    assert_equal [[2, 2, '()']], rows
+    assert_equal [[2, 2, 'if'], [3, 4, '()'], [3, 26, '()']], rows
   end
 
   test 'St3e12', %w(
-  | Example: load, reading a file, rescuing a missing one
+  | Example: load, reading a file, rescuing a missing one, with
+  | no else and no ensure
   | A def with a rescue has its statements before the rescue
-  | as its rows.
-  | Its rescue's are none of them, as a rescue runs only when
-  | a statement raises.
+  | as its rows, then its rescue's: here the empty hash, a
+  | value.
   ) do
     source = <<~RUBY
       def load(path)
@@ -248,7 +248,7 @@ class MethodStatementsTest < Id58TestBase
     rows = statements(source)['k.rb:1:0'].map do |row|
       [row.line, row.column, row.top]
     end
-    assert_equal [[2, 2, '='], [3, 2, '()']], rows
+    assert_equal [[2, 2, '='], [3, 2, '()'], [5, 2, 'value']], rows
   end
 
   test 'St3e13', %w(
@@ -414,8 +414,8 @@ class MethodStatementsTest < Id58TestBase
   | Example: install, a modifier if, a def of discount, then a
   | modifier if
   | Each modifier if is a row at its keyword.
-  | A def inside a def is a statement of its own, a value
-  | with 1 path, as defining it decides nothing.
+  | A def inside a def is a statement of its own, def, with
+  | 1 path, as defining it decides nothing.
   | It is not looked through, as its body runs only when
   | discount is called: discount's ?: is a row of discount's
   | card alone.
@@ -433,7 +433,7 @@ class MethodStatementsTest < Id58TestBase
       each.map { [_1.line, _1.column, _1.top, _1.paths] }
     end
     expected = {
-      'k.rb:1:0' => [[2, 9, 'if', 2], [3, 2, 'value', 1],
+      'k.rb:1:0' => [[2, 9, 'if', 2], [3, 2, 'def', 1],
                      [6, 17, 'if', 2]],
       'k.rb:3:2' => [[4, 4, '?:', 2]]
     }
@@ -445,6 +445,8 @@ class MethodStatementsTest < Id58TestBase
   | value
   | A lambda's body runs only when it is called, so it is not
   | looked through: the write is a row, = with 1 path.
+  | Its body's statements are rows too, after the write's, as
+  | a block's are: here the ?:, with its 2 paths.
   ) do
     source = <<~RUBY
       def capper(most)
@@ -455,7 +457,218 @@ class MethodStatementsTest < Id58TestBase
     rows = statements(source)['k.rb:1:0'].map do |row|
       [row.line, row.column, row.top, row.paths]
     end
-    assert_equal [[2, 2, '=', 1], [3, 2, 'value', 1]], rows
+    expected = [[2, 2, '=', 1], [2, 20, '?:', 2], [3, 2, 'value', 1]]
+    assert_equal expected, rows
+  end
+
+  test 'St3e23', %w(
+  | Example: fee, an if, its then a write, an elsif whose arm
+  | is a write holding a modifier if, an else whose arm is a
+  | write holding a ?:, then a value
+  | Each arm's statements are rows too, flat, after their
+  | if's row, in the order they are written; an elsif is a
+  | site of its own, so a row of its own, its top elsif, as
+  | written.
+  | A modifier if's arm, and a ?:'s, are part of their
+  | site's row, so are no rows of their own.
+  ) do
+    source = <<~RUBY
+      def fee(member, big)
+        if member
+          total = 5
+        elsif big
+          total = 10 if big.odd?
+        else
+          total = big ? 1 : 2
+        end
+        total
+      end
+    RUBY
+    rows = statements(source)['k.rb:1:0'].map do |row|
+      [row.line, row.column, row.top, row.paths]
+    end
+    expected = [
+      [2, 2, 'if', 2], [3, 4, '=', 1], [4, 2, 'elsif', 2],
+      [5, 15, 'if', 2], [7, 12, '?:', 2], [9, 2, 'value', 1]
+    ]
+    assert_equal expected, rows
+  end
+
+  test 'St3e24', %w(
+  | Example: remind, an if whose then holds only a comment,
+  | its else a call
+  | An empty then has no rows; its else's call is a row
+  | after the if's.
+  ) do
+    source = <<~RUBY
+      def remind(order)
+        if order.paid?
+          # nothing to do
+        else
+          order.remind
+        end
+      end
+    RUBY
+    rows = statements(source)['k.rb:1:0'].map do |row|
+      [row.line, row.column, row.top]
+    end
+    assert_equal [[2, 2, 'if'], [5, 4, '()']], rows
+  end
+
+  test 'St3e25', %w(
+  | Example: ship, an unless reminding, else packing, then a
+  | modifier unless logging
+  | An unless's arms' statements are rows too, after its
+  | row, its then's before its else's, as an if's are.
+  | A modifier unless's arm is part of its site's row, so is
+  | no row of its own.
+  ) do
+    source = <<~RUBY
+      def ship(order)
+        unless order.paid?
+          order.remind
+        else
+          order.pack
+        end
+        order.log unless order.quiet?
+      end
+    RUBY
+    rows = statements(source)['k.rb:1:0'].map do |row|
+      [row.line, row.column, row.top]
+    end
+    expected = [
+      [2, 2, 'unless'], [3, 4, '()'], [5, 4, '()'],
+      [7, 12, 'unless']
+    ]
+    assert_equal expected, rows
+  end
+
+  test 'St3e26', %w(
+  | Example: kind, a case whose two whens and else each write
+  | size, then a value
+  | A case's arms' statements are rows too, after its row,
+  | each when's in turn, then its else's.
+  ) do
+    source = <<~RUBY
+      def kind(x)
+        case x
+        when 1, 2
+          size = :small
+        when String
+          size = :text
+        else
+          size = :other
+        end
+        size
+      end
+    RUBY
+    rows = statements(source)['k.rb:1:0'].map do |row|
+      [row.line, row.column, row.top]
+    end
+    expected = [
+      [2, 2, 'case'], [4, 4, '='], [6, 4, '='], [8, 4, '='],
+      [10, 2, 'value']
+    ]
+    assert_equal expected, rows
+  end
+
+  test 'St3e27', %w(
+  | Example: labels, mapping items through an if; picks,
+  | selecting items that are ok? && big?; and late, counting
+  | the items that are late?
+  | A block's statements are rows too, after the statement
+  | holding it, though they run once per item.
+  | A block method's call is a site, its block's one
+  | expression its leaf; that expression is a row too: the
+  | && in picks, a site of its own, and the call in late.
+  ) do
+    source = <<~RUBY
+      def labels(items)
+        items.map do |item|
+          if item[:sale]
+            'sale'
+          else
+            'full'
+          end
+        end
+      end
+
+      def picks(items)
+        items.select { |i| i.ok? && i.big? }
+      end
+
+      def late(items)
+        items.count { |i| i.late? }
+      end
+    RUBY
+    rows = statements(source).transform_values do |each|
+      each.map { [_1.line, _1.column, _1.top] }
+    end
+    expected = {
+      'k.rb:1:0' => [[2, 2, '()'], [3, 4, 'if'], [4, 6, 'value'],
+                     [6, 6, 'value']],
+      'k.rb:11:0' => [[12, 8, 'select'], [12, 21, '&&']],
+      'k.rb:15:0' => [[16, 8, 'count'], [16, 20, '()']]
+    }
+    assert_equal expected, rows
+  end
+
+  test 'St3e28', %w(
+  | Example: load, reading a file, with two rescues, an else
+  | and an ensure
+  | Each rescue's statements are rows too, as a rescue runs
+  | when its exception is raised; then the else's, run when
+  | none is; then the ensure's, run either way: flat, in the
+  | order they are written.
+  ) do
+    source = <<~RUBY
+      def load(path)
+        text = File.read(path)
+      rescue Errno::ENOENT
+        text = ''
+      rescue IOError
+        text = nil
+      else
+        text.strip!
+      ensure
+        log(path)
+      end
+    RUBY
+    rows = statements(source)['k.rb:1:0'].map do |row|
+      [row.line, row.column, row.top]
+    end
+    expected = [
+      [2, 2, '='], [4, 2, '='], [6, 2, '='], [8, 2, '()'],
+      [10, 2, '()']
+    ]
+    assert_equal expected, rows
+  end
+
+  test 'St3e29', %w(
+  | Example: fetch, writing the value of a begin whose rescue
+  | retries later if it can, then a value
+  | A begin's statements, and its rescue's, are rows too,
+  | after the statement holding it, as a block's are.
+  | So the write is not looked through into the begin: the
+  | modifier if is a row once, in the rescue's place.
+  ) do
+    source = <<~RUBY
+      def fetch(url, retries)
+        body = begin
+          get(url)
+        rescue Timeout::Error
+          retry_later(url) if retries.positive?
+        end
+        body
+      end
+    RUBY
+    rows = statements(source)['k.rb:1:0'].map do |row|
+      [row.line, row.column, row.top]
+    end
+    expected = [
+      [2, 2, '='], [3, 4, '()'], [5, 21, 'if'], [7, 2, 'value']
+    ]
+    assert_equal expected, rows
   end
 
   private

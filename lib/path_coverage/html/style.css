@@ -34,15 +34,15 @@
   --syn-k: #7E3BA0; --syn-s: #3B7550; --syn-c: #77808F;
   --syn-n: #9E4A78; --syn-t: #4B52A0; --syn-v: #2A7570; --syn-o: #7A6600;
 }
-/* The same colours in the code and in a site's tree, fold or card
-   row, which quote the code. */
-:is(.src, .tree, .fold, .prow.site) .k { color: var(--syn-k); }
-:is(.src, .tree, .fold, .prow.site) .s { color: var(--syn-s); }
-:is(.src, .tree, .fold, .prow.site) .c { color: var(--syn-c); font-style: italic; }
-:is(.src, .tree, .fold, .prow.site) .n { color: var(--syn-n); }
-:is(.src, .tree, .fold, .prow.site) .t { color: var(--syn-t); }
-:is(.src, .tree, .fold, .prow.site) .v { color: var(--syn-v); }
-:is(.src, .tree, .fold, .prow.site) .o { color: var(--syn-o); font-weight: 700; }
+/* The same colours in the code and in a site's tree, its fold, and
+   a card's rows, which quote the code. */
+:is(.src, .tree, .fold, .statements .prow) .k { color: var(--syn-k); }
+:is(.src, .tree, .fold, .statements .prow) .s { color: var(--syn-s); }
+:is(.src, .tree, .fold, .statements .prow) .c { color: var(--syn-c); font-style: italic; }
+:is(.src, .tree, .fold, .statements .prow) .n { color: var(--syn-n); }
+:is(.src, .tree, .fold, .statements .prow) .t { color: var(--syn-t); }
+:is(.src, .tree, .fold, .statements .prow) .v { color: var(--syn-v); }
+:is(.src, .tree, .fold, .statements .prow) .o { color: var(--syn-o); font-weight: 700; }
 /* Everything a site's tree or a method's grid draws has this one
    tint, in either mode; status is only ever the orange or blue of
    an edge. A lit line, on a path being shown, is yellow. */
@@ -413,9 +413,11 @@ html[data-mode="methods"] .src.def-line {
 .statements .prow.site:hover .pcell, .statements .prow.site:hover .plabel { color: var(--link); }
 .statements .prow.columns .plabel, .statements .prow.columns .pcell { color: var(--muted); }
 /* A card's paths not taken are orange and those taken blue, as a
-   status always is; its column titles are too, as their key. */
+   status always is; its column titles are too, as their key. None
+   not taken, 0, is no gap, so is blue. */
 .statements .pcell.not-taken { color: var(--bad); }
-.statements .pcell.was-taken { color: var(--ok); }
+.statements .pcell.was-taken,
+.statements .pcell.not-taken.none { color: var(--ok); }
 .pcell.ended { background: transparent; }
 .pcell.true, .pcell.false { background: var(--surface); color: var(--fg); }
 .prow.calls .pcell.taken { background: var(--ok-tint); color: var(--ok); }
@@ -453,21 +455,24 @@ html[data-mode="methods"] table.files [data-mode="decisions"] { display: none; }
 html:not([data-mode="methods"]) .jump-list[data-jumps="methods"],
 html[data-mode="methods"] .jump-list[data-jumps="decisions"] { display: none; }
 .jump-list[data-empty] { visibility: hidden; }
-/* The other mode's rail shares the column but shows nothing. */
+/* The other mode's rail shares the column but shows nothing; within
+   each method, the trees' rail shows a loose site's tree, open. */
 html:not([data-mode="methods"]) .rail.pc,
-html[data-mode="methods"] .rail.cc { visibility: hidden; }
-/* Within each method, a line holding a decision is a plain line:
-   its number opens nothing and has no status. The gutter shows
-   only the mode's own arrows: to the sites with gaps within each
-   decision, to the methods with gaps within each method. */
+html[data-mode="methods"] body:not([data-open="cc"]) .rail.cc { visibility: hidden; }
+/* Within each method, a line holding a decision in a method is a
+   plain line: its number opens nothing and has no status, as its
+   method's card holds it. A loose one, outside every method, keeps
+   its button, as no card holds it. The gutter shows only the mode's
+   own arrows: to the sites with gaps within each decision, to the
+   methods with gaps within each method. */
 html[data-mode="methods"] .nav a:not([data-method]),
 html:not([data-mode="methods"]) .nav a[data-method] { display: none; }
-html[data-mode="methods"] button.lnum,
-html[data-mode="methods"] button.lnum[data-status][aria-expanded] {
+html[data-mode="methods"] button.lnum:not(.loose),
+html[data-mode="methods"] button.lnum:not(.loose)[data-status][aria-expanded] {
   pointer-events: none; background: none; color: inherit;
   border-color: transparent; box-shadow: none; font-weight: inherit;
 }
-html[data-mode="methods"] button.lnum::before { content: none; }
+html[data-mode="methods"] button.lnum:not(.loose)::before { content: none; }
 /* Within each method, the number of each method's def line wears a
    site's button's look within each decision: the one tint, edged
    on the top and left in its status colour, orange for gaps and
@@ -491,9 +496,9 @@ html[data-mode="methods"] .lineno.mdef::before {
 html[data-mode="methods"] .lineno.mdef[aria-expanded="true"]::before { content: none; }
 html[data-mode="methods"] .lineno.mdef[aria-expanded="true"] { box-shadow: inset 1px 1px 0 var(--mdef-status); }
 html[data-mode="methods"] .lineno.mdef:hover { filter: brightness(1.1); }
-html[data-mode="methods"] button.lnum .lineno { font-weight: inherit; }
-html[data-mode="methods"] mark.site,
-html[data-mode="methods"] body .block mark.site[data-status] {
+html[data-mode="methods"] button.lnum:not(.loose) .lineno { font-weight: inherit; }
+html[data-mode="methods"] .block:not(:has(> button.loose)) mark.site,
+html[data-mode="methods"] body .block:not(:has(> button.loose)) mark.site[data-status] {
   background: none; box-shadow: none;
 }
-html[data-mode="methods"] .site-count { visibility: hidden; }
+html[data-mode="methods"] button.lnum:not(.loose) .site-count { visibility: hidden; }

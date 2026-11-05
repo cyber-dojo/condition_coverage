@@ -4,6 +4,7 @@ require_relative 'manifest_chains'
 require_relative 'manifest_choices'
 require_relative 'site'
 require_relative 'site_paths'
+require_relative 'statement_arms'
 
 module PathCoverage
   # One row of a method's popout, a top-level statement or a
@@ -98,6 +99,7 @@ module PathCoverage
     class Collector < Prism::Visitor
       include ManifestChains
       include ManifestChoices
+      include StatementArms
 
       # Starts with no methods found; sites are decision mode's,
       # { site => Condition }.
@@ -118,10 +120,10 @@ module PathCoverage
       attr_reader :methods, :names, :lasts, :reaches
 
       # Notes node's name, its last line, its body statements as
-      # its rows, none for an empty body, and where each row that
-      # is no site is reached.
+      # its rows, those in its sites' arms too, none for an empty
+      # body, and where each row that is no site is reached.
       def visit_def_node(node)
-        tops = statements_of(node.body).flat_map { top_nodes(_1) }
+        tops = rows_in(statements_of(node.body))
         site = Site.of(@path, node)
         @methods[site] = tops.map { |top| row_of(top) }
         note_def(site, node)
@@ -146,12 +148,17 @@ module PathCoverage
         end
       end
 
-      # The top-level statements of a def's body: those before
-      # any rescue, as a rescue runs only when one raises; none
-      # for an empty body.
-      def statements_of(body)
-        body = body.statements if body&.type == :begin_node
-        body ? body.body : []
+      # Example: if a then x = 1 end gives the if, then the write.
+      # The nodes statements' rows are for, flat, in the order
+      # they are written: each statement's tops, each followed by
+      # the rows of its arms' statements, when it has any.
+      def rows_in(statements)
+        statements.flat_map do |statement|
+          tops = top_nodes(statement).flat_map do |top|
+            [top, *rows_in(arms_of(top))]
+          end
+          tops + body_rows(statement)
+        end
       end
 
       # The Statement row of node. A site is where decision mode
@@ -180,20 +187,19 @@ module PathCoverage
       end
 
       # node when it is a site, else the outermost sites in its
-      # children, in order; none in a block, whose body is a
-      # context of its own, running once for each of its calls,
-      # or in a def or a lambda, whose body runs only when it is
-      # called, a def's sites rows of its own card.
+      # children, in order; none in a block or a begin, whose
+      # statements are rows of their own, after the statement
+      # holding it, nor in a def or a lambda, whose body runs only
+      # when it is called, a def's sites rows of its own card.
       def sites_in(node)
         return [node] if site?(node)
-        return [] if SCOPES.include?(node.type)
+        return [] if UNSEEN.include?(node.type)
 
         node.compact_child_nodes.flat_map { |child| sites_in(child) }
       end
 
-      # The nodes whose bodies run in a context of their own, so
-      # are never looked through.
-      SCOPES = %i[block_node def_node lambda_node].freeze
+      # The nodes a statement's sites are never looked for in.
+      UNSEEN = %i[block_node begin_node def_node lambda_node].freeze
 
       # True when decision mode has a site named where node's
       # site would start.
@@ -207,20 +213,29 @@ module PathCoverage
         @sites[Site.at(@path, site_loc(node))]
       end
 
-      TOPS = { call_node: '()', return_node: 'return' }.freeze
+      TOPS = {
+        call_node: '()', return_node: 'return', def_node: 'def'
+      }.freeze
 
       # What statement is as written: a site's operator, eg if,
-      # when decision mode has a site where it starts; else =
-      # for a write, () for a call, raise for a raise of the
-      # method's own, as it leaves the method, return for a
-      # return, value for anything else.
+      # when decision mode has a site where it starts, an elsif
+      # being elsif, as written; else = for a write, () for a
+      # call, raise for a raise of the method's own, as it leaves
+      # the method, return for a return, def for a def inside it,
+      # value for anything else.
       def top_of(statement)
         site = site_at(statement)
+        return 'elsif' if site && elsif?(statement)
         return site.operator if site
         return 'raise' if raise?(statement)
         return '=' if write?(statement)
 
         TOPS.fetch(statement.type, 'value')
+      end
+
+      # True for an if written as an elsif.
+      def elsif?(statement)
+        statement.type == :if_node && statement.if_keyword == 'elsif'
       end
 
       # True for a write of any kind: of a variable, eg @x = 1

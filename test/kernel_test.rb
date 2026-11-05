@@ -232,8 +232,9 @@ class KernelTest < Id58TestBase
   | fee with two ifs called once, with true then false
   | index.html's Total row shows both totals.
   | Within each decision: 2 / 4 50%, one of each if's two.
-  | Within each method: 4 / 6 67%, fee's card: its two
-  | 1-path statements reached and one of each if's two.
+  | Within each method: 5 / 8 63%, fee's card: its two
+  | 1-path statements reached and one of each if's two, and,
+  | in the ifs' thens, member's write reached, big's not.
   ) do
     dir = Dir.mktmpdir('6rTS4f')
     File.write("#{dir}/fee.rb", <<~RUBY)
@@ -265,7 +266,7 @@ class KernelTest < Id58TestBase
 
     index = REXML::Document.new(File.read("#{dir}/index.html"))
     total = index.elements.to_a('//tfoot/tr/td')
-    expected = ['Total', '2', '2', '/ 4', '50%', '4', '/ 6', '67%']
+    expected = ['Total', '2', '2', '/ 4', '50%', '5', '/ 8', '63%']
     assert_equal(expected, total.map { text_of(_1) })
   end
 
@@ -376,7 +377,8 @@ class KernelTest < Id58TestBase
   | The JSON report holds the statements reached too.
   | So the render's index has the same Total row as the run's.
   | Within each decision: 2 / 4 50%.
-  | Within each method: 4 / 6 67%.
+  | Within each method: 5 / 8 63%, member's write in its then
+  | reached too.
   ) do
     dir = Dir.mktmpdir('6rTS4q')
     File.write("#{dir}/fee.rb", <<~RUBY)
@@ -421,7 +423,7 @@ class KernelTest < Id58TestBase
 
     index = REXML::Document.new(File.read("#{later}/index.html"))
     total = index.elements.to_a('//tfoot/tr/td')
-    expected = ['Total', '2', '2', '/ 4', '50%', '4', '/ 6', '67%']
+    expected = ['Total', '2', '2', '/ 4', '50%', '5', '/ 8', '63%']
     assert_equal(expected, total.map { text_of(_1) })
   end
 
@@ -430,9 +432,10 @@ class KernelTest < Id58TestBase
   | a report after fee(true, false), another after
   | fee(false, false) too, then a render of both reports
   | The render merges the paths and reaches of every report.
-  | So member was taken both ways, big false only, and both
-  | 1-path statements reached.
-  | Within each method: 5 / 6 83%, not the first report's 4.
+  | So member was taken both ways, big false only, both
+  | 1-path statements reached, and member's write in its
+  | then reached, big's not.
+  | Within each method: 6 / 8 75%, not the first report's 5.
   ) do
     dir = Dir.mktmpdir('6rTS4r')
     File.write("#{dir}/fee_runs.rb", <<~RUBY)
@@ -482,16 +485,17 @@ class KernelTest < Id58TestBase
     index = REXML::Document.new(File.read("#{later}/index.html"))
     total = index.elements.to_a('//tfoot/tr/td')
     methods = total.map { text_of(_1) }.last(3).join(' ')
-    assert_equal '5 / 6 83%', methods
+    assert_equal '6 / 8 75%', methods
   end
 
   test '6rTS4s', %w(
   | Example: a run of fee with two ifs that measures :decisions
   | alone, then a render of its report that measures :methods too
   | The report holds no reaches, so it cannot say whether
-  | fee's 1-path statements ran: the render claims they did
-  | not. Its ifs' paths it does hold, one of each's two.
-  | So within each method: 2 / 6 33%.
+  | fee's 1-path statements ran, its ifs' writes among them:
+  | the render claims they did not. Its ifs' paths it does
+  | hold, one of each's two.
+  | So within each method: 2 / 8 25%.
   ) do
     dir = Dir.mktmpdir('6rTS4s')
     File.write("#{dir}/fee_plain.rb", <<~RUBY)
@@ -536,7 +540,7 @@ class KernelTest < Id58TestBase
     index = REXML::Document.new(File.read("#{later}/index.html"))
     total = index.elements.to_a('//tfoot/tr/td')
     methods = total.map { text_of(_1) }.last(3).join(' ')
-    assert_equal '2 / 6 33%', methods
+    assert_equal '2 / 8 25%', methods
   end
 
   test '6rTS4t', %w(
@@ -1237,8 +1241,9 @@ class KernelTest < Id58TestBase
   | `member` false.
   | The JSON report's totals are [taken, possible]:
   | decisions [2, 4], one path of each if's two.
-  | methods [4, 6], fee's card: its two 1-path statements
-  | reached and one of each if's two.
+  | methods [5, 8], fee's card: its two 1-path statements
+  | reached, one of each if's two, and, in the ifs' thens,
+  | member's write reached, big's not.
   ) do
     dir = Dir.mktmpdir('6rTS41')
     File.write("#{dir}/fee.rb", <<~RUBY)
@@ -1271,7 +1276,7 @@ class KernelTest < Id58TestBase
     ].join("\n")
     assert_output("#{expected}\n") { report.call }
     json = JSON.parse(File.read("#{dir}/path_coverage.json"))
-    totals = { 'decisions' => [2, 4], 'methods' => [4, 6] }
+    totals = { 'decisions' => [2, 4], 'methods' => [5, 8] }
     assert_equal totals, json['totals']
   end
 
@@ -1386,8 +1391,9 @@ class KernelTest < Id58TestBase
   | At exit it prints a line per total, as SimpleCov prints its
   | line and branch coverage.
   | Within decisions: 2 / 4, one of each if's two paths.
-  | Within methods, only when methods are measured: 4 / 6,
-  | fee's card.
+  | Within methods, only when methods are measured: 5 / 8,
+  | fee's card, member's write in its then reached, big's
+  | not.
   ) do
     # Each measure covers a file and module of its own, so neither
     # run redefines the other's fee.
@@ -1422,7 +1428,7 @@ class KernelTest < Id58TestBase
       capture_io { exit_report.call }.first
     end
     decisions = "Path coverage within decisions: 2 / 4 (50.00%)\n"
-    methods = "Path coverage within methods: 4 / 6 (66.67%)\n"
+    methods = "Path coverage within methods: 5 / 8 (62.50%)\n"
     assert_equal [decisions, decisions + methods], printed
   end
 

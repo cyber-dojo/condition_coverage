@@ -79,15 +79,19 @@ module PathCoverage
     end
 
     # Example: if, a site's top, as <span class="k">if</span>.
-    # statement's top, escaped; a site's coloured as the code it
-    # is, as its tree's operator is; any other's, eg value or (),
-    # names no code, so is plain.
+    # statement's top, coloured as the code pane colours the
+    # code it quotes, eg if, def and return as keywords; but
+    # value and (), which name kinds of statement and quote no
+    # code, escaped and plain.
     def self.top(statement)
       text = statement.top
-      return CGI.escapeHTML(text) unless statement.site
+      return CGI.escapeHTML(text) if KINDS.include?(text)
 
       HtmlSyntax.fragment(text)
     end
+
+    # The tops that name a kind of statement, quoting no code.
+    KINDS = %w[value ()].freeze
 
     # The arrow left of a row's line:column, its glyph, as
     # style.css draws it, pointing down while its fold is shut
@@ -125,11 +129,18 @@ module PathCoverage
     # its top, then those colouring not taken and taken.
     CELLS = ['', ' not-taken', ' was-taken'].freeze
 
+    # The class marking a not taken cell of 0, no gap, coloured
+    # blue as taken is; none for any other cell, as a count of
+    # paths not taken, or one not known, ?, is a gap.
+    def self.none(cell, css)
+      css == ' not-taken' && cell == '0' ? ' none' : ''
+    end
+
     # A row div with attrs, lead, then its label, then a span
     # per cell.
     def self.row(attrs, label, cells, lead = '')
       spans = cells.zip(CELLS).map do |cell, css|
-        %(<span class="pcell#{css}">#{cell}</span>)
+        %(<span class="pcell#{css}#{none(cell, css)}">#{cell}</span>)
       end
       %(<div #{attrs}>#{lead}<span class="plabel">#{label}</span>) +
         %(#{spans.join}</div>)
