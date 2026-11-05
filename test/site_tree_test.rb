@@ -3,7 +3,7 @@ require 'path_coverage/manifest'
 require 'path_coverage/site_paths'
 require 'path_coverage/site_tree'
 
-class SiteTreeTest < Id58TestBase
+class SiteTreeTest < TidTest
   test 'EuNs10', %w(
   | Example: ok?(id) && id.start_with?('N')
   | The tree names its operator (&&).

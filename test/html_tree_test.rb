@@ -2,7 +2,7 @@ require_relative 'test_helper'
 require 'path_coverage/html_tree'
 require 'rexml/document'
 
-class HtmlTreeTest < Id58TestBase
+class HtmlTreeTest < TidTest
   test 'c4e7a9', %w(
   | Example: owner at the end of user&.account&.owner
   | owner is no leaf, as it decides no path, so it has no true

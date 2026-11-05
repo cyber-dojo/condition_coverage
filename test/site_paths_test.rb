@@ -2,7 +2,7 @@ require_relative 'test_helper'
 require 'path_coverage/manifest'
 require 'path_coverage/site_paths'
 
-class SitePathsTest < Id58TestBase
+class SitePathsTest < TidTest
   test 'Sp3x10', %w(
   | the possible paths through an && are every way its
   | leaves can be evaluated, true before false, a leaf an

@@ -1,7 +1,7 @@
 require_relative 'test_helper'
 require 'path_coverage/method_statements'
 
-class MethodStatementsTest < Id58TestBase
+class MethodStatementsTest < TidTest
   test 'St3e01', %w(
   | Example: total, a write, a call chain and a value as its
   | top-level statements

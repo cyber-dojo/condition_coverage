@@ -1,7 +1,7 @@
 require_relative 'test_helper'
 require 'path_coverage/html_mode'
 
-class HtmlModeTest < Id58TestBase
+class HtmlModeTest < TidTest
   test 'Tg9e10', %w(
   | Example: the html element's attribute of a run measuring
   | methods

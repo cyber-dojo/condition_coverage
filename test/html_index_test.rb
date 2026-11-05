@@ -2,7 +2,7 @@ require_relative 'test_helper'
 require 'path_coverage/html_index'
 require 'rexml/document'
 
-class HtmlIndexTest < Id58TestBase
+class HtmlIndexTest < TidTest
   test 'zr0H10', %w(
   | Example: kata.rb with decisions [3, 6] and methods [1, 4]
   | Its row links the file to its own page.

@@ -4,7 +4,7 @@ require 'json'
 require 'rexml/document'
 require 'tmpdir'
 
-class KernelTest < Id58TestBase
+class KernelTest < TidTest
   # Its tests swap the configuration of the one global load
   # hook, and capture $stdout.
   serial!
@@ -1880,35 +1880,25 @@ class KernelTest < Id58TestBase
   | its page draws it: its name, first and last lines, and a
   | row per statement, with its paths, how many were taken, and
   | its site, so a reader finds a card's gap without the page.
-  ) do
-    dir = Dir.mktmpdir('6rTS6j')
-    File.write("#{dir}/fee.rb", <<~RUBY)
-      module Fee6rTS6j
+  ) do |t|
+    t.write(<<~RUBY)
+      module Fee
         def self.fee(big) = big ? 10 : 5
       end
     RUBY
-    exit_report = nil
-    on_exit = ->(&block) { exit_report = block }
-    PathCoverage.start(on_exit:) do
-      root dir
-      cover '*.rb'
-      coverage_dir dir
-      report :html
-    end
-    require "#{dir}/fee.rb"
-    Fee6rTS6j.fee(true)
-    exit_report.call
-    json = JSON.parse(File.read("#{dir}/path_coverage.json"))
+    t.start { report :html }
+    t.load::Fee.fee(true)
+    t.report
     expected = {
-      'fee.rb:2:2' => {
+      "#{t.file}:2:2" => {
         'name' => 'fee', 'first' => 2, 'last' => 2,
         'rows' => [
           { 'at' => '2:22', 'top' => '?:', 'paths' => 2, 'taken' => 1,
-            'site' => 'fee.rb:2:22' }
+            'site' => "#{t.file}:2:22" }
         ]
       }
     }
-    assert_equal expected, json['cards']
+    assert_equal expected, t.json['cards']
   end
 
   test '6rTS6k', %w(

@@ -1,7 +1,7 @@
 require_relative 'test_helper'
 require 'path_coverage/console_summary'
 
-class ConsoleSummaryTest < Id58TestBase
+class ConsoleSummaryTest < TidTest
   test 'Cs4m10', %w(
   | Example: lib/kata.rb's site taking 2 of its 3 paths, and
   | test/kata_test.rb's taking 1 of its 2, with groups code and

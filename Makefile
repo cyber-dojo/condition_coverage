@@ -9,7 +9,7 @@ image:
 # Runs the tests with path_coverage measuring its own lib/ and
 # test/. A full run also gates SimpleCov's report against
 # test/coverage_metrics_params.json. tids runs only the tests
-# whose id58 contains one of its values, and skips that gate.
+# whose tid contains one of its values, and skips that gate.
 #   eg make test tids='6D1K p0Kj'
 test:
 	${PWD}/bin/run_tests.sh ${tids}

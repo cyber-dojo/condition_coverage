@@ -1,7 +1,7 @@
 require_relative 'test_helper'
 require 'path_coverage/rewriter'
 
-class RewriterTest < Id58TestBase
+class RewriterTest < TidTest
   test '6D1Ka2', %w(
   | each operand of an && is wrapped in a record call
   | keyed by the && site's path:line:column

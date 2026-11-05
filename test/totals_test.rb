@@ -1,7 +1,7 @@
 require_relative 'test_helper'
 require 'path_coverage/totals'
 
-class TotalsTest < Id58TestBase
+class TotalsTest < TidTest
   test 'Tq7m10', %w(
   | Example: ok?(id) && new?(id) taken by 2 paths of its 3,
   | and ok?(id) ? :ok : :no taken by both of its 2

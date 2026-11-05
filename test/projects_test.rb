@@ -2,7 +2,7 @@ require_relative 'test_helper'
 require 'open3'
 require 'tmpdir'
 
-class ProjectsTest < Id58TestBase
+class ProjectsTest < TidTest
   test '4WXv10', %w(
   | a project run with path coverage started prints,
   | as it exits, a line for each path through an && its run

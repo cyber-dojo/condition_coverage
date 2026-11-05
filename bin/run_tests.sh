@@ -7,7 +7,7 @@ readonly IMAGE=path_coverage-test
 show_help()
 {
   cat <<EOF
-Usage: bin/run_tests.sh [OPTIONS] [ID58...]
+Usage: bin/run_tests.sh [OPTIONS] [TID...]
 
 Runs the tests in a Docker image built from the repo's Dockerfile,
 with path_coverage measuring its own lib/ and test/ (a renamed
@@ -17,7 +17,7 @@ test/coverage_metrics_params.json, exiting non-zero if a test
 fails or a bound is breached. reports/index.html is SimpleCov's
 report and reports/paths/index.html path_coverage's.
 
-With ID58 arguments, runs only the tests whose id contains one of
+With TID arguments, runs only the tests whose tid contains one of
 them, and skips the coverage check: a partial run covers only
 part of the code, so its report cannot meet the bounds.
 

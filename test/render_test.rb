@@ -5,7 +5,7 @@ require 'path_coverage/manifest'
 require 'path_coverage/render'
 require 'tmpdir'
 
-class RenderTest < Id58TestBase
+class RenderTest < TidTest
   test 'Rn5d10', %w(
   | rendering from the JSON reports of several runs
   | reports their merged counts, so only the paths that

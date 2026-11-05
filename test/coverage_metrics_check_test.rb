@@ -1,7 +1,7 @@
 require_relative 'test_helper'
 require_relative 'coverage_metrics_check'
 
-class CoverageMetricsCheckTest < Id58TestBase
+class CoverageMetricsCheckTest < TidTest
   test 'p0Kj10', %w(
   | a missed count above its max is a breach
   | naming the metric, its value and its range

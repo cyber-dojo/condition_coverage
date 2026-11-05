@@ -1,6 +1,6 @@
 require_relative 'test_helper'
 
-class TestHelperTest < Id58TestBase
+class TestHelperTest < TidTest
   # Its tests capture $stdout and set ENV['SHOW_TEST_IDS'].
   serial!
 
@@ -12,19 +12,74 @@ class TestHelperTest < Id58TestBase
   | on both counts: it is ordered with the serial suites,
   | and its tests are run in place, not sent to the pool
   ) do
-    klass = Class.new(Id58TestBase) { serial! }
+    klass = Class.new(TidTest) { serial! }
     assert_equal :random, klass.run_order
 
     assert_equal klass.singleton_class, klass.method(:run).owner
   end
 
   test 'Fb7A10', %w(
-  | a running test can read its own id58 and description
-  ) do
-    assert_equal 'Fb7A10', id58
+  | a running test can read its own tid and description
+  ) do |t|
+    assert_equal 'Fb7A10', t.id
 
-    words = '| a running test can read its own id58 and description'
-    assert_equal words, name58
+    words = '| a running test can read its own tid and description'
+    assert_equal words, t.description
+  end
+
+  test 'Fb7B10', %w(
+  | Example: a test that asks for t.dir twice, then raises
+  | t.dir is one directory, named for the test's tid, made as it
+  | is first asked for. It is removed once the test ends, even as
+  | the test raises, so no test leaves a fixture behind.
+  ) do
+    seen = []
+    klass = Class.new(TidTest) do
+      test('Fb7Bx1', %w(| kata exists)) do |t|
+        seen.push(t.dir, t.dir, File.directory?(t.dir))
+        raise 'disk full'
+      end
+    end
+    name = klass.public_instance_methods(false)[0]
+    assert_output("disk full\n") do
+      assert_raises(RuntimeError) { klass.new(name).send(name) }
+    end
+    dir, again, made = seen
+    assert_equal [dir, true], [again, made]
+    assert_includes File.basename(dir), 'Fb7Bx1'
+    refute File.exist?(dir)
+  end
+
+  test 'Fb7B20', %w(
+  | Example: t.write of module Fee holding fee, then t.load
+  | t.write writes the source to t.file, named for the tid, in
+  | t.dir. t.load loads it wrapped in a module of its own, which
+  | it returns, so a fixture's constants never meet another's.
+  ) do |t|
+    source = "module Fee\n  def self.fee = 5\nend\n"
+    t.write(source)
+    assert_equal 'Fb7B20.rb', t.file
+    assert_equal source, File.read("#{t.dir}/#{t.file}")
+    wrap = t.load
+    assert_equal 5, wrap::Fee.fee
+    assert wrap.const_defined?(:Fee, false)
+  end
+
+  test 'Fb7B30', %w(
+  | Example: t.write of RATE = a ?: on ENV, t.start with report
+  | :html, t.load, then t.report, with no RATE set
+  | t.start starts path_coverage covering t.dir's .rb files,
+  | reporting into t.dir, any settings of its block added.
+  | t.report runs the report the process's exit would. t.json is
+  | the JSON report it wrote: the ?:'s else taken once.
+  ) do |t|
+    t.write("RATE = ENV.key?('RATE_Fb7B30') ? 2 : 1\n")
+    t.start { report :html }
+    t.load
+    t.report
+    taken = t.json['paths']["#{t.file}:1:7"]['taken']
+    assert_equal([0, 1], taken.map { _1['count'] })
+    assert File.exist?("#{t.dir}/index.html")
   end
 
   test 'Fb7A15', %w(
@@ -35,14 +90,14 @@ class TestHelperTest < Id58TestBase
       | POST /kata_create(manifest)
       | has status 200
     )
-    klass = Class.new(Id58TestBase) do
-      test('Fb7Ax1', words, &NO_OP)
+    seen = nil
+    klass = Class.new(TidTest) do
+      test('Fb7Ax1', words) { |t| seen = t.description }
     end
     name = klass.public_instance_methods(false)[0]
-    instance = klass.new(name)
-    instance.send(name)
+    klass.new(name).send(name)
     expected = "| POST /kata_create(manifest)\n| has status 200"
-    assert_equal expected, instance.name58
+    assert_equal expected, seen
   end
 
   test 'Fb7A17', %w(
@@ -53,39 +108,39 @@ class TestHelperTest < Id58TestBase
       | ok? || new? is recorded
       | operand by operand
     )
-    klass = Class.new(Id58TestBase) do
-      test('Fb7Ax2', words, &NO_OP)
+    seen = nil
+    klass = Class.new(TidTest) do
+      test('Fb7Ax2', words) { |t| seen = t.description }
     end
     name = klass.public_instance_methods(false)[0]
-    instance = klass.new(name)
-    instance.send(name)
+    klass.new(name).send(name)
     expected = [
       '| ok? || new? is recorded',
       '| operand by operand'
     ].join("\n")
-    assert_equal expected, instance.name58
+    assert_equal expected, seen
   end
 
   test 'Fb7A18', %w(
   | the name a failure reports puts every bar line
   | in the same column, so the description reads as written
   ) do
-    name58 = "| POST /kata_create(manifest)\n| has status 200"
+    words = "| POST /kata_create(manifest)\n| has status 200"
     expected = [
       'test_',
       "id='Fb7Ax8'",
       '| POST /kata_create(manifest)',
       '| has status 200'
     ].join("\n").to_sym
-    actual = Id58TestBase.test_name('Fb7Ax8', name58)
+    actual = TidTest.test_name('Fb7Ax8', words)
     assert_equal expected, actual
   end
 
   test 'Fb7A20', %w(
-  | an empty id58 is refused, pointing at the offending test
+  | an empty tid is refused, pointing at the offending test
   ) do
     error = assert_raises(RuntimeError) do
-      Class.new(Id58TestBase) { test('', %w(| kata exists), &NO_OP) }
+      Class.new(TidTest) { test('', %w(| kata exists), &NO_OP) }
     end
     expected = [
       '',
@@ -101,17 +156,17 @@ class TestHelperTest < Id58TestBase
   end
 
   test 'Fb7A30', %w(
-  | an id58 using a letter outside the alphabet is refused
+  | a tid using a letter outside the alphabet is refused
   ) do
     error = assert_raises(RuntimeError) do
-      Class.new(Id58TestBase) do
+      Class.new(TidTest) do
         test('Fb7AO1', %w(| kata exists), &NO_OP)
       end
     end
     expected = [
       '',
       '',
-      '     !not id58',
+      '     !not a tid',
       '     !',
       "test 'Fb7AO1',",
       "'| kata exists'",
@@ -126,7 +181,7 @@ class TestHelperTest < Id58TestBase
   | so every failure report shows its lines as written
   ) do
     error = assert_raises(RuntimeError) do
-      Class.new(Id58TestBase) do
+      Class.new(TidTest) do
         test('Fb7Ax3', %w(kata exists), &NO_OP)
       end
     end
@@ -144,10 +199,10 @@ class TestHelperTest < Id58TestBase
   end
 
   test 'Fb7A40', %w(
-  | an id58 already used by another test is refused
+  | a tid already used by another test is refused
   ) do
     error = assert_raises(RuntimeError) do
-      Class.new(Id58TestBase) do
+      Class.new(TidTest) do
         test('Fb7Ax4', %w(| kata exists), &NO_OP)
         test('Fb7Ax4', %w(| kata missing), &NO_OP)
       end
@@ -166,10 +221,10 @@ class TestHelperTest < Id58TestBase
   end
 
   test 'Fb7A50', %w(
-  | a test whose id58 contains none of the command-line args
+  | a test whose tid contains none of the command-line args
   | is not defined
   ) do
-    klass = Class.new(Id58TestBase) do
+    klass = Class.new(TidTest) do
       def self.args = ['Kp9']
       test('Fb7Ax5', %w(| kata exists), &NO_OP)
     end
@@ -177,10 +232,10 @@ class TestHelperTest < Id58TestBase
   end
 
   test 'Fb7A60', %w(
-  | with SHOW_TEST_IDS=true a test prints its id58 and file
+  | with SHOW_TEST_IDS=true a test prints its tid and file
   | before running
   ) do
-    klass = Class.new(Id58TestBase) do
+    klass = Class.new(TidTest) do
       test('Fb7Ax6', %w(| kata exists), &NO_OP)
     end
     name = klass.public_instance_methods(false)[0]
@@ -195,7 +250,7 @@ class TestHelperTest < Id58TestBase
   | a test that raises prints the error's message,
   | then re-raises it
   ) do
-    klass = Class.new(Id58TestBase) do
+    klass = Class.new(TidTest) do
       test('Fb7Ax7', %w(| kata exists)) { raise 'disk full' }
     end
     name = klass.public_instance_methods(false)[0]

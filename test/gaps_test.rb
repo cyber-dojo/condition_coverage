@@ -2,7 +2,7 @@ require_relative 'test_helper'
 require 'path_coverage/gaps'
 require 'path_coverage/result'
 
-class GapsTest < Id58TestBase
+class GapsTest < TidTest
   test 'ngWa20', %w(
   | a path needing the outcome a fixed leaf can never have
   | is impossible, so it is never a gap

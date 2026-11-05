@@ -1,7 +1,7 @@
 require_relative 'test_helper'
 require 'path_coverage/result'
 
-class ResultTest < Id58TestBase
+class ResultTest < TidTest
   test 'DYTY10', %w(
   | the result lists every site in the manifest
   | with the counts of each of its operands,

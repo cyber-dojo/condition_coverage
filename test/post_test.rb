@@ -6,7 +6,7 @@ require 'json'
 require 'socket'
 require 'tmpdir'
 
-class PostTest < Id58TestBase
+class PostTest < TidTest
   # Its tests capture $stdout, which is process-wide.
   serial!
 

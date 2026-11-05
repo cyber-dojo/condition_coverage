@@ -2,7 +2,7 @@ require_relative 'test_helper'
 require 'path_coverage/html_file'
 require 'rexml/document'
 
-class HtmlFileTest < Id58TestBase
+class HtmlFileTest < TidTest
   test 'gae510', %w(
   | a file's listing shows every line's code in order;
   | a line with no condition has a plain number, and a line

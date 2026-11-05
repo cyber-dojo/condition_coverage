@@ -7,7 +7,7 @@ require 'open3'
 require 'socket'
 require 'tmpdir'
 
-class AutoTest < Id58TestBase
+class AutoTest < TidTest
   # One of its tests requires auto in this process, which
   # reads the configuration of the one global load hook.
   serial!

@@ -4,7 +4,7 @@ require 'path_coverage/manifest'
 require 'path_coverage/site_paths'
 require 'tmpdir'
 
-class FoldMatrixTest < Id58TestBase
+class FoldMatrixTest < TidTest
   # Its test swaps the configuration of the one global load
   # hook.
   serial!

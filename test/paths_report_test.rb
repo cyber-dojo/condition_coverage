@@ -1,7 +1,7 @@
 require_relative 'test_helper'
 require 'path_coverage/paths_report'
 
-class PathsReportTest < Id58TestBase
+class PathsReportTest < TidTest
   test 'Pr7q10', %w(
   | the paths report gives each site its leaves' spans, as
   | line:column pairs, beside each path and its count, so a

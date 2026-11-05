@@ -1,7 +1,7 @@
 require_relative 'test_helper'
 require 'path_coverage/manifest'
 
-class ManifestTest < Id58TestBase
+class ManifestTest < TidTest
   test '6asy10', %w(
   | each && site in a file is found without running it,
   | with the byte range of each of its operands, so an &&

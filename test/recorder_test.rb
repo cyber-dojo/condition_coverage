@@ -1,7 +1,7 @@
 require_relative 'test_helper'
 require 'path_coverage/recorder'
 
-class RecorderTest < Id58TestBase
+class RecorderTest < TidTest
   test '8TuB10', %w(
   | recording an operand returns its value unchanged,
   | so the && it sits in still short-circuits

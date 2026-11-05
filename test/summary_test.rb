@@ -1,7 +1,7 @@
 require_relative 'test_helper'
 require 'path_coverage/summary'
 
-class SummaryTest < Id58TestBase
+class SummaryTest < TidTest
   test 'SEye10', %w(
   | Example: kata.rb with two && sites, team.rb with one
   | Each covered file gets one row for the index page.

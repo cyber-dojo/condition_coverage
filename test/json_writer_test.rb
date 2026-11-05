@@ -4,7 +4,7 @@ require 'path_coverage/result'
 require 'json'
 require 'tmpdir'
 
-class JsonWriterTest < Id58TestBase
+class JsonWriterTest < TidTest
   test 'wdt910', %w(
   | the result is written as raw JSON under "sites",
   | the base every other reporter reads, with the names of

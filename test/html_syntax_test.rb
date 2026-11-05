@@ -1,7 +1,7 @@
 require_relative 'test_helper'
 require 'path_coverage/html_syntax'
 
-class HtmlSyntaxTest < Id58TestBase
+class HtmlSyntaxTest < TidTest
   test 'Sx7h10', %w(
   | Example: def ok?(id) = id.size == 6 # six
   | def is a keyword, 6 a number and # six a comment.

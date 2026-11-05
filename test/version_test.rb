@@ -2,7 +2,7 @@ require_relative 'test_helper'
 require 'path_coverage'
 require 'open3'
 
-class VersionTest < Id58TestBase
+class VersionTest < TidTest
   test 'W3kU10', %w(
   | requiring the gem's entry point defines its version
   ) do

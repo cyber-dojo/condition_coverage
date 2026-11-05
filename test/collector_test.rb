@@ -6,7 +6,7 @@ require 'open3'
 require 'socket'
 require 'tmpdir'
 
-class CollectorTest < Id58TestBase
+class CollectorTest < TidTest
   # Its tests listen on ports and spawn a collector, which
   # must not take each other's connections.
   serial!

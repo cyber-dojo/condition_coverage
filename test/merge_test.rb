@@ -1,7 +1,7 @@
 require_relative 'test_helper'
 require 'path_coverage/merge'
 
-class MergeTest < Id58TestBase
+class MergeTest < TidTest
   test 'Mg8q10', %w(
   | the operands of several runs merge by adding each
   | operand's true and false counts, keeping a fixed

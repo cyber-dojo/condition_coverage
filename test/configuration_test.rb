@@ -1,7 +1,7 @@
 require_relative 'test_helper'
 require 'path_coverage/configuration'
 
-class ConfigurationTest < Id58TestBase
+class ConfigurationTest < TidTest
   test 'A9MJ10', %w(
   | a misspelt setting in the start block is refused,
   | naming it and listing the settings there are,

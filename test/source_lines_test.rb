@@ -1,7 +1,7 @@
 require_relative 'test_helper'
 require 'path_coverage/source_lines'
 
-class SourceLinesTest < Id58TestBase
+class SourceLinesTest < TidTest
   test 'MDBw10', %w(
   | each source line gets its number, its text and a status:
   | nil with no condition, covered when every outcome of its

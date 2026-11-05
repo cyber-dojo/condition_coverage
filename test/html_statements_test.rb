@@ -2,7 +2,7 @@ require_relative 'test_helper'
 require 'path_coverage/html_statements'
 require 'path_coverage/method_statements'
 
-class HtmlStatementsTest < Id58TestBase
+class HtmlStatementsTest < TidTest
   test 'Hs4q01', %w(
   | Example: ship, an if with only its then taken, its then's
   | call reached, then a value not known
