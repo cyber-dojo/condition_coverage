@@ -20,8 +20,9 @@ module PathCoverage
     # Result#outside gives them.
     LISTED = %i[outside].freeze
 
-    # operands, and any paths, and parts' outside: and totals:,
-    # as the JSON report's text, with
+    # operands, and any paths, and parts' outside:, totals: and
+    # cards:, as WithinMethods.listed gives them, as the JSON
+    # report's text, with
     # parts' fingerprint:, as Configuration#fingerprint gives
     # it, the names of the kinds measured, and parts' reached:,
     # as Recorder#reached gives it, even empty, as a run that
@@ -32,10 +33,21 @@ module PathCoverage
       report['paths'] = paths unless paths.empty?
       report.merge!(lists(parts))
       report['reached'] = parts[:reached] if parts.key?(:reached)
-      totals = parts.fetch(:totals, {})
-      report['totals'] = totals unless totals.empty?
+      report.merge!(kept(parts))
       report['kinds'] = Kinds.names
       JSON.pretty_generate(report)
+    end
+
+    # The keys of parts written as they are, when not empty.
+    KEPT = %i[totals cards].freeze
+
+    # { key => its value } of each of parts' KEPT keys that has
+    # a value not empty.
+    def self.kept(parts)
+      KEPT.filter_map do |key|
+        value = parts.fetch(key, {})
+        [key.to_s, value] unless value.empty?
+      end.to_h
     end
 
     # { key => its list } of each of parts' LISTED keys that

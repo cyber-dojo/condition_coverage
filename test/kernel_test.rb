@@ -1873,6 +1873,80 @@ class KernelTest < Id58TestBase
     assert_equal expected, card_taken(page, 2)
   end
 
+  test '6rTS6j', %w(
+  | Example: module Fee holding fee, a def of a ?:, called once
+  | with big true
+  | The JSON report lists fee's card, under its def's site, as
+  | its page draws it: its name, first and last lines, and a
+  | row per statement, with its paths, how many were taken, and
+  | its site, so a reader finds a card's gap without the page.
+  ) do
+    dir = Dir.mktmpdir('6rTS6j')
+    File.write("#{dir}/fee.rb", <<~RUBY)
+      module Fee6rTS6j
+        def self.fee(big) = big ? 10 : 5
+      end
+    RUBY
+    exit_report = nil
+    on_exit = ->(&block) { exit_report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+      report :html
+    end
+    require "#{dir}/fee.rb"
+    Fee6rTS6j.fee(true)
+    exit_report.call
+    json = JSON.parse(File.read("#{dir}/path_coverage.json"))
+    expected = {
+      'fee.rb:2:2' => {
+        'name' => 'fee', 'first' => 2, 'last' => 2,
+        'rows' => [
+          { 'at' => '2:22', 'top' => '?:', 'paths' => 2, 'taken' => 1,
+            'site' => 'fee.rb:2:22' }
+        ]
+      }
+    }
+    assert_equal expected, json['cards']
+  end
+
+  test '6rTS6k', %w(
+  | Example: module Rate holding a ?: outside any method, with
+  | no RATE set
+  | The JSON report lists its top card too, under the site of
+  | its first line's start, titled Rate, its scope, as its page
+  | draws it, so a reader finds a gap outside every def too.
+  ) do
+    dir = Dir.mktmpdir('6rTS6k')
+    File.write("#{dir}/rate.rb", <<~RUBY)
+      module Rate6rTS6k
+        RATE = ENV.key?('RATE6rTS6k') ? 2 : 1
+      end
+    RUBY
+    exit_report = nil
+    on_exit = ->(&block) { exit_report = block }
+    PathCoverage.start(on_exit:) do
+      root dir
+      cover '*.rb'
+      coverage_dir dir
+      report :html
+    end
+    require "#{dir}/rate.rb"
+    exit_report.call
+    json = JSON.parse(File.read("#{dir}/path_coverage.json"))
+    expected = {
+      'rate.rb:2:0' => {
+        'name' => 'Rate6rTS6k', 'first' => 2, 'last' => 2,
+        'rows' => [
+          { 'at' => '2:09', 'top' => '?:', 'paths' => 2, 'taken' => 1,
+            'site' => 'rate.rb:2:9' }
+        ]
+      }
+    }
+    assert_equal expected, json['cards']
+  end
+
   private
 
   # [label, last cell's text] of each row of the statement card
