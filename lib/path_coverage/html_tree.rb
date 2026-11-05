@@ -1,64 +1,20 @@
 require 'cgi/escape'
 require_relative 'condition'
+require_relative 'html_branch'
+require_relative 'html_cells'
 require_relative 'html_labels'
 require_relative 'html_syntax'
 require_relative 'kinds'
 
 module PathCoverage
-  # The tree of a span's sites on a file's page, from SiteTree.of
-  # for each site: a grid whose columns are a site's paths.
+  # The tree of a site, from SiteTree.of, as its row's fold in a
+  # card shows it: a grid whose columns are the site's paths.
   module HtmlTree
-    OUTCOMES = {
-      true => 'T', false => 'F', nil => '',
-      ITEMS[0] => '0', ITEMS[1] => '1', ITEMS[2] => '*',
-      ANSWERS[0] => 'T', ANSWERS[1] => 'F', ANSWERS[2] => 'TF',
-      PRESENCE[0] => [0x25CF].pack('U'),
-      PRESENCE[1] => [0x2205].pack('U')
-    }.freeze
-
-    # A tick marks a path taking an arm.
-    TAKEN = { true => [0x2713].pack('U'), false => '' }.freeze
-
-    # The tree of a span, open when its sites have gaps, else
-    # hidden: each site's rows in a group of their own.
-    def self.of(number, site_trees, open)
-      groups = site_trees.map do |site|
-        rows = site_rows(site).join
-        %(<div class="site" data-site="">#{rows}</div>)
-      end
-      hidden = open ? '' : ' hidden="hidden"'
-      body = groups.join
-      %(<div class="tree" id="tree-#{number}"#{hidden}>#{body}</div>)
-    end
-
     # A site's row, naming its operator and each path's count,
     # then the rows of its operands.
     def self.site_rows(site)
-      counts = count_cells(site[:counts])
+      counts = HtmlCells.counts(site[:counts])
       [row(at(site), operator(site), counts), *operand_rows(site, '')]
-    end
-
-    # Example: counts 0, 2 and 1284 give 0, * and *.
-    # One cell per path: 0 for a path never taken, marked as a
-    # gap, * for one taken any number of times, as whether it
-    # was taken is what counts; its count shows on hover, so a
-    # count in the thousands never widens the cell.
-    def self.count_cells(counts)
-      counts.map do |count|
-        css, mark = HtmlLabels::MARKS[count.zero?]
-        times = HtmlLabels.times(count)
-        %(<span class="#{css}" data-count="#{times}">#{mark}</span>)
-      end.join
-    end
-
-    # One cell per path, naming each with names; a &. receiver's,
-    # shown as a glyph, titled not nil or nil for its hover text.
-    def self.cells(values, names = OUTCOMES)
-      values.map do |value|
-        title = PRESENCE.include?(value) ? %( title="#{value}") : ''
-        attrs = %(class="cell" data-cell=""#{title})
-        %(<span #{attrs}>#{names[value]}</span>)
-      end.join
     end
 
     # SPIKE: the data-at attribute of a node located in its
@@ -81,8 +37,8 @@ module PathCoverage
       last = operands.size - 1
       operands.each_with_index.flat_map do |operand, i|
         tip = i == last
-        branch = indent + (tip ? '└─ ' : '├─ ')
-        under = indent + (tip ? '   ' : '│  ')
+        branch = indent + (tip ? HtmlBranch::ELL : HtmlBranch::TEE)
+        under = indent + (tip ? HtmlBranch::GAP : HtmlBranch::BAR)
         node_rows(operand, branch, under, condition[:operator])
       end
     end
@@ -107,14 +63,22 @@ module PathCoverage
     # where its else is. A plain arm marks the paths taking it.
     def self.arm_rows(arm, branch, under, choice)
       body = arm[:body]
-      values = body ? cells(body[:cells]) : cells(arm[:cells], TAKEN)
+      values = arm_cells(arm, body)
       named = STATEMENT_CHOICES.include?(choice) && arm[:arm] == :then
       text = HtmlLabels.arm(arm, choice, named)
       flag = named ? ' data-named=""' : ''
-      lead = branch_cell(branch) +
+      lead = HtmlBranch.cell(branch) +
              %(<span class="arm" data-label=""#{flag}>#{text}</span>)
       row = row(%( data-arm=""#{at(arm)}), lead, values)
       body ? [row, *operand_rows(body, under)] : [row]
+    end
+
+    # The cells of arm's row: its body's values, when its body is
+    # a condition; else a tick on each path that took it.
+    def self.arm_cells(arm, body)
+      return HtmlCells.of(body[:cells]) if body
+
+      HtmlCells.of(arm[:cells], HtmlCells::TAKEN)
     end
 
     # operands with each node standing for the nodes its kind
@@ -130,9 +94,9 @@ module PathCoverage
     # A nested condition's row: its branch, its operator, and
     # its value on each path.
     def self.subtree_row(condition, branch)
-      lead = branch_cell(branch) + operator(condition)
+      lead = HtmlBranch.cell(branch) + operator(condition)
       attrs = %( data-subtree=""#{at(condition)})
-      row(attrs, lead, cells(condition[:cells]))
+      row(attrs, lead, HtmlCells.of(condition[:cells]))
     end
 
     # A row of the grid, with attrs, lead's cells naming it,
@@ -157,16 +121,11 @@ module PathCoverage
     # it instead.
     def self.operand_row(operand, branch)
       text = HtmlSyntax.fragment(operand[:text].to_s)
-      lead = branch_cell(branch) +
+      lead = HtmlBranch.cell(branch) +
              %(<span class="text" data-text="">#{text}</span>)
       attrs = %( data-operand=""#{at(operand)})
-      names = operand[:called] ? TAKEN : OUTCOMES
-      row(attrs, lead, cells(operand[:cells], names))
-    end
-
-    # The cell drawing a row's branch from its operator.
-    def self.branch_cell(branch)
-      %(<span class="branch" data-branch="">#{branch}</span>)
+      names = operand[:called] ? HtmlCells::TAKEN : HtmlCells::OUTCOMES
+      row(attrs, lead, HtmlCells.of(operand[:cells], names))
     end
   end
 end

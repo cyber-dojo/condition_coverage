@@ -142,7 +142,7 @@ module PathCoverage
       # is reached only when the one before is not nil.
       def self.rows(chain, indent)
         chain[:operands].each_with_index.map do |operand, depth|
-          branch = "#{indent}#{'   ' * depth}└─ "
+          branch = "#{indent}#{HtmlBranch::GAP * depth}#{HtmlBranch::ELL}"
           HtmlTree.operand_row(operand, branch)
         end
       end

@@ -773,15 +773,14 @@ class KernelTest < Id58TestBase
     taken = json['paths']['safe_admin.rb:6:4']['taken']
     assert_equal([1, 1, 1, 1], taken.map { _1['count'] })
     page = File.read("#{dir}/files/safe_admin.rb.html")
-    tree = REXML::Document.new(page).elements["//*[@id='tree-6']"]
+    tree = fold_at(page, 'safe_admin.rb:6')
     rows = tree.elements.to_a('.//*[@data-operand]')
     texts = rows.map { text_of(_1.elements['*[@data-text]']) }
     assert_equal ['ok', 'user', 'admin?'], texts
-    cells = rows[1].elements.to_a('*[@data-cell]').map { text_of(_1) }
-    disc, empty = [0x25CF, 0x2205].map { [_1].pack('U') }
-    assert_equal [disc, disc, empty, ''], cells
+    cells = rows[1].elements.to_a('*[@data-cell]').map { cell_of(_1) }
+    assert_equal ['present', 'present', 'absent', ''], cells
     titles = rows[1].elements.to_a('*[@data-cell]').map do |cell|
-      cell.attributes['title']
+      cell.attributes['data-hover']
     end
     assert_equal ['not nil', 'not nil', 'nil', nil], titles
   end
@@ -922,7 +921,7 @@ class KernelTest < Id58TestBase
     assert_output('', '') { exit_report.call }
 
     page = File.read("#{dir}/files/both_html.rb.html")
-    tree = REXML::Document.new(page).elements["//*[@id='tree-3']"]
+    tree = fold_at(page, 'both_html.rb:3')
     operators = tree.elements.to_a('.//*[@data-operator]')
     expected = ['&&', 'select {', 'all?']
     assert_equal(expected, operators.map { text_of(_1) })
@@ -1005,7 +1004,7 @@ class KernelTest < Id58TestBase
     expected = ['Total', '1', '1', '/ 3', '33%', '2', '/ 4', '50%']
     assert_equal(expected, total.map { text_of(_1) })
     page = REXML::Document.new(File.read("#{dir}/files/crew.rb.html"))
-    tree = "//div[@class='tree']//*[@data-count]"
+    tree = "//div[@class='fold']//*[@data-count]"
     counts = page.elements.to_a(tree)
     assert_equal(%w(0 0 *), counts.map { |count| text_of(count) })
   end
@@ -1584,12 +1583,12 @@ class KernelTest < Id58TestBase
     exit_report.call
 
     page = File.read("#{dir}/files/owner.rb.html")
-    tree = REXML::Document.new(page).elements["//*[@id='tree-2']"]
+    tree = fold_at(page, 'owner.rb:2')
     rows = tree.elements.to_a('.//*[@data-operand]')
     texts = rows.map { text_of(_1.elements['*[@data-text]']) }
     assert_equal %w(user account owner), texts
     cells = rows.last.elements.to_a('*[@data-cell]')
-    assert_includes cells.map { text_of(_1) }, [0x2713].pack('U')
+    assert_includes cells.map { cell_of(_1) }, 'taken'
   end
 
   test '6rTS6a', %w(
@@ -1715,22 +1714,23 @@ class KernelTest < Id58TestBase
     Label6rTS6c.label(true, true)
     Label6rTS6c.mark(false)
     exit_report.call
-    page = REXML::Document.new(File.read("#{dir}/files/label6c.rb.html"))
-    located = lambda do |tree, kind|
-      rows = page.elements.to_a("//*[@id='#{tree}']//*[@#{kind}]")
-      rows.map { !_1.attributes['data-at'].nil? }
+    page = File.read("#{dir}/files/label6c.rb.html")
+    located = lambda do |line, kind|
+      fold = fold_at(page, "label6c.rb:#{line}")
+      fold.elements.to_a(".//*[@#{kind}]").map do |row|
+        !row.attributes['data-at'].nil?
+      end
     end
-    assert_equal [true, true], located.call('tree-3', 'data-arm')
-    assert_equal [true] * 3, located.call('tree-3', 'data-operand')
-    assert_equal [false, true], located.call('tree-7', 'data-arm')
+    assert_equal [true, true], located.call(3, 'data-arm')
+    assert_equal [true] * 3, located.call(3, 'data-operand')
+    assert_equal [false, true], located.call(7, 'data-arm')
   end
 
   test '6rTS6d', %w(
   | Example: ship, an if then a value, measured within methods,
   | called once with a paid order
-  | Its card folds the if's tree under the if's row.
-  | The fold holds the same rows as the if's tree within each
-  | decision: its operator, its 2 path counts, the one never
+  | Its card folds the if's tree under the if's row: its
+  | operator, a mark for each of its 2 paths, the one never
   | taken first, and its operands.
   ) do
     dir = Dir.mktmpdir('6rTS6d')
@@ -1757,11 +1757,11 @@ class KernelTest < Id58TestBase
     exit_report.call
     page = REXML::Document.new(File.read("#{dir}/files/ship6d.rb.html"))
     fold = "//div[@class='fold'][@data-site='ship6d.rb:3:4']"
-    site = page.elements["#{fold}/div[@class='site']"]
     counts = page.elements.to_a("#{fold}//*[@data-count]")
     assert_equal(%w(0 *), counts.map { text_of(_1) })
-    tree = page.elements["//div[@id='tree-3']/div[@class='site']"]
-    assert_equal tree.to_s, site.to_s
+    operands = page.elements.to_a("#{fold}//*[@data-operand]")
+    texts = operands.map { text_of(_1.elements['*[@data-text]']) }
+    assert_equal ['order[:paid]'], texts
   end
 
   test '6rTS6e', %w(
@@ -1967,7 +1967,9 @@ class KernelTest < Id58TestBase
         coverage_dir dir
       end
       require "#{dir}/rate.rb"
-      exit_report.call
+      gap = 'rate.rb:1:14 path never taken: ' \
+            "`ENV.key?('RATE6rTS6m')` true\n"
+      assert_output(gap) { exit_report.call }
       JSON.parse(File.read("#{dir}/path_coverage.json"))
     end
     taken = jsons.last['paths'].values.first['taken']
@@ -1975,6 +1977,14 @@ class KernelTest < Id58TestBase
   end
 
   private
+
+  # Example: owner.rb:2 gives the fold of the site on line 2.
+  # The fold, in its card, of the site at file:line in page, the
+  # page's text; nil for none.
+  def fold_at(page, line)
+    site = "starts-with(@data-site, '#{line}:')"
+    REXML::Document.new(page).elements["//div[@class='fold'][#{site}]"]
+  end
 
   # [label, last cell's text] of each row of the statement card
   # of the def at line first in page.

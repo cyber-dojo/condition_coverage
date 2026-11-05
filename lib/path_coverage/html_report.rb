@@ -35,9 +35,9 @@ module PathCoverage
     def self.write_pages(operands, files, config, recorded)
       files.each do |full_path, parsed|
         path = config.relative(full_path)
-        grids = HtmlCards.methods(path, parsed, recorded)
+        cards = HtmlCards.methods(path, parsed, recorded)
         out = "#{config.output_dir}/files/#{path}.html"
-        write_page(out, path, parsed, [operands, recorded[0]], grids)
+        write_page(out, path, parsed, [operands, recorded[0]], cards)
       end
     end
 
@@ -57,17 +57,15 @@ module PathCoverage
     end
 
     # Writes one file's page to out, from its sites' operand
-    # counts and paths, with grids, its methods' cards, then a
-    # card for each span of its sites at the top level.
+    # counts and paths, with cards, its methods', then a card for
+    # each span of its sites at the top level.
     def self.write_page(out, path, parsed,
-                        (operands, site_paths), grids)
+                        (operands, site_paths), cards)
       source, sites = parsed.values_at(:source, :sites)
       plain = SourceLines.of(source, sites, operands)
       lines = coloured(source, plain)
-      trees = trees(source, sites, lines, site_paths)
       tops = HtmlCards.tops(path, parsed, lines, site_paths)
-      page = HtmlFile.page(path, lines, trees, "#{grids}\n#{tops}",
-                           methods: true)
+      page = HtmlFile.page(path, lines, cards + tops)
       FileUtils.mkdir_p(File.dirname(out))
       File.write(out, page)
     end
@@ -79,18 +77,6 @@ module PathCoverage
       lines.map do |line|
         line.merge(tokens: tokens.fetch(line[:number], []))
       end
-    end
-
-    # { first line of a span => [SiteTree.of, ...] } for the
-    # sites of one file, each under the span its line is in.
-    def self.trees(source, sites, lines, site_paths)
-      trees = Hash.new { |all, first| all[first] = [] }
-      sites.each do |site, condition|
-        first = lines[SourceLines.line_of(site) - 1][:span].begin
-        tree = SiteTree.of(source, condition, site_paths.fetch(site))
-        trees[first] << located(source, condition, tree)
-      end
-      trees
     end
 
     # simplecov:disable

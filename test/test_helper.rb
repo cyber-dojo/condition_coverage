@@ -177,6 +177,13 @@ class Id58TestBase < Minitest::Test
     REXML::XPath.match(element, './/text()').map(&:value).join
   end
 
+  # Example: a taken arm's cell gives taken, a T cell T.
+  # What a tree's cell shows: the mark it draws, eg taken,
+  # present or absent, else its text.
+  def cell_of(cell)
+    [cell.attributes['data-mark'], text_of(cell)].compact.first
+  end
+
   # Hook for subclasses; runs before each test body.
   def id58_setup; end
 

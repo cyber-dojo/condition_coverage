@@ -11,10 +11,9 @@ class HtmlTreeTest < Id58TestBase
   | others blank.
   ) do
     owner = { text: 'owner', called: true, cells: [true, false] }
-    row = PathCoverage::HtmlTree.operand_row(owner, '└─ ')
+    row = PathCoverage::HtmlTree.operand_row(owner, 'lhs')
     html = REXML::Document.new(row)
-    cells = html.elements.to_a('//*[@data-cell]').map { text_of(_1) }
-    tick = [0x2713].pack('U')
-    assert_equal [tick, ''], cells
+    cells = html.elements.to_a('//*[@data-cell]').map { cell_of(_1) }
+    assert_equal ['taken', ''], cells
   end
 end

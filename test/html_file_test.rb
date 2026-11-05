@@ -6,8 +6,8 @@ class HtmlFileTest < Id58TestBase
   test 'gae510', %w(
   | a file's listing shows every line's code in order;
   | a line with no condition has a plain number, and a line
-  | with one has its number on a button giving its status,
-  | closed when covered, and naming the tree it opens
+  | with one outside every method has its number on a loose
+  | button giving its status, closed, naming the card it opens
   ) do
     lines = [
       { number: 1, text: 'module Kata', status: nil, span: nil },
@@ -36,7 +36,7 @@ class HtmlFileTest < Id58TestBase
     expected = {
       'data-status' => 'covered',
       'aria-expanded' => 'false',
-      'aria-controls' => 'tree-3'
+      'aria-controls' => 'paths-3'
     }
     attributes = button[0].attributes
     actual = expected.keys.to_h { |name| [name, attributes[name]] }
@@ -45,10 +45,10 @@ class HtmlFileTest < Id58TestBase
   end
 
   test 'gae520', %w(
-  | the lines of a condition written over several lines
-  | share one button holding all their numbers, which opens
-  | the tree named after the first, and their code is
-  | still shown line by line
+  | the lines of a condition written over several lines,
+  | outside every method, share one button holding all their
+  | numbers, which opens the card named after the first, and
+  | their code is still shown line by line
   ) do
     lines = [
       { number: 1, text: 'module Kata', status: nil, span: nil },
@@ -68,7 +68,7 @@ class HtmlFileTest < Id58TestBase
     numbers = buttons[0].elements.to_a('*[@data-line]')
     actual = numbers.map { |element| text_of(element) }
     assert_equal %w(3 4), actual
-    assert_equal 'tree-3', buttons[0].attributes['aria-controls']
+    assert_equal 'paths-3', buttons[0].attributes['aria-controls']
 
     codes = html.elements.to_a('//*[@data-src]')
     expected = lines.map { |line| line[:text] }
@@ -77,18 +77,10 @@ class HtmlFileTest < Id58TestBase
   end
 
   test 'gae530', %w(
-  | a covered span's tree is hidden until its button opens it,
-  | and sits straight after the span, so it never splits it;
-  | it has one row per operand: its text, then its outcome on
-  | each path, T or F, blank where the path never reached it
+  | Example: the tree of ok?(id) && id.start_with?('N')
+  | It has one row per operand: its text, then its outcome on
+  | each path, T or F, blank where the path never reached it.
   ) do
-    lines = [
-      { number: 1, text: 'module Kata', status: nil, span: nil },
-      { number: 2,
-        text: "  def self.kata?(id) = ok?(id) && id.start_with?('N')",
-        status: :covered, span: 2..2 },
-      { number: 3, text: 'end', status: nil, span: nil }
-    ]
     trees = {
       2 => [
         {
@@ -101,14 +93,7 @@ class HtmlFileTest < Id58TestBase
         }
       ]
     }
-    listing = PathCoverage::HtmlFile.listing(lines, trees)
-    html = REXML::Document.new(listing)
-
-    tree = html.elements["//*[@id='tree-2']"]
-    assert_equal 'hidden', tree.attributes['hidden']
-    before = tree.previous_element
-    opener = before.elements['.//button'].attributes['aria-controls']
-    assert_equal 'tree-2', opener
+    tree = tree_of(trees[2])
 
     rows = tree.elements.to_a('.//*[@data-operand]')
     actual = rows.map do |row|
@@ -128,10 +113,6 @@ class HtmlFileTest < Id58TestBase
   | its count on hover, a path never taken marked as a gap;
   | its operands branch below
   ) do
-    lines = [
-      { number: 1, text: '  ok?(id) && new?(id)', status: :gaps,
-        span: 1..1 }
-    ]
     trees = {
       1 => [
         {
@@ -144,9 +125,7 @@ class HtmlFileTest < Id58TestBase
         }
       ]
     }
-    listing = PathCoverage::HtmlFile.listing(lines, trees)
-    html = REXML::Document.new(listing)
-    tree = html.elements["//*[@id='tree-1']"]
+    tree = tree_of(trees[1])
 
     operator = tree.elements['.//*[@data-operator]']
     assert_equal '&&', text_of(operator)
@@ -154,7 +133,7 @@ class HtmlFileTest < Id58TestBase
     counts = operator.parent.elements.to_a('*[@data-count]')
     actual = counts.map do |count|
       attributes = count.attributes
-      [text_of(count), attributes['class'], attributes['data-count']]
+      [text_of(count), attributes['class'], attributes['data-hover']]
     end
     expected = [
       ['0', 'count never', '0 times'], ['*', 'count', '1,284 times'],
@@ -162,9 +141,7 @@ class HtmlFileTest < Id58TestBase
     ]
     assert_equal expected, actual
 
-    branches = tree.elements.to_a('.//*[@data-branch]')
-    actual = branches.map { |element| text_of(element) }
-    assert_equal ['├─ ', '└─ '], actual
+    assert_equal %w(ths lhs), branches_of(tree)
   end
 
   test 'gae538', %w(
@@ -172,10 +149,6 @@ class HtmlFileTest < Id58TestBase
   | like an operand, and its own operands branch below it,
   | indented under its branch so the tree reads as one
   ) do
-    lines = [
-      { number: 1, text: '  ok?(id) && (new?(id) || id.size == 6)',
-        status: :gaps, span: 1..1 }
-    ]
     either = {
       operator: '||', cells: [true, false],
       operands: [
@@ -194,18 +167,13 @@ class HtmlFileTest < Id58TestBase
         }
       ]
     }
-    listing = PathCoverage::HtmlFile.listing(lines, trees)
-    html = REXML::Document.new(listing)
-    tree = html.elements["//*[@id='tree-1']"]
+    tree = tree_of(trees[1])
 
     operators = tree.elements.to_a('.//*[@data-operator]')
     actual = operators.map { |element| text_of(element) }
     assert_equal ['&&', '||'], actual
 
-    branches = tree.elements.to_a('.//*[@data-branch]')
-    actual = branches.map { |element| text_of(element) }
-    expected = ['├─ ', '└─ ', '   ├─ ', '   └─ ']
-    assert_equal expected, actual
+    assert_equal %w(ths lhs sssths ssslhs), branches_of(tree)
 
     texts = tree.elements.to_a('.//*[@data-operand]/*[@data-text]')
     actual = texts.map { |element| text_of(element) }
@@ -216,10 +184,6 @@ class HtmlFileTest < Id58TestBase
   | a nested condition that is not the last operand keeps its
   | parent's branch line running down beside its own operands
   ) do
-    lines = [
-      { number: 1, text: '  (ok?(id) || new?(id)) && id.size == 6',
-        status: :covered, span: 1..1 }
-    ]
     either = {
       operator: '||', cells: [true, true],
       operands: [
@@ -238,14 +202,9 @@ class HtmlFileTest < Id58TestBase
         }
       ]
     }
-    listing = PathCoverage::HtmlFile.listing(lines, trees)
-    html = REXML::Document.new(listing)
-    tree = html.elements["//*[@id='tree-1']"]
+    tree = tree_of(trees[1])
 
-    branches = tree.elements.to_a('.//*[@data-branch]')
-    actual = branches.map { |element| text_of(element) }
-    expected = ['├─ ', '│  ├─ ', '│  └─ ', '└─ ']
-    assert_equal expected, actual
+    assert_equal %w(ths vssths vsslhs lhs), branches_of(tree)
   end
 
   test 'gae531', %w(
@@ -255,10 +214,6 @@ class HtmlFileTest < Id58TestBase
   | branching below; a plain arm is named by its text, and
   | marks each path that took it
   ) do
-    lines = [
-      { number: 1, text: '  ok?(id) ? new?(id) && id.size == 6 : :no',
-        status: :gaps, span: 1..1 }
-    ]
     both = {
       operator: '&&', cells: [false, true, nil],
       operands: [
@@ -285,33 +240,23 @@ class HtmlFileTest < Id58TestBase
         }
       ]
     }
-    listing = PathCoverage::HtmlFile.listing(lines, trees)
-    html = REXML::Document.new(listing)
-    tree = html.elements["//*[@id='tree-1']"]
+    tree = tree_of(trees[1])
 
     rows = tree.elements.to_a('.//*[@data-arm]')
     actual = rows.map do |row|
-      cells = row.elements.to_a('*[@data-cell]').map { text_of(_1) }
+      cells = row.elements.to_a('*[@data-cell]').map { cell_of(_1) }
       [text_of(row.elements['*[@data-label]']), *cells]
     end
-    tick = [0x2713].pack('U')
-    expected = [['? &&', 'F', 'T', ''], [': :no', '', '', tick]]
+    expected = [['? &&', 'F', 'T', ''], [': :no', '', '', 'taken']]
     assert_equal expected, actual
 
-    branches = tree.elements.to_a('.//*[@data-branch]')
-    actual = branches.map { |element| text_of(element) }
-    expected = ['├─ ', '├─ ', '│  ├─ ', '│  └─ ', '└─ ']
-    assert_equal expected, actual
+    assert_equal %w(ths ths vssths vsslhs lhs), branches_of(tree)
   end
 
   test 'gae533', %w(
   | an if's arms are named then and else, as their text is
   | statements, and each marks the paths that took it
   ) do
-    lines = [
-      { number: 1, text: '  if x == a && y == b', status: :gaps,
-        span: 1..1 }
-    ]
     both = {
       operator: '&&', cells: [false, true, false],
       operands: [
@@ -338,19 +283,16 @@ class HtmlFileTest < Id58TestBase
         }
       ]
     }
-    listing = PathCoverage::HtmlFile.listing(lines, trees)
-    html = REXML::Document.new(listing)
-    tree = html.elements["//*[@id='tree-1']"]
+    tree = tree_of(trees[1])
 
     rows = tree.elements.to_a('.//*[@data-arm]')
     actual = rows.map do |row|
-      cells = row.elements.to_a('*[@data-cell]').map { text_of(_1) }
+      cells = row.elements.to_a('*[@data-cell]').map { cell_of(_1) }
       [text_of(row.elements['*[@data-label]']), *cells]
     end
-    tick = [0x2713].pack('U')
     expected = [
-      ['then', '', tick, ''],
-      ['else', tick, '', tick]
+      ['then', '', 'taken', ''],
+      ['else', 'taken', '', 'taken']
     ]
     assert_equal expected, actual
   end
@@ -359,9 +301,6 @@ class HtmlFileTest < Id58TestBase
   | Example: unless x alpha end
   | The arm's row is labelled then, as for an if.
   ) do
-    lines = [
-      { number: 1, text: '  unless x', status: :gaps, span: 1..1 }
-    ]
     trees = {
       1 => [
         {
@@ -376,9 +315,7 @@ class HtmlFileTest < Id58TestBase
         }
       ]
     }
-    listing = PathCoverage::HtmlFile.listing(lines, trees)
-    html = REXML::Document.new(listing)
-    tree = html.elements["//*[@id='tree-1']"]
+    tree = tree_of(trees[1])
 
     labels = tree.elements.to_a('.//*[@data-arm]/*[@data-label]')
     assert_equal(['then'], labels.map { |label| text_of(label) })
@@ -390,10 +327,6 @@ class HtmlFileTest < Id58TestBase
   | So its label is marked as a name, to be told apart.
   | Its else, and the ternary's arm labels, quote code, so are not.
   ) do
-    lines = [
-      { number: 1, text: 'if x', status: :gaps, span: 1..1 },
-      { number: 2, text: 'x ? :a : :b', status: :gaps, span: 2..2 }
-    ]
     arms = lambda do |texts|
       %i[then else].zip(texts, [[true, false], [false, true]])
                    .map do |arm, text, cells|
@@ -407,11 +340,9 @@ class HtmlFileTest < Id58TestBase
     end
     trees = { 1 => tree.call('if', %w(alpha beta)),
               2 => tree.call('?:', %w(:a :b)) }
-    listing = PathCoverage::HtmlFile.listing(lines, trees)
-    html = REXML::Document.new(listing)
     named = lambda do |line|
-      html.elements.to_a("//*[@id='tree-#{line}']//*[@data-label]")
-          .map { |label| label.attributes['data-named'] }
+      labels = tree_of(trees[line]).elements.to_a('.//*[@data-label]')
+      labels.map { |label| label.attributes['data-named'] }
     end
     actual = [named.call(1), named.call(2)]
     assert_equal [['', nil], [nil, nil]], actual
@@ -422,10 +353,6 @@ class HtmlFileTest < Id58TestBase
   | Its operator && is coloured as it is in the code.
   | So is each operand, eg the 6 of id.size == 6.
   ) do
-    lines = [
-      { number: 1, text: 'ok?(id) && id.size == 6', status: :gaps,
-        span: 1..1 }
-    ]
     operands = [
       { text: 'ok?(id)', cells: [true, false] },
       { text: 'id.size == 6', cells: [true, nil] }
@@ -434,9 +361,9 @@ class HtmlFileTest < Id58TestBase
       1 => [{ operator: '&&', counts: [0, 1], cells: [true, false],
               operands: }]
     }
-    listing = PathCoverage::HtmlFile.listing(lines, trees)
-    tree = REXML::Document.new(listing).elements["//*[@id='tree-1']"]
-    spans = tree.elements.to_a('.//span[@class]/span[@class]')
+    tree = tree_of(trees[1])
+    named = './/span[@data-operator or @data-text]/span[@class]'
+    spans = tree.elements.to_a(named)
     coloured = spans.map do |span|
       [span.attributes['class'], text_of(span)]
     end
@@ -450,9 +377,6 @@ class HtmlFileTest < Id58TestBase
   | The else row shows a tick on the path that took it.
   | The when's pattern (1) has a row below it.
   ) do
-    lines = [
-      { number: 1, text: '  case x', status: :gaps, span: 1..1 }
-    ]
     small = {
       operator: 'when', cells: [true, false],
       operands: [{ text: '1', cells: [true, false] }]
@@ -474,17 +398,14 @@ class HtmlFileTest < Id58TestBase
         }
       ]
     }
-    listing = PathCoverage::HtmlFile.listing(lines, trees)
-    html = REXML::Document.new(listing)
-    tree = html.elements["//*[@id='tree-1']"]
+    tree = tree_of(trees[1])
 
     rows = tree.elements.to_a('.//*[@data-arm]')
     actual = rows.map do |row|
-      cells = row.elements.to_a('*[@data-cell]').map { text_of(_1) }
+      cells = row.elements.to_a('*[@data-cell]').map { cell_of(_1) }
       [text_of(row.elements['*[@data-label]']), *cells]
     end
-    tick = [0x2713].pack('U')
-    assert_equal [%w(when T F), ['else', '', tick]], actual
+    assert_equal [%w(when T F), ['else', '', 'taken']], actual
     texts = tree.elements.to_a('.//*[@data-operand]/*[@data-text]')
     assert_equal(['1'], texts.map { |text| text_of(text) })
   end
@@ -496,10 +417,6 @@ class HtmlFileTest < Id58TestBase
   | The id.ok? row shows its last answer: T or F.
   | It is blank where the block was never called.
   ) do
-    lines = [
-      { number: 1, text: '  ids.any? { |id| id.ok? }', status: :gaps,
-        span: 1..1 }
-    ]
     trees = {
       1 => [
         {
@@ -512,9 +429,7 @@ class HtmlFileTest < Id58TestBase
         }
       ]
     }
-    listing = PathCoverage::HtmlFile.listing(lines, trees)
-    html = REXML::Document.new(listing)
-    tree = html.elements["//*[@id='tree-1']"]
+    tree = tree_of(trees[1])
 
     rows = tree.elements.to_a('.//*[@data-operand]')
     actual = rows.map do |row|
@@ -531,10 +446,6 @@ class HtmlFileTest < Id58TestBase
   | F when all were false.
   | TF when both.
   ) do
-    lines = [
-      { number: 1, text: '  ids.select { |id| id.ok? }',
-        status: :gaps, span: 1..1 }
-    ]
     trees = {
       1 => [
         {
@@ -551,17 +462,16 @@ class HtmlFileTest < Id58TestBase
         }
       ]
     }
-    listing = PathCoverage::HtmlFile.listing(lines, trees)
-    html = REXML::Document.new(listing)
-    rows = html.elements.to_a("//*[@id='tree-1']//*[@data-operand]")
+    rows = tree_of(trees[1]).elements.to_a('.//*[@data-operand]')
     cells = rows.last.elements.to_a('*[@data-cell]')
     assert_equal(%w(T F TF), cells.map { |cell| text_of(cell) })
   end
 
   test 'gae536', %w(
-  | a button over two or more sites shows how many,
-  | and its tree keeps each site's rows in a group of their own,
-  | so they can be told apart; a one-site button shows no count
+  | Example: two lines outside every method, the first holding
+  | two sites, the second one
+  | A loose button over two or more sites shows how many; a
+  | one-site button shows no count.
   ) do
     lines = [
       { number: 1, text: '  [ok?(a) && new?(a), ok?(b) && new?(b)]',
@@ -569,6 +479,23 @@ class HtmlFileTest < Id58TestBase
       { number: 2, text: '  ok?(c) && new?(c)', status: :covered,
         span: 2..2 }
     ]
+    tops = [[1, 'gaps', 2], [2, 'covered', 1]]
+    cards = tops.map do |first, status, sites|
+      PathCoverage::Card.new(first:, last: first, column: 0, status:,
+                             top: true, sites:, html: '')
+    end
+    listing = PathCoverage::HtmlFile.listing(lines, cards)
+    html = REXML::Document.new(listing)
+    counts = html.elements.to_a('//button/*[@data-site-count]')
+    assert_equal(['2'], counts.map { |element| text_of(element) })
+  end
+
+  test 'gae576', %w(
+  | Example: a tree of two sites, as a fold draws a button's
+  | tree over two sites
+  | Each site's rows are in a group of their own, so they can
+  | be told apart.
+  ) do
     site = {
       operator: '&&', counts: [1], cells: [true],
       operands: [
@@ -576,70 +503,33 @@ class HtmlFileTest < Id58TestBase
         { text: 'new?(a)', cells: [true] }
       ]
     }
-    trees = { 1 => [site, site], 2 => [site] }
-    listing = PathCoverage::HtmlFile.listing(lines, trees)
-    html = REXML::Document.new(listing)
-
-    counts = html.elements.to_a('//button/*[@data-site-count]')
-    actual = counts.map { |element| text_of(element) }
-    assert_equal ['2'], actual
-
-    groups = html.elements.to_a("//*[@id='tree-1']/*[@data-site]")
+    groups = tree_of([site, site]).elements.to_a('*[@data-site]')
     assert_equal 2, groups.size
   end
 
-  test 'gae532', %w(
-  | a site with gaps has its tree open as the page loads,
-  | so the gaps show without a click; a covered site's tree
-  | stays closed
-  ) do
-    lines = [
-      { number: 1, text: '  ok?(a) && new?(a)', status: :gaps,
-        span: 1..1 },
-      { number: 2, text: '  ok?(b) && new?(b)', status: :covered,
-        span: 2..2 }
-    ]
-    listing = PathCoverage::HtmlFile.listing(lines)
-    html = REXML::Document.new(listing)
-
-    buttons = html.elements.to_a('//button')
-    actual = buttons.map { |b| b.attributes['aria-expanded'] }
-    assert_equal %w(true false), actual
-
-    trees = html.elements.to_a("//*[@class='tree']")
-    actual = trees.map { |tree| tree.attributes['hidden'] }
-    assert_equal [nil, 'hidden'], actual
-  end
-
   test 'gae534', %w(
-  | every row has a cell left of its number, so the numbers
-  | stay aligned; at a site with gaps it links to the previous
-  | and next site with gaps, wrapping round at either end
+  | Example: four lines each a top card's, with gaps at lines 1,
+  | 3 and 5, covered at line 4, and line 2 in none
+  | Every row has a gutter left of its number, so the numbers
+  | stay aligned. By a card with gaps it links to the previous
+  | and next card with gaps, wrapping round at either end; by a
+  | covered card, the only one, to itself.
   ) do
-    lines = [
-      { number: 1, text: '  ok?(a) && new?(a)', status: :gaps,
-        span: 1..1 },
-      { number: 2, text: '  log(a)', status: nil, span: nil },
-      { number: 3, text: '  ok?(b) && new?(b)', status: :gaps,
-        span: 3..3 },
-      { number: 4, text: '  ok?(c) && new?(c)', status: :covered,
-        span: 4..4 },
-      { number: 5, text: '  ok?(d) && new?(d)', status: :gaps,
-        span: 5..5 }
-    ]
-    listing = PathCoverage::HtmlFile.listing(lines)
-    html = REXML::Document.new(listing)
-
-    cells = html.elements.to_a('//*[@data-nav]')
+    lines = [1, 2, 3, 4, 5].map do |number|
+      { number:, text: "  ok?(#{number})", status: nil, span: nil }
+    end
+    cards = { 1 => 'gaps', 3 => 'gaps', 4 => 'covered', 5 => 'gaps' }
+    cards = cards.map do |first, status|
+      PathCoverage::Card.new(first:, last: first, column: 0, status:,
+                             top: true, sites: 1, html: '')
+    end
+    listing = PathCoverage::HtmlFile.listing(lines, cards)
+    cells = REXML::Document.new(listing).elements.to_a('//*[@data-nav]')
     actual = cells.map do |cell|
-      %w(prev next).map do |way|
-        link = cell.elements["a[@data-#{way}]"]
-        link&.[]('href')
-      end
+      cell.elements.to_a('a').map { |link| link.attributes['href'] }
     end
     expected = [
-      ['#L5', '#L3'], [nil, nil], ['#L1', '#L5'], [nil, nil],
-      ['#L3', '#L1']
+      %w(#L5 #L3), [], %w(#L1 #L5), %w(#L4 #L4), %w(#L3 #L1)
     ]
     assert_equal expected, actual
   end
@@ -663,34 +553,19 @@ class HtmlFileTest < Id58TestBase
   end
 
   test 'gae545', %w(
-  | a file's page opens with one header, sticky in the page,
-  | holding the back link, the path, and two lists of links to
-  | the first line of each site: those covered, then those
-  | with gaps
+  | Example: module_lines, a top card with gaps at line 1 and a
+  | method's card covered at line 3
+  | A file's page opens with one header, sticky in the page,
+  | holding the back link, the path, and its row of jumps to the
+  | first line of each card with gaps.
   ) do
-    lines = [
-      { number: 1, text: '  ok?(a) && new?(a)', status: :gaps,
-        span: 1..1 },
-      { number: 2, text: '  ok?(b) && new?(b)', status: :covered,
-        span: 2..2 },
-      { number: 3, text: '  log(b)', status: nil, span: nil },
-      { number: 4, text: '  ok?(c) && new?(c)', status: :gaps,
-        span: 4..4 }
-    ]
-    html_file = PathCoverage::HtmlFile
-    page = html_file.page('source/kata.rb', lines, {})
-    html = REXML::Document.new(page)
-    head = html.elements['//*[@data-head]']
-
+    page = PathCoverage::HtmlFile.page('source/kata.rb', module_lines,
+                                       cards_of_module)
+    head = REXML::Document.new(page).elements['//*[@data-head]']
     assert_equal 'source/kata.rb', text_of(head.elements['.//h1'])
     refute_nil head.elements['.//a[@data-index]']
-
-    expected = { 'covered' => %w(#L2), 'gaps' => %w(#L1 #L4) }
-    actual = expected.keys.to_h do |status|
-      links = head.elements.to_a(".//*[@data-jumps='#{status}']/a")
-      [status, links.map { |link| link.attributes['href'] }]
-    end
-    assert_equal expected, actual
+    links = head.elements.to_a(".//*[@class='jump-list']/a")
+    assert_equal(%w(#L1), links.map { _1.attributes['href'] })
   end
 
   test 'gae540', %w(
@@ -701,8 +576,7 @@ class HtmlFileTest < Id58TestBase
       { number: 1, text: 'module Kata', status: nil, span: nil },
       { number: 2, text: 'end', status: nil, span: nil }
     ]
-    html_file = PathCoverage::HtmlFile
-    page = html_file.page('source/kata.rb', lines, {})
+    page = PathCoverage::HtmlFile.page('source/kata.rb', lines)
     html = REXML::Document.new(page)
 
     assert_equal 'source/kata.rb', text_of(html.elements['//h1'])
@@ -718,41 +592,25 @@ class HtmlFileTest < Id58TestBase
   test 'gae550', %w(
   | Example: an empty file
   | Its page has no lines.
-  | Its covered and gaps lists have no links.
+  | Its row of jumps has no links.
   ) do
-    page = PathCoverage::HtmlFile.page('source/empty.rb', [], {})
+    page = PathCoverage::HtmlFile.page('source/empty.rb', [])
     html = REXML::Document.new(page)
     assert_equal [], html.elements.to_a('//*[@data-line]')
-    assert_equal({ 'covered' => [], 'gaps' => [] }, jumps_of(html))
+    assert_equal [], jump_links(html)
   end
 
   test 'gae560', %w(
-  | Example: the page of a file holding require 'json' only, in
-  | runs measuring methods, and not
+  | Example: the page of a file holding require 'json' only
   | Its header's top line is the Path coverage title, linking
   | to the index.
-  | There is no mode toggle: measuring methods, the html
-  | element names the one mode the page shows, within each
-  | method; not measuring them, it names none, so the page
-  | shows within each decision.
   ) do
     lines = [
       { number: 1, text: "require 'json'", status: nil, span: nil }
     ]
-    top = '//header/div[@class="top"]'
-    html_of = lambda do |methods|
-      page = PathCoverage::HtmlFile.page('source/json.rb', lines, {},
-                                         methods:)
-      REXML::Document.new(page)
-    end
-    modes = lambda do |methods|
-      html = html_of.call(methods)
-      [html.root.attributes['data-mode'],
-       html.elements.to_a('//nav[@class="modes"]').size]
-    end
-    assert_equal [['methods', 0], [nil, 0]],
-                 [modes.call(true), modes.call(false)]
-    link = html_of.call(true).elements["#{top}/p[@class=\"title\"]/a"]
+    page = PathCoverage::HtmlFile.page('source/json.rb', lines)
+    title = '//header/div[@class="top"]/p[@class="title"]/a'
+    link = REXML::Document.new(page).elements[title]
     actual = [text_of(link), link.attributes['href']]
     assert_equal ['Path coverage', '../../index.html'], actual
   end
@@ -765,8 +623,7 @@ class HtmlFileTest < Id58TestBase
     lines = [
       { number: 1, text: "require 'json'", status: nil, span: nil }
     ]
-    page = PathCoverage::HtmlFile.page('source/models/fee.rb',
-                                       lines, {})
+    page = PathCoverage::HtmlFile.page('source/models/fee.rb', lines)
     link = REXML::Document.new(page).elements['//h1[@class="path"]/a']
     expected = ['source/models/fee.rb',
                 '../../../index.html#row-source/models/fee.rb']
@@ -774,16 +631,14 @@ class HtmlFileTest < Id58TestBase
   end
 
   test 'gae563', %w(
-  | Example: the page of source/json.rb, in a run measuring
-  | methods
+  | Example: the page of source/json.rb
   | Its header's top line holds, in order, the Path coverage
   | title, the file's path, then the theme button.
   ) do
     lines = [
       { number: 1, text: "require 'json'", status: nil, span: nil }
     ]
-    page = PathCoverage::HtmlFile.page('source/json.rb', lines, {},
-                                       methods: true)
+    page = PathCoverage::HtmlFile.page('source/json.rb', lines)
     top = REXML::Document.new(page).elements['//header/div[@class="top"]']
     parts = top.elements.to_a.map do |part|
       [part.name, part.attributes['class']]
@@ -793,15 +648,14 @@ class HtmlFileTest < Id58TestBase
   end
 
   test 'gae564', %w(
-  | Example: the page of source/json.rb, in a run not measuring
-  | methods
+  | Example: the page of source/json.rb
   | Its title bar ends with the light and dark theme button.
   | Its script switches the theme as that button is pressed.
   ) do
     lines = [
       { number: 1, text: "require 'json'", status: nil, span: nil }
     ]
-    page = PathCoverage::HtmlFile.page('source/json.rb', lines, {})
+    page = PathCoverage::HtmlFile.page('source/json.rb', lines)
     top = REXML::Document.new(page).elements['//div[@class="top"]']
     assert_equal 'button', top.elements.to_a.last.name
     assert_equal 'theme', top.elements.to_a.last.attributes['class']
@@ -830,22 +684,21 @@ class HtmlFileTest < Id58TestBase
 
   test 'gae551', %w(
   | Example: a file holding require 'json' only
-  | Its one line has no site.
-  | So its covered and gaps lists have no links.
+  | Its one line has no site, so no card.
+  | So its row of jumps has no links.
   ) do
     lines = [
       { number: 1, text: "require 'json'", status: nil, span: nil }
     ]
-    page = PathCoverage::HtmlFile.page('source/json.rb', lines, {})
-    html = REXML::Document.new(page)
-    assert_equal({ 'covered' => [], 'gaps' => [] }, jumps_of(html))
+    page = PathCoverage::HtmlFile.page('source/json.rb', lines)
+    assert_equal [], jump_links(REXML::Document.new(page))
   end
 
   test 'gae552', %w(
   | Example: a file of two lines, ok?(a) && new?(a) and
   | ok?(b) && new?(b), each with gaps
-  | Each line starts a span of its own.
-  | So the gaps list links to both.
+  | Each line is a top card of its own.
+  | So the row of jumps links to both.
   | Each one's arrows point to the other, wrapping round.
   ) do
     lines = [
@@ -854,10 +707,14 @@ class HtmlFileTest < Id58TestBase
       { number: 2, text: 'ok?(b) && new?(b)', status: :gaps,
         span: 2..2 }
     ]
-    page = PathCoverage::HtmlFile.page('source/kata.rb', lines, {})
+    cards = [1, 2].map do |first|
+      PathCoverage::Card.new(first:, last: first, column: 0,
+                             status: 'gaps', top: true, sites: 1,
+                             html: '')
+    end
+    page = PathCoverage::HtmlFile.page('source/kata.rb', lines, cards)
     html = REXML::Document.new(page)
-    expected = { 'covered' => [], 'gaps' => %w(#L1 #L2) }
-    assert_equal expected, jumps_of(html)
+    assert_equal %w(#L1 #L2), jump_links(html)
 
     cells = html.elements.to_a('//*[@data-nav]')
     actual = cells.map do |cell|
@@ -875,10 +732,6 @@ class HtmlFileTest < Id58TestBase
   | The right side's row is labelled ||= key.upcase.
   | It marks the path that ran it, the target false.
   ) do
-    lines = [
-      { number: 1, text: '  store[key] ||= key.upcase',
-        status: :covered, span: 1..1 }
-    ]
     trees = {
       1 => [
         {
@@ -893,27 +746,272 @@ class HtmlFileTest < Id58TestBase
         }
       ]
     }
-    listing = PathCoverage::HtmlFile.listing(lines, trees)
-    html = REXML::Document.new(listing)
-    tree = html.elements["//*[@id='tree-1']"]
+    tree = tree_of(trees[1])
 
     target = tree.elements['.//*[@data-operand]']
     cells = target.elements.to_a('*[@data-cell]').map { text_of(_1) }
     assert_equal %w(T F), cells
     arm = tree.elements['.//*[@data-arm]']
     label = text_of(arm.elements['*[@data-label]'])
-    taken = arm.elements.to_a('*[@data-cell]').map { text_of(_1) }
-    tick = [0x2713].pack('U')
-    assert_equal ['||= key.upcase', ['', tick]], [label, taken]
+    taken = arm.elements.to_a('*[@data-cell]').map { cell_of(_1) }
+    assert_equal ['||= key.upcase', ['', 'taken']], [label, taken]
+  end
+
+  test 'gae570', %w(
+  | Example: X = a ? 1 : 2 on line 1, then module M holding
+  | def self.f(a), lines 3 to 5, its body a covered ?:
+  | Each line of f's code is marked in its method, with f's
+  | status and its def's column, so CSS draws f's stripe; its
+  | def line is marked so, its text's length given for its band,
+  | and its last line as its end. Lines in no method are plain.
+  ) do
+    html = REXML::Document.new(listing_of_module)
+    srcs = html.elements.to_a('//*[@data-src]').map do |src|
+      attributes = src.attributes
+      [attributes['class'], attributes['data-method-status'],
+       attributes['style']]
+    end
+    expected = [
+      ['src', nil, nil], ['src', nil, nil],
+      ['src in-method def-line', 'covered',
+       '--def-col: 2; --def-end: 15'],
+      ['src in-method', 'covered', '--def-col: 2'],
+      ['src in-method method-end', 'covered', '--def-col: 2'],
+      ['src', nil, nil]
+    ]
+    assert_equal expected, srcs
+  end
+
+  test 'gae571', %w(
+  | Example: X = a ? 1 : 2 on line 1, then module M holding
+  | def self.f(a), lines 3 to 5, its body a covered ?:
+  | f's def number opens its card: it is marked a def's, with
+  | f's status, closed. The rows of f's body, after its def
+  | line, start folded under it.
+  ) do
+    html = REXML::Document.new(listing_of_module)
+    number = html.elements["//*[@id='L3']"].attributes
+    actual = %w(class data-status aria-expanded).map { number[_1] }
+    assert_equal ['lineno mdef', 'covered', 'false'], actual
+    folded = (1..6).select do |n|
+      row = html.elements["//*[@id='L#{n}']/ancestor::div[1]"]
+      row.attributes['class'].split.include?('method-folded')
+    end
+    assert_equal [4, 5], folded
+  end
+
+  test 'gae572', %w(
+  | Example: X = a ? 1 : 2 on line 1, then module M holding
+  | def self.f(a), lines 3 to 5, its body a covered ?:
+  | The gutter by each card's first line links to the cards of
+  | its status before and after it, wrapping round: here each
+  | card is the only one of its status, so links to itself.
+  ) do
+    html = REXML::Document.new(listing_of_module)
+    arrows = html.elements.to_a('//*[@data-nav]/a').map do |arrow|
+      attributes = arrow.attributes
+      %w(data-status href aria-label).map { attributes[_1] }
+    end
+    expected = [
+      ['gaps', '#L1', 'Previous card with gaps, line 1'],
+      ['gaps', '#L1', 'Next card with gaps, line 1'],
+      ['covered', '#L3', 'Previous card covered, line 3'],
+      ['covered', '#L3', 'Next card covered, line 3']
+    ]
+    assert_equal expected, arrows
+  end
+
+  test 'gae573', %w(
+  | Example: X = a ? 1 : 2 on line 1, then module M holding
+  | def self.f(a), lines 3 to 5, its body a covered ?:
+  | Line 1's site is in no method, so its button is loose: it
+  | opens line 1's top card and wears its status. Line 4's site
+  | is f's card's, so its number is plain, opening nothing.
+  ) do
+    html = REXML::Document.new(listing_of_module)
+    buttons = html.elements.to_a('//button').map do |button|
+      attributes = button.attributes
+      %w(class data-status aria-controls).map { attributes[_1] }
+    end
+    assert_equal [['lnum loose', 'gaps', 'paths-1']], buttons
+    number = html.elements["//*[@id='L4']"]
+    assert_equal 'lineno', number.attributes['class']
+  end
+
+  test 'gae574', %w(
+  | Example: a top card with gaps at line 1, and a method's card
+  | covered at line 3
+  | The header's one row of jumps, labelled Gaps, links to the
+  | first line of each card with gaps, in line order. A file
+  | with none keeps the row, marked empty, so the header is the
+  | same height.
+  ) do
+    jumps = PathCoverage::HtmlNav.jumps(cards_of_module)
+    list = REXML::Document.new(jumps).elements["//*[@class='jump-list']"]
+    label = list.elements["*[@class='jump-label']"]
+    assert_equal 'Gaps', text_of(label)
+    links = list.elements.to_a('a').map { _1.attributes['href'] }
+    assert_equal ['#L1'], links
+    assert_nil list.attributes['data-empty']
+    none = REXML::Document.new(PathCoverage::HtmlNav.jumps([]))
+    empty = none.elements["//*[@class='jump-list']"]
+    assert_equal '', empty.attributes['data-empty']
+  end
+
+  test 'gae575', %w(
+  | Example: a top card at line 1 and a method's card at line 3
+  | The page holds both cards, hidden, in the rail beside the
+  | code, then the divider that drags the rail's width.
+  ) do
+    lines = module_lines
+    page = PathCoverage::HtmlFile.page('source/m.rb', lines,
+                                       cards_of_module)
+    html = REXML::Document.new(page)
+    box = html.elements["//*[@class='box']"]
+    kids = box.elements.to_a('*').map { _1.attributes['class'] }
+    assert_equal %w(rail code divider), kids
+    rail = box.elements["*[@class='rail']"]
+    ids = rail.elements.to_a('*').map { _1.attributes['id'] }
+    assert_equal %w(paths-1 paths-3), ids
+  end
+
+  test 'gae577', %w(
+  | Example: module M holding def outer, lines 2 to 6, with gaps,
+  | holding def inner(a), lines 3 to 5, covered, its body a ?:
+  | Each line of inner's is in both methods, and wears its
+  | innermost's status and def's column. The ?: is a method's,
+  | so its number is plain. Every row of outer's body starts
+  | folded, inner's def line among them.
+  ) do
+    lines = [
+      { number: 1, text: 'module M', status: nil, span: nil },
+      { number: 2, text: '  def self.outer', status: nil, span: nil },
+      { number: 3, text: '    def self.inner(a)', status: nil,
+        span: nil },
+      { number: 4, text: '      a ? 1 : 2', status: :covered,
+        span: 4..4 },
+      { number: 5, text: '    end', status: nil, span: nil },
+      { number: 6, text: '  end', status: nil, span: nil },
+      { number: 7, text: 'end', status: nil, span: nil }
+    ]
+    card = PathCoverage::Card
+    cards = [
+      card.new(first: 2, last: 6, column: 2, top: false,
+               status: 'gaps', sites: nil, html: ''),
+      card.new(first: 3, last: 5, column: 4, top: false,
+               status: 'covered', sites: nil, html: '')
+    ]
+    listing = PathCoverage::HtmlFile.listing(lines, cards)
+    html = REXML::Document.new(listing)
+    srcs = html.elements.to_a('//*[@data-src]')[2..5].map do |src|
+      %w(class data-method-status style).map { src.attributes[_1] }
+    end
+    expected = [
+      ['src in-method def-line', 'covered',
+       '--def-col: 4; --def-end: 21'],
+      ['src in-method', 'covered', '--def-col: 4'],
+      ['src in-method method-end', 'covered', '--def-col: 4'],
+      ['src in-method method-end', 'gaps', '--def-col: 2']
+    ]
+    assert_equal expected, srcs
+    assert_equal [], html.elements.to_a('//button')
+    folded = "//*[contains(@class, 'method-folded')]"
+    rows = html.elements.to_a(folded)
+    numbers = rows.map { text_of(_1.elements['*[@data-line]']) }
+    assert_equal %w(3 4 5 6), numbers
+  end
+
+  test 'gae578', %w(
+  | Example: module M holding def a, lines 2 to 3, then def b(x),
+  | lines 4 to 6, its body a ?:, then Y = y ? 1 : 2 on line 8
+  | The ?: in b, the second method, is a method's, not loose:
+  | its number is plain, with no button. Y's ?: is in neither,
+  | so it is loose, with the one button.
+  ) do
+    lines = [
+      { number: 1, text: 'module M', status: nil, span: nil },
+      { number: 2, text: '  def self.a', status: nil, span: nil },
+      { number: 3, text: '  end', status: nil, span: nil },
+      { number: 4, text: '  def self.b(x)', status: nil, span: nil },
+      { number: 5, text: '    x ? 1 : 2', status: :gaps, span: 5..5 },
+      { number: 6, text: '  end', status: nil, span: nil },
+      { number: 7, text: 'end', status: nil, span: nil },
+      { number: 8, text: 'Y = y ? 1 : 2', status: :gaps, span: 8..8 }
+    ]
+    cards = [[2, 3], [4, 6]].map do |first, last|
+      PathCoverage::Card.new(first:, last:, column: 2, top: false,
+                             status: 'gaps', sites: nil, html: '')
+    end
+    listing = PathCoverage::HtmlFile.listing(lines, cards)
+    html = REXML::Document.new(listing)
+    opens = html.elements.to_a('//button').map do |button|
+      button.attributes['aria-controls']
+    end
+    assert_equal ['paths-8'], opens
+    number = html.elements["//*[@id='L5']"]
+    assert_equal 'lineno', number.attributes['class']
   end
 
   private
 
-  # { status => hrefs } of the header's covered and gaps lists.
-  def jumps_of(html)
-    %w(covered gaps).to_h do |status|
-      links = html.elements.to_a("//*[@data-jumps='#{status}']/a")
-      [status, links.map { |link| link.attributes['href'] }]
+  # The lines of X = a ? 1 : 2 on line 1, then module M holding
+  # def self.f(a), lines 3 to 5, its body a ?: on line 4.
+  def module_lines
+    [
+      { number: 1, text: 'X = a ? 1 : 2', status: :gaps, span: 1..1 },
+      { number: 2, text: 'module M', status: nil, span: nil },
+      { number: 3, text: '  def self.f(a)', status: nil, span: nil },
+      { number: 4, text: '    a ? 1 : 2', status: :covered,
+        span: 4..4 },
+      { number: 5, text: '  end', status: nil, span: nil },
+      { number: 6, text: 'end', status: nil, span: nil }
+    ]
+  end
+
+  # The cards of module_lines: a top card with gaps at line 1, and
+  # f's covered, lines 3 to 5 at column 2.
+  def cards_of_module
+    grid = ->(n) { %(<div class="pathgrid" id="paths-#{n}"/>) }
+    card = PathCoverage::Card
+    [
+      card.new(first: 1, last: 1, column: 0, top: true,
+               status: 'gaps', sites: 1, html: grid.call(1)),
+      card.new(first: 3, last: 5, column: 2, top: false,
+               status: 'covered', sites: nil, html: grid.call(3))
+    ]
+  end
+
+  # The parsed tree of sites, as SiteTree.of gives each, drawn as
+  # a fold in a card draws it: each site's rows in a group of
+  # their own.
+  def tree_of(sites)
+    groups = sites.map do |site|
+      rows = PathCoverage::HtmlTree.site_rows(site).join
+      %(<div class="site" data-site="">#{rows}</div>)
     end
+    fold = %(<div class="fold">#{groups.join}</div>)
+    REXML::Document.new(fold).root
+  end
+
+  # The listing of module_lines with its cards.
+  def listing_of_module
+    PathCoverage::HtmlFile.listing(module_lines, cards_of_module)
+  end
+
+  # Example: a tee then a dash then a space gives ths.
+  # The kinds of each branch's cells in tree, in order, one
+  # letter a cell: t tee, l ell, v bar, h dash, s space.
+  def branches_of(tree)
+    tree.elements.to_a('.//*[@data-branch]').map do |branch|
+      cells = branch.elements.to_a('*[@data-bx]')
+      cells.map { |cell| cell.attributes['data-bx'] }.join
+    end
+  end
+
+  # The hrefs of the header's row of jumps, to each card with
+  # gaps.
+  def jump_links(html)
+    links = html.elements.to_a("//*[@class='jump-list']/a")
+    links.map { |link| link.attributes['href'] }
   end
 end

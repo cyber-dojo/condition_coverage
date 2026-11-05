@@ -1,11 +1,12 @@
+require_relative 'card'
 require_relative 'html_statements'
 require_relative 'html_tree'
 require_relative 'method_statements'
 require_relative 'site_tree'
 
 module PathCoverage
-  # The cards of one file's page, hidden until side.js moves one
-  # into the rail: a card for each of its methods, and one for
+  # The cards of one file's page, as Card gives them, in the rail
+  # beside its code: a card for each of its methods, and one for
   # each span of its lines holding sites at the top level; each
   # site's row with its tree folded under it. It relies on
   # HtmlReport.located to place each tree's rows in the source.
@@ -20,9 +21,19 @@ module PathCoverage
       tree = ->(at) { fold(source, sites, site_paths, at) }
       MethodStatements.of(source, path, sites).map do |site, rows|
         taken = MethodStatements.taken(rows, site_paths, reached)
-        HtmlStatements.card(site, names[site], rows, taken,
-                            lasts[site], &tree)
-      end.join("\n")
+        named = [names[site], lasts[site]]
+        method_card(site, named, rows, taken, &tree)
+      end
+    end
+
+    # The Card of the def at site named name, ending on line last,
+    # its rows' taken as taken gives them.
+    def self.method_card(site, (name, last), rows, taken, &)
+      html = HtmlStatements.card(site, name, rows, taken, last, &)
+      first, column = site.split(':').last(2).map { Integer(_1) }
+      status = HtmlStatements.status(rows, taken)
+      Card.new(first:, last:, column:, status:, top: false,
+               sites: nil, html:)
     end
 
     # A top card for each span of lines holding sites at the top
@@ -35,7 +46,7 @@ module PathCoverage
       scopes = scopes(source)
       spans(path, parsed, lines).map do |span, rows|
         top(path, span, rows, site_paths, scopes[span.begin], &tree)
-      end.join("\n")
+      end
     end
 
     # The top card of the span of lines of the file at path,
@@ -43,7 +54,11 @@ module PathCoverage
     def self.top(path, span, rows, site_paths, scope, &)
       taken = MethodStatements.taken(rows, site_paths)
       site = "#{path}:#{span.begin}:0"
-      HtmlStatements.top_card(site, scope, rows, taken, span.end, &)
+      html = HtmlStatements.top_card(site, scope, rows, taken,
+                                     span.end, &)
+      Card.new(first: span.begin, last: span.end, column: 0,
+               status: HtmlStatements.status(rows, taken), top: true,
+               sites: rows.size, html:)
     end
 
     # A lambda giving the scope of a line of source, as scope
