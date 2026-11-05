@@ -12,12 +12,131 @@ Status: sites cover `&&`, `||`, `and`, `or`, the ternary `?:`,
 with a subject, and the block methods `any?` `all?` `none?` `find`
 `detect` `find_index` `take_while` `select` `filter` `reject`
 `partition` `count` `filter_map`, the writes `||=` and `&&=`, and `&.`
-safe-navigation chains. Method paths cover `if` decisions.
+safe-navigation chains. Method paths cover every site at a method's
+top level.
 More decisions hidden inside calls come next (see Roadmap).
 
 Demo: https://cyber-dojo.github.io/path_coverage/ shows the HTML report
 for the mock source tree in `demo/`. `make demo` builds and opens the
 same report locally.
+
+## Overview
+
+A *site* is one decision in your code: an `&&`, `||`, `if`,
+`case`, `&.` chain, `||=`, or a block method such as `any?`.
+Each way it can go is a *path*. For example
+
+```ruby
+name.size > 2 && name.ascii_only?
+```
+
+has three paths: true then true, true then false, and false
+alone, as `&&` then skips its right side.
+
+Line and branch coverage can be 100% while a path was never
+taken. path_coverage counts how often each path was taken:
+within each site, and within each method, through its sites.
+
+As the run exits it writes its report:
+- `path_coverage.json`, for AIs and other tools.
+- `index.html`, with a page per file, for people.
+
+## Reading the HTML
+
+Clicking a `def` line on a file's HTML page opens that method's
+*card* to its left. One card is always open.
+
+A card has a row for each site in the method, by `line:col`,
+with its counts of paths not taken and taken.
+
+Clicking a row's `▼` opens it:
+- on the left is the site's code, as a tree.
+- on the right is one column for each possible path through it.
+  - the column's head is `≀0` for a path never taken, and `≀*`
+    for one taken (hover for its count). Look for zeros!
+  - the symbols in a column line up with the tree's rows, and
+    are explained below.
+
+### Boolean: `T` `F`
+
+Many parts of a site, such as `name.size > 2`, are true or false.
+
+![A file's page: line 2, name.size > 2 && name.ascii_only?, its card open to its left](docs/example-outcome.png)
+
+- `T` the expression was true.
+- `F` the expression was false.
+
+In this example, there was no test which exercised the path where `name.size > 2` was `true`, and
+`name.ascii_only?` was `false`.
+
+### Unreachable: blank
+
+Some parts of a site are not always evaluated.
+
+![A file's page: line 2, @x = dee || dum, its card open to its left](docs/example-unreachable.png)
+
+- "blank" the expression is never evaluated.
+
+In the second column `dee` was `T`, so because of `||`'s short-circuiting, `dum` is never evaluated.
+
+### Taken: `✓`
+
+An `if` takes one of its arms.
+
+![A file's page: line 2, if paid, its card open to its left](docs/example-taken.png)
+
+- `✓` marks the column whose path took that "arm"
+
+The `paid` row is the `if`'s predicate, `T` or `F`. Below it is one row
+per arm, named `then` and `else`.  The first column, `paid` false, took `else`; the
+second, `paid` true, took `then`.
+
+### Navigation: `∅` `●`
+
+`&.` skips the rest of its chain when its receiver is nil.
+
+![A file's page: line 2, user&.account&.owner, its card open to its left](docs/example-nil.png)
+
+- `∅` the receiver was nil, so `&.` skipped the rest of the chain.
+- `●` the receiver was not nil, so `&.` made the call.
+
+In this example, there was no test which exercised the path where
+`user` was nil.
+
+### Count: `0` `1` `*`
+
+A block method can call its block on any number of items.
+
+![A file's page: line 2, ids.any? { |id| id.odd? }, its card open to its left](docs/example-count.png)
+
+- `0` the block was called with no items.
+- `1` the block was called with one item.
+- `*` the block was called with two or more items.
+
+In this example, there was no test which exercised the path where
+the block was called with two or more items and every answer was
+`false`.
+
+### Both: `TF`
+
+A block's answers can differ from item to item.
+
+![A file's page: line 2, ids.select { |id| id.odd? }, its card open to its left](docs/example-both.png)
+
+- `T` every answer of the block was true.
+- `F` every answer of the block was false.
+- `TF` the block's answers were both true and false.
+
+In this example, there was no test which exercised the path where
+the block was called with two or more items and every answer was
+`false`.
+
+### Lots of paths!
+
+Ruby code can be very compact so short expressions can generate lots of paths!
+
+![A file's page: line 2, if user&.admin? && ids.select { |id| id.odd? }.any?, its card open to its left](docs/example-overview.png)
+
 
 ## Getting started
 
@@ -34,7 +153,6 @@ PathCoverage.start do
   cover 'test/**/*.rb'         # more than one cover glob may be given
   skip 'source/vendor/**/*.rb' # except these, though a cover glob matches them
   coverage_dir '/tmp/coverage' # where path_coverage.json is written
-  measure :decisions, :methods # :decisions alone unless :methods is named
   report :gaps, :html          # the reporters run at exit (default :gaps);
                                # also :summary and :post
   group 'code', 'source/**/*.rb' # each group a tab of its own on index.html
@@ -44,86 +162,6 @@ PathCoverage.start do
   treat 'any?', as: :nonempty  # any? is true when its receiver has items
 end
 ```
-
-
-## Reading the HTML
-
-Clicking a line number on a file's HTML page opens that line's popout.
-
-Each popout has two sections:
-- on the left is a hierarchical representation of the code fragment.
-- on the right is one column for each possible path through that fragment.
-  - at the top of the column is the count of that path. Look for zeros!
-  - the symbols in the column align with their fragment and are explained below.
-
-### Boolean: `T` `F` 
-
-![A file's page: line 2, name.size > 2 && name.ascii_only?, its button pressed, its popout open beside it](docs/example-outcome.png)
-
-- `T` the expression was true.
-- `F` the expression was false.
-
-In this example, there was no test which exercised the path where `name.size > 2` was `true`, and 
-`name.ascii_only?` was `false`.
-
-### Unreachable: blank 
-
-![A file's page: line 2, @x = dee || dum, its button pressed, its popout open beside it](docs/example-unreachable.png)
-
-- "blank" the expression is never evaluated. 
-
-In the second column `dee` was `T`, so because of `||`'s short-circuiting, `dum` is never evaluated.
-
-### Taken: `✓`
-
-![A file's page: line 2, if paid, its button pressed, its popout open beside it](docs/example-taken.png)
-
-- `✓` marks the column whose path took that "arm"
-
-The `paid` row is the `if`'s predicate, `T` or `F`. Below it is one row
-per arm, named `then` and `else`.  The first column, `paid` false, took `else`; the
-second, `paid` true, took `then`.
-
-### Navigation: `∅` `●`
-
-![A file's page: line 2, user&.account&.owner, its button pressed, its popout open beside it](docs/example-nil.png)
-
-- `∅` the receiver was nil, so `&.` skipped the rest of the chain.
-- `●` the receiver was not nil, so `&.` made the call.
-
-In this example, there was no test which exercised the path where
-`user` was nil.
-
-### Count: `0` `1` `*`
-
-![A file's page: line 2, ids.any? { |id| id.odd? }, its button pressed, its popout open beside it](docs/example-count.png)
-
-- `0` the block was called with no items.
-- `1` the block was called with one item.
-- `*` the block was called with two or more items.
-
-In this example, there was no test which exercised the path where
-the block was called with two or more items and every answer was
-`false`.
-
-### Both: `TF`
-
-![A file's page: line 2, ids.select { |id| id.odd? }, its button pressed, its popout open beside it](docs/example-both.png)
-
-- `T` every answer of the block was true.
-- `F` every answer of the block was false.
-- `TF` the block's answers were both true and false.
-
-In this example, there was no test which exercised the path where
-the block was called with two or more items and every answer was
-`false`.
-
-### Lots of paths!
-
-Ruby code can be very compact so short expressions can generate lots of paths!
-
-![A file's page: line 2, if user&.admin? && ids.select { |id| id.odd? }.any?, its button pressed, its popout open beside it](docs/example-overview.png)
-
 
 ## Use when you cannot edit the code!
 
@@ -171,10 +209,10 @@ As the process exits:
 
 - `path_coverage.json` is always written to `coverage_dir`: every site
   of every covered file, with each operand's true and false counts under
-  `sites`, each site's paths under `paths`, each method's paths taken
-  under `method_paths` when `:methods` is measured, and the paths taken
+  `sites`, each site's paths under `paths`, each method's card under
+  `cards`, the statements reached under `reached`, and the paths taken
   of all possible under `totals`, as [taken, possible]: `decisions`,
-  `methods` when `:methods` is measured, and, with groups, each group's
+  `methods`, and, with groups, each group's
   own under `groups`, eg `"groups": {"code": {"decisions": [481, 567]}}`.
   It also names the kinds of site measured under `kinds`, any `ignored`
   operators and `treats`, and any paths taken that a treatment rules
@@ -188,20 +226,15 @@ As the process exits:
   every run left. A report whose kinds, `ignored` or `treats` differ
   from `config`'s is refused, as its sites list their paths
   differently.
-- `:gaps` prints one line per path never taken, in manifest order: a
-  site's naming the outcome of each leaf on it, a method's the outcome
-  of each decision on it, by line:
+- `:gaps` prints one line per site path never taken, in manifest
+  order, naming the outcome of each leaf on it:
 
 ```text
 source/kata.rb:3:23 path never taken: `ok?(id)` true, `new?(id)` false
 source/kata.rb:4:24 never reached
-source/fee.rb:2:2 fee path never taken: line 4 true, line 7 false
 ```
 
 ### Decisions
-
-The paths within each decision are always measured, whatever `measure`
-names.
 
 A site is named by the `path:line:column` where it starts, the path
 relative to `root`. A site in a covered file the run never loaded is
@@ -308,51 +341,35 @@ cannot be closed is the lesser error than hiding one that can.
 
 ### Methods
 
-With `measure :decisions, :methods`, each method with two or more
-decisions also counts each call's path through them: the outcome of each
-decision it reached, in order. A method is named by the `path:line:column`
-of its `def`, then its name. Each decision is one outcome on the path,
-however many leaves its predicate has; those are its site's to show. So a
-site's columns stay its own leaves' combinations, and a method's its own
-decisions', rather than multiplying together. A decision whose arm always
-leaves the method ends the path there.
+Each method has a card, named by the `path:line:column` of its `def`,
+with a row per top-level statement. A row that is a site counts its
+paths; any other row is one path, taken when the statement is reached.
+A method's total adds up its rows. A file's code outside any method
+gets a card of its own.
 
-The JSON report's `method_paths` lists each method's paths taken, with
-their counts, so a later render, or several runs' reports merged, still
-shows them. A report with none, eg from a run that did not measure
-`:methods`, renders as no method path taken:
+The JSON report's `cards` hold each card's rows:
 
 ```json
-"method_paths": {
-  "source/fee.rb:2:2": [
-    { "path": [true, false], "count": 1 }
-  ]
+"cards": {
+  "label.rb:1:0": {
+    "name": "label", "first": 1, "last": 7,
+    "rows": [
+      { "at": "2:02", "top": "if", "paths": 2, "taken": 1, "site": "label.rb:2:2" },
+      { "at": "3:04", "top": "value", "paths": 1, "taken": 1, "site": null },
+      { "at": "5:04", "top": "value", "paths": 1, "taken": 0, "site": null }
+    ]
+  }
 }
 ```
 
 ### Reporters
 
-- `:html` writes `index.html` to `coverage_dir`: the covered files with
-  their sites and their paths taken of all possible, within each decision
-  and, when `:methods` is measured, within each method (eg
-  `9 / 28 (32%)`, or `-` for a file with no method of two or more
-  decisions), each column sortable, and a Total row for every file
-  together. Each file name opens `files/<path>.html`, the file's
-  source. On a line holding a site the line number is a button (blue
-  and outlined when every outcome was seen, solid orange when any is
-  missing) that opens a grid of the site's paths, on the left. Its rows
-  are the site's tree: its operators, nested as Ruby groups them, a
-  ternary's arms marked `?` and `:`, an `if`'s named `then` and `else`,
-  and its leaves. Its columns are the site's paths, never taken first,
-  each headed by its count, orange when zero; a leaf shows its outcome on
-  each path, T or F, blank where the path never reached it, and a plain
-  arm a dot on each path that took it. A site written over several lines
-  has one button over all of its line numbers. Grids with gaps start
-  open. A header that stays at the top of the page lists every site as a
-  link to its line, covered sites first, then those with gaps, and arrows
-  beside each site with gaps jump to the previous and next one, wrapping
-  round at either end. Measuring paths, each method's grid of its
-  decisions' paths opens on the right.
+- `:html` writes `index.html` to `coverage_dir`: a sortable row per
+  covered file, with its sites and its paths taken of all possible
+  within each method (eg `9 / 28 32%`, or `-` for a file with no
+  method of two or more decisions), and a Total row. Each file name
+  opens `files/<path>.html`, the file's source with its cards, as
+  Reading the HTML shows.
 - `:post` sends the JSON report, as an HTTP POST, to the url set by
   `collector 'http://...'`. It is for a run whose own files are thrown
   away, such as a failing `docker build` step. It prints nothing, never
@@ -360,7 +377,7 @@ shows them. A report with none, eg from a run that did not measure
   that cannot be reached or does not answer within a second, so the
   run's output and exit status are unchanged.
 - `:summary` prints each total as SimpleCov prints its line and branch
-  coverage, the methods line only when `:methods` is measured:
+  coverage:
 
 ```text
 Path coverage within decisions: 527 / 631 (83.52%)
@@ -396,9 +413,8 @@ PathCoverage.leave(PathCoverage.enter("k.rb:2:2", 2), PathCoverage.record("k.rb:
 
 An `if` site's leave call wraps its predicate alone, as its path is
 decided there, so an arm that returns or raises still counts it.
-Measuring paths, each method starts a path at its entry, and each
-decision's predicate is wrapped in a decide call too, outside its site's
-calls.
+Each statement that is no site gets a reach call before it, counting
+its run, for its card's row.
 
 A command call such as `ok? id` (after `and`) is not valid as a bare
 argument, so that leaf alone gets parentheses of its own, and so does a
@@ -469,11 +485,6 @@ source/user.rb:4:9 path taken that a treatment rules out: `user.name` nil
 - an evaluation that raised part way through a site, eg
   `ok?(id) && fetch(id)` where `fetch` raises, reported as a path that
   raised rather than dropped as unfinished.
-- within each method, every top-level decision, not only `if`
-  statements. A top-level `case`, ternary, `&.` or `&&` decides as much
-  as an `if` does. Two decisions on the same value combine into paths
-  that cannot happen, eg `x&.call` then `x ? 1 : 2` has 2 paths, not 4.
-  Such paths must be found before any are listed as gaps.
 - complexity maximums, reported and gated, since the possible paths
   count how much there is to test, not only how much was tested. A
   file's total measures its size, so each is a maximum over smaller
@@ -544,24 +555,7 @@ for `lib/` are the same with it as without.
 Pages workflow (`.github/workflows/pages.yml`) runs the same script on
 each push to `main` and publishes `site/`.
 
-`bin/capture_readme_images.sh` rebuilds the demo and saves this README's
-two screenshots, `docs/decision.png` and `docs/method.png`, from it with
-headless Chrome. Run it again whenever the report's look changes.
+`bin/capture_card_images.sh` runs the examples in `demo/cards/` and
+saves this README's screenshots, `docs/example-*.png`, with headless
+Chrome. Run it again whenever the card's look changes.
 
-
-## Within each decision
-
-The first `if` can go three ways: member and paid, member and not
-paid, not a member. A member who has not paid may never have been
-tried.
-
-![The first if's grid: a column per way it can go, each headed by
-its count, the member who has not paid at 0](docs/decision.png)
-
-## Within each method
-
-The two `if`s can go four ways together. A paying member with a small
-order may never have been tried.
-
-![fee's grid: a column per way its two ifs can go together, each
-headed by its count, true then false at 0 and selected](docs/method.png)
