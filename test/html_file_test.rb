@@ -368,6 +368,37 @@ class HtmlFileTest < TidTest
     assert_equal [['return', '', 'leaves']], actual
   end
 
+  test 'gae581', %w(
+  | Example: return total if order[:pickup], on line 50
+  | Its fold's return row is placed at its arm's code, return
+  | total, so hovering return in the code pane opens the fold
+  | and lights that row.
+  ) do
+    trees = {
+      1 => [
+        {
+          operator: 'if', counts: [1, 1], cells: [nil, nil],
+          at: [50, 17, 50, 34],
+          operands: [
+            {
+              text: 'order[:pickup]', cells: [false, true],
+              at: [50, 20, 50, 34]
+            },
+            {
+              arm: :then, text: 'return total', at: [50, 4, 50, 16],
+              cells: [false, true], body: nil
+            }
+          ]
+        }
+      ]
+    }
+    tree = tree_of(trees[1])
+
+    rows = tree.elements.to_a('.//*[@data-leaves]')
+    placed = rows.map { _1.attributes['data-at'] }
+    assert_equal ['50,4,50,16'], placed
+  end
+
   test 'gae566', %w(
   | Example: x ? :a : :b
   | A ?:'s fold keeps a row for each arm, ? and :, as its arms

@@ -63,13 +63,13 @@ module PathCoverage
 
     # The row of an arm that leaves the method, as leaving gives
     # it: return or raise, coloured as code, marking each path
-    # that leaves there.
+    # that leaves there, placed at its code.
     def self.leaves_row(node, branch)
       word = HtmlSyntax.fragment(node[:leaves])
       lead = HtmlBranch.cell(branch) +
              %(<span class="arm" data-label="">#{word}</span>)
       cells = HtmlCells.of(node[:cells], HtmlCells::LEAVES)
-      row(' data-leaves=""', lead, cells)
+      row(%( data-leaves=""#{at(node)}), lead, cells)
     end
 
     # A ternary's arm's row, ? for then and : for else: an arm
@@ -111,12 +111,13 @@ module PathCoverage
       end
     end
 
-    # { leaves: return or raise, cells: } for arm when its code
-    # returns or raises, cells marking the paths that took it, so
-    # left the method; nil for an arm that does neither.
+    # { leaves: return or raise, cells:, at: } for arm when its
+    # code returns or raises, cells marking the paths that took
+    # it, so left the method, at where its code is, so hovering it
+    # lights the row; nil for an arm that does neither.
     def self.leaving(arm)
       word = arm[:text].to_s[LEAVES, 1]
-      word && { leaves: word, cells: arm[:cells] }
+      word && { leaves: word, cells: arm[:cells], at: arm[:at] }
     end
 
     # operands with each node standing for the nodes its kind
