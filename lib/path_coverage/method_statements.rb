@@ -98,23 +98,25 @@ module PathCoverage
     # not known counts as not taken, never more than it ran.
     def self.totals(source, path, paths, reached, sites = nil)
       of(source, path, sites).transform_values do |rows|
-        [taken(rows, paths, reached).compact.sum, size(rows)]
+        seen = taken(rows, paths, reached).compact.sum
+        [seen, size(rows.map(&:paths))]
       end
     end
 
-    # Example: rows with 1, 2 and 2 paths have size 5.
-    # The paths a method's tests are to take: its rows' paths
-    # added up, each row's taken on its own.
-    def self.size(rows)
-      rows.sum(&:paths)
+    # Example: rows of 1, 2 and 2 paths, [1, 2, 2], have size 5.
+    # The paths a method's tests are to take: paths, its rows'
+    # paths, added up, each row's taken on its own.
+    def self.size(paths)
+      paths.sum
     end
 
-    # Example: rows with 1, 2 and 2 paths have complexity 4.
-    # The paths through a method as a whole: its rows' paths
-    # multiplied, as each path of one row goes on to each of
-    # the next.
-    def self.complexity(rows)
-      rows.map(&:paths).reduce(1, :*)
+    # Example: rows of 1, 2 and 2 paths, [1, 2, 2], have
+    # complexity 4.
+    # The paths through a method as a whole: paths, its rows'
+    # paths, multiplied, as each path of one row goes on to each
+    # of the next.
+    def self.complexity(paths)
+      paths.reduce(1, :*)
     end
 
     # Example: an if row with only its then taken gives 1.

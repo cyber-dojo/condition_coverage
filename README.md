@@ -210,7 +210,8 @@ As the process exits:
 - `path_coverage.json` is always written to `coverage_dir`: every site
   of every covered file, with each operand's true and false counts under
   `sites`, each site's paths under `paths`, each method's card under
-  `cards`, the statements reached under `reached`, and the paths taken
+  `cards`, how each card's rows nest under `tree`, the statements
+  reached under `reached`, and the paths taken
   of all possible under `totals`, as [taken, possible]: `decisions`,
   `methods`, and, with groups, each group's
   own under `groups`, eg `"groups": {"code": {"decisions": [481, 567]}}`.
@@ -358,6 +359,23 @@ The JSON report's `cards` hold each card's rows:
       { "at": "3:04", "top": "value", "paths": 1, "taken": 1, "site": null },
       { "at": "5:04", "top": "value", "paths": 1, "taken": 0, "site": null }
     ]
+  }
+}
+```
+
+Its `tree` says how those rows nest, by file, then card, then row.
+A row inside a site names that site as its `parent`, the arm it is
+`in`, and `on`, the indices of the parent's paths that run it, in the
+order `paths` lists them. A row at the method's top has none of these.
+
+```json
+"tree": {
+  "label.rb": {
+    "1:0": {
+      "2:2": { "parent": null, "in": null, "on": null },
+      "3:4": { "parent": "2:2", "in": "then", "on": [0] },
+      "5:4": { "parent": "2:2", "in": "else", "on": [1] }
+    }
   }
 }
 ```

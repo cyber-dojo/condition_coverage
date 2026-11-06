@@ -122,16 +122,17 @@ module PathCoverage
 
   # Writes result as the JSON report at config's json_path: its
   # operands, site paths, paths a treatment rules out, totals,
-  # each def's card, the statements the recorder reached, so a
-  # render from the JSON alone has them, and config's
-  # fingerprint.
+  # each def's card, how each card's rows nest, the statements
+  # the recorder reached, so a render from the JSON alone has
+  # them, and config's fingerprint.
   def self.write_json(result, files, config)
     report = PathsReport.of(result.paths, files)
     reached = @recorder.reached
     cards = WithinMethods.listed(files, config, result, reached)
+    tree = WithinMethods.tree(files, config, result)
     parts = {
       totals: totals(result, files, config), outside: result.outside,
-      cards:, fingerprint: config.fingerprint, reached:
+      cards:, tree:, fingerprint: config.fingerprint, reached:
     }
     path = config.json_path
     JsonWriter.write(result.operands, path, report, **parts)

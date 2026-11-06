@@ -1610,6 +1610,60 @@ class KernelTest < TidTest
     assert_equal expected, t.json['cards']
   end
 
+  test '6rTS6n', %w(
+  | Example: module Fee holding fee, an if of big holding a ?:
+  | of vip, called once with big false
+  | The JSON report lists how fee's card's rows nest, under its
+  | file, then its card, each row by its line:column: the ?:
+  | runs in the if's then arm, on its path 0, so a reader can
+  | tell which paths reach a row, whatever the run took.
+  ) do |t|
+    t.write(<<~RUBY)
+      module Fee
+        def self.fee(big, vip)
+          if big
+            vip ? 10 : 5
+          end
+        end
+      end
+    RUBY
+    t.start { report :html }
+    t.load::Fee.fee(false, true)
+    t.report
+    expected = {
+      t.file => {
+        '2:2' => {
+          '3:4' => { 'parent' => nil, 'in' => nil, 'on' => nil },
+          '4:6' => { 'parent' => '3:4', 'in' => 'then', 'on' => [0] }
+        }
+      }
+    }
+    assert_equal expected, t.json['tree']
+  end
+
+  test '6rTS6p', %w(
+  | Example: module Rate holding a ?: outside any method
+  | The JSON report lists how its top card's rows nest too,
+  | under the card's line:column, as cards names it.
+  ) do |t|
+    t.write(<<~RUBY, 'rate.rb')
+      module Rate
+        RATE = ENV.key?('RATE6rTS6p') ? 2 : 1
+      end
+    RUBY
+    t.start { report :html }
+    t.load('rate.rb')
+    t.report
+    expected = {
+      'rate.rb' => {
+        '2:0' => {
+          '2:9' => { 'parent' => nil, 'in' => nil, 'on' => nil }
+        }
+      }
+    }
+    assert_equal expected, t.json['tree']
+  end
+
   test '6rTS6m', %w(
   | Example: two starts in one process, eg two tests, each over
   | its own rate.rb, a ?: whose site has the same name in both,

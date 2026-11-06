@@ -20,9 +20,9 @@ module PathCoverage
     # Result#outside gives them.
     LISTED = %i[outside].freeze
 
-    # operands, and any paths, and parts' outside:, totals: and
-    # cards:, as WithinMethods.listed gives them, as the JSON
-    # report's text, with
+    # operands, and any paths, and parts' outside:, totals:,
+    # cards:, as WithinMethods.listed gives them, and tree:, as
+    # WithinMethods.tree gives it, as the JSON report's text, with
     # parts' fingerprint:, as Configuration#fingerprint gives
     # it, the names of the kinds measured, and parts' reached:,
     # as Recorder#reached gives it, even empty, as a run that
@@ -39,7 +39,7 @@ module PathCoverage
     end
 
     # The keys of parts written as they are, when not empty.
-    KEPT = %i[totals cards].freeze
+    KEPT = %i[totals cards tree].freeze
 
     # { key => its value } of each of parts' KEPT keys that has
     # a value not empty.

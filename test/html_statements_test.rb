@@ -1,6 +1,7 @@
 require_relative 'test_helper'
 require 'path_coverage/html_statements'
 require 'path_coverage/method_statements'
+require 'path_coverage/within_methods'
 
 class HtmlStatementsTest < TidTest
   test 'Hs4q01', %w(
@@ -162,9 +163,11 @@ class HtmlStatementsTest < TidTest
       FEE = (ENV['BIG'] ? 10 : 0) + (ENV['VIP'] ? 5 : 0)
     RUBY
     rows = PathCoverage::MethodStatements.top_rows(source, 'k.rb')
-    html = PathCoverage::HtmlStatements.top_card(
-      'k.rb:1:0', 'file', rows, [1, 1], 1
-    ) { |at| %(<div class="row">#{at}</div>) }
+    listed = listed('k.rb:1:0', 'file', rows, [1, 1], 1)
+    statements = PathCoverage::HtmlStatements
+    html = statements.top_card('k.rb:1:0', listed) do |at|
+      %(<div class="row">#{at}</div>)
+    end
     open = '<div class="pathgrid statements top-level" id="paths-1"'
     assert_includes html, open
     assert_includes html, 'data-first="1" data-col="0" data-last="1"'
@@ -197,9 +200,18 @@ class HtmlStatementsTest < TidTest
 
   private
 
-  # The card HtmlStatements gives for these arguments.
-  def card(...)
-    PathCoverage::HtmlStatements.card(...)
+  # The card HtmlStatements draws at site for the card listed
+  # gives, with tree.
+  def card(site, name, rows, taken, last, &)
+    listed = listed(site, name, rows, taken, last)
+    PathCoverage::HtmlStatements.card(site, listed, &)
+  end
+
+  # The card the JSON report lists at site, named name, ending
+  # on line last, its rows' taken as taken gives them.
+  def listed(site, name, rows, taken, last)
+    counted = rows.zip(taken)
+    PathCoverage::WithinMethods.card(site, name, last, counted)
   end
 
   # The texts of each row of html's grid: its label, then each

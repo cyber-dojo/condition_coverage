@@ -64,7 +64,7 @@ module PathCoverage
       source, sites = parsed.values_at(:source, :sites)
       plain = SourceLines.of(source, sites, operands)
       lines = coloured(source, plain)
-      tops = HtmlCards.tops(path, parsed, lines, site_paths)
+      tops = HtmlCards.tops(path, parsed, [operands, site_paths])
       page = HtmlFile.page(path, lines, cards + tops)
       FileUtils.mkdir_p(File.dirname(out))
       File.write(out, page)

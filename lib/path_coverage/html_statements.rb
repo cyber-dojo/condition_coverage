@@ -11,20 +11,21 @@ module PathCoverage
   module HtmlStatements
     # Example: ship, an if then a value, gives its title row,
     # the column titles, then an if row and a value row.
-    # The card of the def named name at site, its rows' taken as
-    # MethodStatements.taken gives them, last its def's last
-    # line. tree, when given, gives a row's site's tree rows,
-    # folded under its row.
-    def self.card(site, name, rows, taken, last, &)
+    # The card at site drawn from card, as the JSON report lists
+    # it, as WithinMethods.card gives it: its name, its last line
+    # and its rows. tree, when given, gives a row's site's tree
+    # rows, folded under its row.
+    def self.card(site, card, &)
       first, column = site.split(':').last(2)
+      rows = card['rows']
       attrs = [
         %(id="paths-#{first}" data-first="#{first}"),
-        %(data-col="#{column}" data-last="#{last}"),
-        %(data-status="#{status(rows, taken)}" hidden="hidden")
+        %(data-col="#{column}" data-last="#{card['last']}"),
+        %(data-status="#{status(rows)}" hidden="hidden")
       ].join(' ')
-      head = title_row(first, name, rows, taken) + columns_row
+      head = title_row(first, card['name'], rows) + columns_row
       %(<div class="#{GRID}" #{attrs}>) +
-        %(#{head}#{body(rows, taken, &)}</div>)
+        %(#{head}#{body(rows, &)}</div>)
     end
 
     # The classes of every card.
@@ -33,42 +34,43 @@ module PathCoverage
     # Example: FEE = (a ? 1 : 0) + (b ? 2 : 0) on line 1, scope
     # file, gives a card titled file, a ?: row each.
     # The card of the sites at the top level whose lines start at
-    # site, as card gives it, last its lines' last; titled by
-    # scope, eg file or its module, as a method's card is by its
-    # method, and marked top-level, as it is no method's: a class
-    # no other part of the page has, so no style of another's, eg
-    # the header's top line's display, shows it when it is
-    # hidden.
-    def self.top_card(site, scope, rows, taken, last, &)
-      card(site, scope, rows, taken, last, &)
+    # site, drawn from card as card draws a def's, its name its
+    # scope, eg file or its module, as a method's card is named
+    # by its method, its last its lines' last; and marked
+    # top-level, as it is no method's: a class no other part of
+    # the page has, so no style of another's, eg the header's top
+    # line's display, shows it when it is hidden.
+    def self.top_card(site, card, &)
+      card(site, card, &)
         .sub(%(class="#{GRID}"), %(class="#{GRID} top-level"))
     end
 
-    # Each statement's row, a site's with the rows tree gives
-    # for that site folded under it.
-    def self.body(rows, taken, &tree)
-      rows.zip(taken).map do |row, count|
-        site = row.site
+    # Each row's, a site's with the rows tree gives for that site
+    # folded under it; rows as the JSON report lists a card's.
+    def self.body(rows, &tree)
+      rows.map do |row|
+        site = row['site']
         folded = tree&.call(site) if site
-        row_of(row, count, folds: !folded.nil?) + fold(row, folded)
+        row_of(row, folds: !folded.nil?) + fold(site, folded)
       end.join
     end
 
     # covered when every row's taken is known and is all of its
     # paths; gaps otherwise, as a row not known may have one.
-    def self.status(rows, taken)
-      done = rows.zip(taken).all? { |row, count| count == row.paths }
+    def self.status(rows)
+      done = rows.all? { |row| row['taken'] == row['paths'] }
       done ? 'covered' : 'gaps'
     end
 
     # The row level with the def: its name, *complexity, then
     # how many of its paths were not taken, those of rows not
     # known among them, and how many were.
-    def self.title_row(first, name, rows, taken)
-      seen = taken.compact.sum
+    def self.title_row(first, name, rows)
+      seen = rows.map { _1['taken'] }.compact.sum
+      paths = rows.map { _1['paths'] }
       cells = [
-        "*#{MethodStatements.complexity(rows)}",
-        (MethodStatements.size(rows) - seen).to_s, seen.to_s
+        "*#{MethodStatements.complexity(paths)}",
+        (MethodStatements.size(paths) - seen).to_s, seen.to_s
       ]
       attrs = %(class="prow calls" data-line="#{first}")
       row(attrs, CGI.escapeHTML(name.to_s), cells)
@@ -80,28 +82,29 @@ module PathCoverage
       row('class="prow columns"', 'line:col', cells)
     end
 
-    # One statement's row: its line:column, the column two
-    # digits so they line up, its top, how many of its paths
-    # were not taken, and how many were, ? for both when not
-    # known. A site's row is marked as one, so a click on it can
-    # open its tree; when it folds a tree, its arrow, left of its
+    # One statement's row, as the JSON report lists it: its
+    # line:column, its at, its top, how many of its paths were
+    # not taken, and how many were, ? for both when not known. A
+    # site's row is marked as one, so a click on it can open its
+    # tree; when it folds a tree, its arrow, left of its
     # line:column, shows whether the fold is open.
-    def self.row_of(statement, count, folds: false)
-      counts = count ? [statement.paths - count, count] : %w[? ?]
-      cells = [top(statement), *counts.map(&:to_s)]
-      css = statement.site ? 'prow site' : 'prow'
-      attrs = %(class="#{css}" data-line="#{statement.line}")
-      lead = folds ? arrow(statement) : ''
-      row(attrs, label(statement), cells, lead)
+    def self.row_of(row, folds: false)
+      count = row['taken']
+      counts = count ? [row['paths'] - count, count] : %w[? ?]
+      cells = [top(row['top']), *counts.map(&:to_s)]
+      css = row['site'] ? 'prow site' : 'prow'
+      at = row['at']
+      attrs = %(class="#{css}" data-line="#{Integer(at[/\d+/])}")
+      lead = folds ? arrow(at) : ''
+      row(attrs, at, cells, lead)
     end
 
     # Example: if, a site's top, as <span class="k">if</span>.
-    # statement's top, coloured as the code pane colours the
+    # A row's top, text, coloured as the code pane colours the
     # code it quotes, eg if, def and return as keywords; but
     # value and (), which name kinds of statement and quote no
     # code, escaped and plain.
-    def self.top(statement)
-      text = statement.top
+    def self.top(text)
       return CGI.escapeHTML(text) if KINDS.include?(text)
 
       HtmlSyntax.fragment(text)
@@ -110,14 +113,14 @@ module PathCoverage
     # The tops that name a kind of statement, quoting no code.
     KINDS = %w[value ()].freeze
 
-    # The arrow left of a row's line:column, its glyph, as
-    # style.css draws it, pointing down while its fold is shut
+    # The arrow left of the line:column at of a row, its glyph,
+    # as style.css draws it, pointing down while its fold is shut
     # and up while it is open.
-    def self.arrow(statement)
+    def self.arrow(at)
       [
         '<button type="button" class="fold-arrow"',
         ' aria-expanded="false"',
-        %( aria-label="Paths of #{label(statement)}"></button>)
+        %( aria-label="Paths of #{at}"></button>)
       ].join
     end
 
@@ -129,14 +132,14 @@ module PathCoverage
              line: statement.line, column: statement.column)
     end
 
-    # The fold under statement's row, hidden until the row is
-    # clicked: tree, its site's rows as its tree draws them.
-    # Empty for a row with no tree.
-    def self.fold(statement, tree)
+    # The fold under the row of site, hidden until the row is
+    # clicked: tree, site's rows as its tree draws them. Empty
+    # for a row with no tree.
+    def self.fold(site, tree)
       return '' unless tree
 
       [
-        %(<div class="fold" data-site="#{statement.site}"),
+        %(<div class="fold" data-site="#{site}"),
         ' hidden="hidden"><div class="site" data-site="">',
         tree, '</div></div>'
       ].join

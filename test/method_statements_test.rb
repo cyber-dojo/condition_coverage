@@ -176,10 +176,10 @@ class MethodStatementsTest < TidTest
         total
       end
     RUBY
-    rows = statements(source)['k.rb:1:0']
+    paths = statements(source)['k.rb:1:0'].map(&:paths)
     assert_equal [10, 16], [
-      PathCoverage::MethodStatements.size(rows),
-      PathCoverage::MethodStatements.complexity(rows)
+      PathCoverage::MethodStatements.size(paths),
+      PathCoverage::MethodStatements.complexity(paths)
     ]
   end
 
