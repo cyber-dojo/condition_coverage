@@ -32,7 +32,10 @@ mkdir -p "${ROOT_DIR}/site"
 
 # site/ is emptied from inside the container, the side that writes
 # it: emptied on the host, the bind mount can then fail to write it.
+# The container runs as the host user who owns site/, eg the CI
+# runner, so it can write there; still not as root.
 docker run --rm \
+  --user "$(id -u):$(id -g)" \
   --volume "${ROOT_DIR}:/gem:ro" \
   --volume "${ROOT_DIR}/site:/site" \
   --env COVERAGE_DIR=/site \

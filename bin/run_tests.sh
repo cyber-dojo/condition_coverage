@@ -64,9 +64,12 @@ SelfCoverage.unhook
 
 mkdir -p "${ROOT_DIR}/reports"
 
+# The container runs as the host user who owns reports/, eg a CI
+# runner, so it can write there; still not as root.
 run_in_image()
 {
   docker run --rm \
+    --user "$(id -u):$(id -g)" \
     --volume "${ROOT_DIR}:/gem:ro" \
     --volume "${ROOT_DIR}/reports:/reports" \
     --env RUBYOPT='-W2 --enable-frozen-string-literal' \
