@@ -259,10 +259,14 @@ body[data-open] button.lnum:focus-visible { outline: none; }
 }
 .operator { font-weight: 600; }
 .row .arm { white-space: pre; font-weight: 600; }
-/* An if's then names its arm, quoting no code, so is italic. */
-.row .arm[data-named] { font-style: italic; }
 .branch { white-space: pre; color: var(--muted); margin-right: -16px; }
-.row .text { white-space: pre; }
+/* A leaf's text is never wider than 48ch, nor than its row has
+   room for: the rest of a long one scrolls within it, so its
+   cells stay in their columns at the row's right edge. */
+.row .text {
+  white-space: pre; min-width: 0; max-width: 48ch;
+  overflow-x: auto; scrollbar-width: thin;
+}
 /* A branch's cell, of the kind its data-bx names, drawn a whole
    row tall so branches join from row to row: v a vertical line,
    t a vertical with a stub right, l the top half of a vertical
@@ -436,6 +440,8 @@ body.dragging { cursor: col-resize; user-select: none; }
    fold's row marks the characters of its operand. */
 .src.lit { background: var(--cond-tint); }
 mark.chars { background: var(--lit); color: inherit; border-radius: 3px; box-shadow: 0 0 0 2px var(--lit); }
+/* The fold row of the code under the pointer, lit as marked code is. */
+.fold .row.hovered { background: var(--lit); border-radius: 3px; }
 .fold .row[data-at] { cursor: default; }
 .fold .row[data-at]:hover { background: rgba(255, 255, 255, 0.08); }
 

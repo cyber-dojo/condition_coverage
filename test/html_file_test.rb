@@ -254,8 +254,10 @@ class HtmlFileTest < TidTest
   end
 
   test 'gae533', %w(
-  | an if's arms are named then and else, as their text is
-  | statements, and each marks the paths that took it
+  | Example: if x == a && y == b alpha else beta end
+  | An if's fold shows its predicate's leaves, but no row for
+  | its arms: which arm a path takes follows from those leaves,
+  | and the code in an arm is a card row of its own.
   ) do
     both = {
       operator: '&&', cells: [false, true, false],
@@ -285,21 +287,14 @@ class HtmlFileTest < TidTest
     }
     tree = tree_of(trees[1])
 
-    rows = tree.elements.to_a('.//*[@data-arm]')
-    actual = rows.map do |row|
-      cells = row.elements.to_a('*[@data-cell]').map { cell_of(_1) }
-      [text_of(row.elements['*[@data-label]']), *cells]
-    end
-    expected = [
-      ['then', '', 'taken', ''],
-      ['else', 'taken', '', 'taken']
-    ]
-    assert_equal expected, actual
+    assert_equal [], tree.elements.to_a('.//*[@data-arm]')
+    texts = tree.elements.to_a('.//*[@data-operand]/*[@data-text]')
+    assert_equal(['x == a', 'y == b'], texts.map { text_of(_1) })
   end
 
   test 'gae547', %w(
   | Example: unless x alpha end
-  | The arm's row is labelled then, as for an if.
+  | Its fold has no row for its arm, as for an if.
   ) do
     trees = {
       1 => [
@@ -317,35 +312,32 @@ class HtmlFileTest < TidTest
     }
     tree = tree_of(trees[1])
 
-    labels = tree.elements.to_a('.//*[@data-arm]/*[@data-label]')
-    assert_equal(['then'], labels.map { |label| text_of(label) })
+    assert_equal [], tree.elements.to_a('.//*[@data-arm]')
   end
 
   test 'gae566', %w(
-  | Example: if x alpha else beta end, then x ? :a : :b
-  | The if's then names its first arm, quoting no code.
-  | So its label is marked as a name, to be told apart.
-  | Its else, and the ternary's arm labels, quote code, so are not.
+  | Example: x ? :a : :b
+  | A ?:'s fold keeps a row for each arm, ? and :, as its arms
+  | are part of its one expression, each marking the paths that
+  | took it.
   ) do
-    arms = lambda do |texts|
-      %i[then else].zip(texts, [[true, false], [false, true]])
-                   .map do |arm, text, cells|
-        { arm:, text:, cells:, body: nil }
-      end
+    trees = {
+      1 => [{ operator: '?:', counts: [0, 1], cells: [nil, nil],
+              operands: [
+                { text: 'x', cells: [true, false] },
+                { arm: :then, text: ':a', cells: [true, false],
+                  body: nil },
+                { arm: :else, text: ':b', cells: [false, true],
+                  body: nil }
+              ] }]
+    }
+    rows = tree_of(trees[1]).elements.to_a('.//*[@data-arm]')
+    actual = rows.map do |row|
+      cells = row.elements.to_a('*[@data-cell]').map { cell_of(_1) }
+      [text_of(row.elements['*[@data-label]']), *cells]
     end
-    tree = lambda do |operator, texts|
-      [{ operator:, counts: [0, 1], cells: [nil, nil],
-         operands: [{ text: 'x', cells: [true, false] },
-                    *arms.call(texts)] }]
-    end
-    trees = { 1 => tree.call('if', %w(alpha beta)),
-              2 => tree.call('?:', %w(:a :b)) }
-    named = lambda do |line|
-      labels = tree_of(trees[line]).elements.to_a('.//*[@data-label]')
-      labels.map { |label| label.attributes['data-named'] }
-    end
-    actual = [named.call(1), named.call(2)]
-    assert_equal [['', nil], [nil, nil]], actual
+    expected = [['? :a', 'taken', ''], [': :b', '', 'taken']]
+    assert_equal expected, actual
   end
 
   test 'gae567', %w(
@@ -372,10 +364,9 @@ class HtmlFileTest < TidTest
 
   test 'gae548', %w(
   | Example: case x when 1 then :small else :other end
-  | The arms' rows are labelled when and else.
-  | The when row shows whether it matched on each path: T F.
-  | The else row shows a tick on the path that took it.
-  | The when's pattern (1) has a row below it.
+  | Its fold has no row for its arms, as for an if; but each
+  | when's patterns are leaves of the case, so the when shows,
+  | whether it matched on each path, T F, its pattern 1 below.
   ) do
     small = {
       operator: 'when', cells: [true, false],
@@ -400,12 +391,10 @@ class HtmlFileTest < TidTest
     }
     tree = tree_of(trees[1])
 
-    rows = tree.elements.to_a('.//*[@data-arm]')
-    actual = rows.map do |row|
-      cells = row.elements.to_a('*[@data-cell]').map { cell_of(_1) }
-      [text_of(row.elements['*[@data-label]']), *cells]
-    end
-    assert_equal [%w(when T F), ['else', '', 'taken']], actual
+    assert_equal [], tree.elements.to_a('.//*[@data-arm]')
+    matched = tree.elements['.//*[@data-subtree]']
+    cells = matched.elements.to_a('*[@data-cell]').map { cell_of(_1) }
+    assert_equal %w(T F), cells
     texts = tree.elements.to_a('.//*[@data-operand]/*[@data-text]')
     assert_equal(['1'], texts.map { |text| text_of(text) })
   end
@@ -729,8 +718,8 @@ class HtmlFileTest < TidTest
   | Example: store[key] ||= key.upcase, its target true on one
   | path and false on the other
   | The target, store[key], has a row showing T then F.
-  | The right side's row is labelled ||= key.upcase.
-  | It marks the path that ran it, the target false.
+  | The right side has no row, as an if's arm has none: it runs
+  | exactly where the target is false.
   ) do
     trees = {
       1 => [
@@ -751,10 +740,7 @@ class HtmlFileTest < TidTest
     target = tree.elements['.//*[@data-operand]']
     cells = target.elements.to_a('*[@data-cell]').map { text_of(_1) }
     assert_equal %w(T F), cells
-    arm = tree.elements['.//*[@data-arm]']
-    label = text_of(arm.elements['*[@data-label]'])
-    taken = arm.elements.to_a('*[@data-cell]').map { cell_of(_1) }
-    assert_equal ['||= key.upcase', ['', 'taken']], [label, taken]
+    assert_equal [], tree.elements.to_a('.//*[@data-arm]')
   end
 
   test 'gae570', %w(

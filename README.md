@@ -57,6 +57,9 @@ Clicking a row's `▼` opens it:
   - the symbols in a column line up with the tree's rows, and
     are explained below.
 
+Hovering over code in the open card's method opens the tree holding
+that code, its row lit. A long piece of code scrolls within its row.
+
 ### Boolean: `T` `F`
 
 Many parts of a site, such as `name.size > 2`, are true or false.
@@ -81,15 +84,19 @@ In the second column `dee` was `T`, so because of `||`'s short-circuiting, `dum`
 
 ### Taken: `✓`
 
-An `if` takes one of its arms.
+A `?:` takes one of its arms.
 
-![A file's page: line 2, if paid, its card open to its left](docs/example-taken.png)
+![A file's page: line 2, paid ? 'paid' : 'due', its card open to its left](docs/example-taken.png)
 
-- `✓` marks the column whose path took that "arm"
+- `✓` marks the column whose path goes to that arm
 
-The `paid` row is the `if`'s predicate, `T` or `F`. Below it is one row
-per arm, named `then` and `else`.  The first column, `paid` false, took `else`; the
-second, `paid` true, took `then`.
+The `paid` row is the `?:`'s predicate, `T` or `F`. Below it is one row
+per arm, `? 'paid'` and `: 'due'`. The first column, `paid` false, never
+taken, goes to `: 'due'`; the second, `paid` true, to `? 'paid'`.
+
+An `if`, `unless`, `case` or `||=` shows no arm rows: which arm a path
+takes follows from its predicate, and the code in an arm is a row of
+its own on the card.
 
 ### Navigation: `∅` `●`
 

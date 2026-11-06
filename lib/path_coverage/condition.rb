@@ -2,10 +2,6 @@ module PathCoverage
   # The operators whose predicate picks an arm.
   CHOICES = %w[?: if unless].freeze
 
-  # The choices whose arms are statements, so whose path is
-  # decided by their predicate alone.
-  STATEMENT_CHOICES = %w[if unless].freeze
-
   # The operator of a safe-navigation chain, eg user&.account.
   SAFE = '&.'.freeze
 

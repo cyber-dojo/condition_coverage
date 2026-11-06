@@ -18,10 +18,6 @@ module Cells
 
   # The tick: the arm each path took.
   def self.label(paid)
-    if paid
-      'paid'
-    else
-      'due'
-    end
+    paid ? 'paid' : 'due'
   end
 end

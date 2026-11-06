@@ -68,11 +68,6 @@ module PathCoverage
         end
       end
 
-      # The name of one of its arms: when or else.
-      def self.arm_label(arm, _choice)
-        arm[:arm].to_s
-      end
-
       # Its patterns need pattern calls.
       def self.own_calls?
         true

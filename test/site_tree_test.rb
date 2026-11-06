@@ -321,10 +321,9 @@ class SiteTreeTest < TidTest
   test 'EuNs85', %w(
   | Example: user&.account&.owner as a site of its own
   | Its leaves are its receivers, user and account, as only
-  | they decide its path.
-  | The tree shows owner too, after account, so it reads as
-  | the code does.
-  | owner is called on each path where no receiver was nil.
+  | they decide its path, and its tree shows just those: owner
+  | decides no path, and is called exactly where account is not
+  | nil.
   ) do
     source = "def owner_of(user) = user&.account&.owner\n"
     site = PathCoverage::Manifest.sites(source, 'k.rb').values.first
@@ -333,10 +332,7 @@ class SiteTreeTest < TidTest
     end
     tree = PathCoverage::SiteTree.of(source, site, paths)
     texts = tree[:operands].map { _1[:text] }
-    owner = tree[:operands].last
-    assert_equal %w(user account owner), texts
-    assert_equal [true, [true, false, false]],
-                 [owner[:called], owner[:cells]]
+    assert_equal %w(user account), texts
   end
 
   test 'EuNs86', %w(

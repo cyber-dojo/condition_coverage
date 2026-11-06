@@ -18,8 +18,8 @@ module PathCoverage
       PRESENCE[1] => ['', 'absent', PRESENCE[1]]
     }.freeze
 
-    # [text, mark] of an arm's cell, or of one only called: taken
-    # on a path that took it or called it, else blank.
+    # [text, mark] of a ternary's arm's cell: taken on a path
+    # that took it, else blank.
     TAKEN = { true => ['', 'taken'], false => [''] }.freeze
 
     # The cells of values, each named as names gives it.

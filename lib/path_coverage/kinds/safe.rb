@@ -44,12 +44,9 @@ module PathCoverage
       end
 
       # Its value in each column: false where a receiver was nil,
-      # as the chain then gives nil, else its last leaf's. Only the
-      # chain's end, after its last leaf, can be a node only
-      # called, so it alone is left out.
+      # as the chain then gives nil, else its last leaf's.
       def self.value(_operator, operands)
-        leaves = operands.last[:called] ? operands[0...-1] : operands
-        columns = leaves.map { |operand| operand[:cells] }.transpose
+        columns = operands.map { |operand| operand[:cells] }.transpose
         columns.map do |column|
           column.include?(PRESENCE[1]) ? false : column.last
         end
@@ -106,13 +103,11 @@ module PathCoverage
       # Its leaves' nodes, each after the first showing only what
       # it adds to the one before, eg account after user.
       # A leading &. is left out, as the chain's own row shows it.
-      # Any of the chain after its last leaf follows, eg owner in
-      # user&.account&.owner, as a node of its own.
+      # The chain after its last leaf, eg owner in
+      # user&.account&.owner, has no node: it decides no path, and
+      # is called exactly where that leaf is not nil.
       def self.texted(source, condition, nodes)
-        ranges = condition.operands
-        texted = with_added(source, ranges, nodes)
-        rest = shown(source, ranges.last.end...condition.extent.end)
-        rest.empty? ? texted : [*texted, called(rest, texted.last)]
+        with_added(source, condition.operands, nodes)
       end
 
       # nodes, the nodes of a chain's leaves at ranges, each after
@@ -129,15 +124,6 @@ module PathCoverage
       # The text of source at range, less any leading &.
       def self.shown(source, range)
         source.byteslice(range).delete_prefix('&.')
-      end
-
-      # The node of text, the end of a chain after its last
-      # leaf, eg owner: no leaf, as it decides no path, but marked
-      # called on each path where last, the last leaf, was not
-      # nil.
-      def self.called(text, last)
-        cells = last[:cells].map { |cell| cell == PRESENCE[0] }
-        { text:, called: true, cells: }
       end
 
       # The rows of its leaves, each under the one before, as each

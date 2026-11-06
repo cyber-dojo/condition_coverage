@@ -52,13 +52,9 @@ module PathCoverage
         condition.operands.first
       end
 
-      # The name of one of its arms, of a condition named choice:
-      # then or else for an if or an unless, as its text is
-      # statements; ? or : for a ternary's, then its condition's
-      # operator, or its text for a plain arm.
-      def self.arm_label(arm, choice)
-        return arm[:arm].to_s if STATEMENT_CHOICES.include?(choice)
-
+      # The name of one of a ternary's arms: ? or :, then its
+      # condition's operator, or its text for a plain arm.
+      def self.arm_label(arm)
         mark = arm[:arm] == :then ? '?' : ':'
         body = arm[:body]
         "#{mark} #{body ? body[:operator] : arm[:text]}"

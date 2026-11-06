@@ -33,42 +33,35 @@ module PathCoverage
       own = Kinds.of(condition[:operator]).rows(condition, indent)
       return own if own
 
-      operands = unfolded(condition[:operands])
+      operands = unfolded(shown(condition))
       last = operands.size - 1
       operands.each_with_index.flat_map do |operand, i|
         tip = i == last
         branch = indent + (tip ? HtmlBranch::ELL : HtmlBranch::TEE)
         under = indent + (tip ? HtmlBranch::GAP : HtmlBranch::BAR)
-        node_rows(operand, branch, under, condition[:operator])
+        node_rows(operand, branch, under)
       end
     end
 
-    # The rows of one operand of a condition whose operator is
-    # choice, branching after branch, any operands of its own
-    # indented to under.
-    def self.node_rows(operand, branch, under, choice)
-      if operand.key?(:arm)
-        return arm_rows(operand, branch, under, choice)
-      end
+    # The rows of one operand of a condition, branching after
+    # branch, any operands of its own indented to under.
+    def self.node_rows(operand, branch, under)
+      return arm_rows(operand, branch, under) if operand.key?(:arm)
       return [operand_row(operand, branch)] unless operand[:operator]
 
       [subtree_row(operand, branch), *operand_rows(operand, under)]
     end
 
-    # An arm's row: a ternary's, ? for then and : for else, an
-    # arm holding a condition showing the condition's operator
-    # and value, its operands below, a plain arm its text; an
-    # if's named then or else, as its text is statements; its then
-    # label marked as a name, as no then is written in its code,
-    # where its else is. A plain arm marks the paths taking it.
-    def self.arm_rows(arm, branch, under, choice)
+    # A ternary's arm's row, ? for then and : for else: an arm
+    # holding a condition showing the condition's operator and
+    # value, its operands below; a plain arm its text, marking
+    # the paths taking it.
+    def self.arm_rows(arm, branch, under)
       body = arm[:body]
       values = arm_cells(arm, body)
-      named = STATEMENT_CHOICES.include?(choice) && arm[:arm] == :then
-      text = HtmlLabels.arm(arm, choice, named)
-      flag = named ? ' data-named=""' : ''
+      label = HtmlLabels.arm(arm)
       lead = HtmlBranch.cell(branch) +
-             %(<span class="arm" data-label=""#{flag}>#{text}</span>)
+             %(<span class="arm" data-label="">#{label}</span>)
       row = row(%( data-arm=""#{at(arm)}), lead, values)
       body ? [row, *operand_rows(body, under)] : [row]
     end
@@ -79,6 +72,20 @@ module PathCoverage
       return HtmlCells.of(body[:cells]) if body
 
       HtmlCells.of(arm[:cells], HtmlCells::TAKEN)
+    end
+
+    # The operands of condition a card's fold shows: a ?:'s arms,
+    # as its arms are part of its one expression; for any other,
+    # eg an if, a ||= or a case, no arm, as which arm a path takes
+    # follows from its leaves, but each arm's body, eg a when's
+    # patterns, which are leaves of its own.
+    def self.shown(condition)
+      operands = condition[:operands]
+      return operands if condition[:operator] == '?:'
+
+      operands.flat_map do |operand|
+        operand.key?(:arm) ? [operand[:body]].compact : [operand]
+      end
     end
 
     # operands with each node standing for the nodes its kind
@@ -116,16 +123,12 @@ module PathCoverage
 
     # One operand's row: its branch, text, coloured as the code it
     # is, and its outcome on each path.
-    # An operand that is only called, eg owner at the end of
-    # user&.account&.owner, has a tick on each path that called
-    # it instead.
     def self.operand_row(operand, branch)
       text = HtmlSyntax.fragment(operand[:text].to_s)
       lead = HtmlBranch.cell(branch) +
              %(<span class="text" data-text="">#{text}</span>)
       attrs = %( data-operand=""#{at(operand)})
-      names = operand[:called] ? HtmlCells::TAKEN : HtmlCells::OUTCOMES
-      row(attrs, lead, HtmlCells.of(operand[:cells], names))
+      row(attrs, lead, HtmlCells.of(operand[:cells]))
     end
   end
 end

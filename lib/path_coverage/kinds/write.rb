@@ -14,12 +14,6 @@ module PathCoverage
 
       OPERATORS = WRITES
 
-      # The name of its arm, of a write named choice: the operator
-      # and its right side, eg ||= key.upcase.
-      def self.arm_label(arm, choice)
-        "#{choice} #{arm[:text]}"
-      end
-
       # Its target needs no record call, and its right side a
       # written_at call.
       def self.own_calls?

@@ -1322,9 +1322,10 @@ class KernelTest < TidTest
   test '6rTS55', %w(
   | Example: user&.account&.owner, called with no user, and
   | with a user whose account has an owner
-  | The card shows the chain's rows as user, account, then
-  | owner, so they read as the code does.
-  | owner is ticked on the one path that called it.
+  | The card shows the chain's rows as user, then account, so
+  | they read as the code does.
+  | owner has no row: it decides no path, and is called exactly
+  | where account is not nil.
   ) do |t|
     t.write(<<~RUBY, 'owner.rb')
       module Owner
@@ -1342,9 +1343,7 @@ class KernelTest < TidTest
     tree = fold_at(page, 'owner.rb:2')
     rows = tree.elements.to_a('.//*[@data-operand]')
     texts = rows.map { text_of(_1.elements['*[@data-text]']) }
-    assert_equal %w(user account owner), texts
-    cells = rows.last.elements.to_a('*[@data-cell]')
-    assert_includes cells.map { cell_of(_1) }, 'taken'
+    assert_equal %w(user account), texts
   end
 
   test '6rTS6a', %w(
@@ -1416,8 +1415,8 @@ class KernelTest < TidTest
   test '6rTS6c', %w(
   | Example: label, a ternary whose then arm is an && chain,
   | and mark, an if whose then arm holds only a comment
-  | Each arm's row in its tree is located in the source,
-  | data-at, but the empty then arm, as it has no code.
+  | Each arm's row in the ternary's tree is located in the
+  | source, data-at; the if's tree has no arm rows.
   | The && in label's then arm is located too, its operands
   | with it.
   ) do |t|
@@ -1450,7 +1449,7 @@ class KernelTest < TidTest
     end
     assert_equal [true, true], located.call(3, 'data-arm')
     assert_equal [true] * 3, located.call(3, 'data-operand')
-    assert_equal [false, true], located.call(7, 'data-arm')
+    assert_equal [], located.call(7, 'data-arm')
   end
 
   test '6rTS6d', %w(
