@@ -101,27 +101,45 @@ module PathCoverage
       ]
     end
 
-    # One arm of a ternary, statements its code: a condition
-    # folds in as its body, being part of the one expression, as
-    # does a plain arm with sites inside it, its value its last
-    # leaf; a plain arm with none has no body.
+    # One arm of a ternary, statements its code: a ternary is a
+    # site of its own, as an if's arm holding an if is, so the arm
+    # is plain; another condition folds in as its body, being part
+    # of the one expression, as does a plain arm with sites inside
+    # it, its value its last leaf; a plain arm with none has no
+    # body.
     def arm_of(kind, statements)
       written = grouped(statements.body.first)
       extent = extent_of(statements)
-      body = if foldable?(written)
-               condition_of(written)
+      body = if ternary?(written)
+               own_site(statements)
              else
-               inner = collected { statements.accept(self) }
-               inner.empty? ? nil : contained(inner, extent)
+               arm_body(written, statements, extent)
              end
       Arm.new(kind:, extent:, body:)
     end
 
-    # True for a condition that folds into a ternary's site: a
-    # ternary, never ignored, as the ternary it folds into is
-    # not; or an &&, ||, and or or not ignored.
+    # No body, for an arm, statements its code, whose ternary is a
+    # site of its own: visited in a new scope, so it is noted as one.
+    def own_site(statements)
+      scoped { statements.accept(self) }
+      nil
+    end
+
+    # The body of a ternary's arm, statements its code, written its
+    # one expression, extent its byte range: the condition written
+    # is, when it folds; else the sites inside it, contained, nil
+    # for none.
+    def arm_body(written, statements, extent)
+      return condition_of(written) if foldable?(written)
+
+      inner = collected { statements.accept(self) }
+      inner.empty? ? nil : contained(inner, extent)
+    end
+
+    # True for a condition that folds into a ternary's site: an
+    # &&, ||, and or or not ignored.
     def foldable?(node)
-      ternary?(node) || (operator?(node) && !ignored?(node))
+      operator?(node) && !ignored?(node)
     end
 
     # True for a ternary, an if with no if keyword.

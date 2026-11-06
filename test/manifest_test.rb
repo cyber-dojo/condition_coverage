@@ -363,8 +363,9 @@ class ManifestTest < TidTest
 
   test '6asy95', %w(
   | a ternary that is an arm of a ternary, in parentheses,
-  | folds in as that arm's body, so the whole expression is
-  | one site
+  | is a site of its own, the arm holding it a plain arm, as an
+  | if's arm holding an if is: each is a row of its own card,
+  | the card's tree placing the inner in the outer's then arm
   ) do
     source = <<~RUBY
       def k(x, y)
@@ -376,10 +377,10 @@ class ManifestTest < TidTest
       extent: 19...28
     )
     outer = condition(
-      '?:', 14...15, arm(:then, 18...29, inner), arm(:else, 32...33),
+      '?:', 14...15, arm(:then, 18...29), arm(:else, 32...33),
       extent: 14...33
     )
-    expected = { 'k.rb:2:2' => outer }
+    expected = { 'k.rb:2:2' => outer, 'k.rb:2:7' => inner }
     actual = PathCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end

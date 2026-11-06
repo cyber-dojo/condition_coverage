@@ -1664,6 +1664,34 @@ class KernelTest < TidTest
     assert_equal expected, t.json['tree']
   end
 
+  test '6rTS6q', %w(
+  | Example: module Pick holding pick, a ?: of a whose then arm
+  | is a ?: of b, called with a and b true, then with a false
+  | Each ?: is a site, and a row, of its own: the outer took both
+  | its paths, the inner, run only in the outer's then arm, its
+  | then alone; the tree places the inner in that arm.
+  ) do |t|
+    t.write(<<~RUBY)
+      module Pick
+        def self.pick(a, b) = a ? (b ? 1 : 2) : 3
+      end
+    RUBY
+    t.start { report :html }
+    pick = t.load::Pick
+    pick.pick(true, true)
+    pick.pick(false, true)
+    t.report
+    rows = t.json['cards']["#{t.file}:2:2"]['rows'].map do |row|
+      row.values_at('at', 'top', 'paths', 'taken')
+    end
+    assert_equal [['2:24', '?:', 2, 2], ['2:29', '?:', 2, 1]], rows
+    tree = {
+      '2:24' => { 'parent' => nil, 'in' => nil, 'on' => nil },
+      '2:29' => { 'parent' => '2:24', 'in' => 'then', 'on' => [0] }
+    }
+    assert_equal tree, t.json['tree'][t.file]['2:2']
+  end
+
   test '6rTS6m', %w(
   | Example: two starts in one process, eg two tests, each over
   | its own rate.rb, a ?: whose site has the same name in both,
