@@ -122,6 +122,40 @@ class CardTreeTest < TidTest
     assert_equal expected, PathCoverage::CardWays.of(source, 'k.rb')
   end
 
+  test 'Ct8e09', %w(
+  | Example: guard, a return modifier then a ?:; twice, two
+  | return modifiers on one line then a value; early, an if
+  | whose then arm returns, then a ?:; must, a raise unless
+  | modifier then a ?:
+  | A way that returns or raises leaves the method there, so it
+  | goes on to none of the rows after it: each is 3 ways, the
+  | one that leaves early and the 2 that go on, not 2 times 2.
+  ) do
+    source = <<~RUBY
+      def guard(a, b)
+        return 0 if a
+        b ? 1 : 2
+      end
+      def twice(a, b)
+        return 0 if a; return 1 if b
+        2
+      end
+      def early(a, b)
+        if a
+          return 1
+        end
+        b ? 1 : 2
+      end
+      def must(a, b)
+        raise 'no' unless a
+        b ? 1 : 2
+      end
+    RUBY
+    defs = %w(k.rb:1:0 k.rb:5:0 k.rb:9:0 k.rb:15:0)
+    expected = defs.to_h { [_1, 3] }
+    assert_equal expected, PathCoverage::CardWays.of(source, 'k.rb')
+  end
+
   test 'Ct8e07', %w(
   | Example: led?, an || of an any? and xs.empty?
   | The || starts where the any?'s receiver, xs, does, yet it is

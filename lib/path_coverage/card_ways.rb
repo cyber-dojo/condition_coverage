@@ -5,16 +5,19 @@ require_relative 'site_paths'
 
 module PathCoverage
   # The number of ways one call can go through each card, folded
-  # over its tree, as CardTree places its rows: rows one after
-  # another multiply, as each way through one goes on to each way
-  # through the next; a site adds up its paths, each times the
-  # ways of the rows it runs on that path; and a row that is the
-  # whole of a leaf counts only those of its paths that give the
-  # leaf the outcome the path has, so no impossible way is
-  # counted where gives knows it. A block's body counts once.
+  # over its tree, as CardTree places its rows. Each row gives a
+  # pair, [ways that go on, ways that leave the method]: a return
+  # or a raise leaves, and so does each path of a site taking an
+  # arm that returns or raises, eg return 0 if a. Rows one after
+  # another multiply, but only the ways that go on reach the next
+  # row; a site adds up its paths, each with the rows it runs on
+  # that path one after another; and a row that is the whole of a
+  # leaf counts only those of its paths that give the leaf the
+  # outcome the path has, so no impossible way is counted where
+  # gives knows it. A block's body counts once.
   class CardWays
-    # Example: { "k.rb:1:0" => 4 } for def f(a, b), an if of a
-    # whose then arm is a ?: of an &&, and whose else is a value.
+    # Example: { "k.rb:1:0" => 3 } for def f(a, b), return 0 if a,
+    # then a ?: of b: 1 way leaves, 2 go on.
     # { def site => its ways } for each def in source, its sites
     # those of no settings.
     def self.of(source, path)
@@ -27,62 +30,118 @@ module PathCoverage
     # { site => Condition }, as Manifest.sites gives them.
     def self.card(source, sites, rows)
       places = CardTree.nested(source, sites, rows)
-      new(rows, places, sites).total
+      new(source, rows, places, sites).total
     end
 
-    # The fold of rows, a card's, placed as places has them, each
-    # site row's Condition among sites.
-    def initialize(rows, places, sites)
+    # The tops of rows that leave the method.
+    LEAVING = %w[return raise].freeze
+
+    # An arm that leaves the method, by its code's start.
+    LEAVES = /\A(?:return|raise)\b/
+
+    # The pair of rows one after another, from their pairs: the
+    # ways that go on through them all, and those that leave at
+    # one of them, having gone on through every one before it.
+    def self.sequence(pairs)
+      pairs.reduce([1, 0]) do |(on, left), (more, leaving)|
+        [on * more, left + (on * leaving)]
+      end
+    end
+
+    # The fold of rows, a card's in source, placed as places has
+    # them, each site row's Condition among sites.
+    def initialize(source, rows, places, sites)
+      @source = source
       @rows = rows.to_h { |row| [CardTree.key_of(row), row] }
       @places = places
       @sites = sites
       @children = places.keys.group_by { places[_1]['parent'] }
     end
 
-    # The ways through the card: its top rows' multiplied.
+    # The ways through the card: its top rows' pairs, one after
+    # another, those that go on and those that leave.
     def total
-      tops = @children.fetch(nil, [])
-      tops.map { |key| ways_of(key) }.reduce(1, :*)
+      tops = @children.fetch(nil, []).map { |key| pair_of(key) }
+      CardWays.sequence(tops).sum
     end
 
-    # The ways through the row keyed key: 1 for a row that is no
-    # site; for a site, its paths' ways added up.
-    def ways_of(key)
-      site = @rows[key].site
-      return 1 unless site
+    # The pair of the row keyed key: a return's or a raise's
+    # leaves, any other row that is no site goes on; a site's adds
+    # up its paths' pairs.
+    def pair_of(key)
+      row = @rows[key]
+      return plain(row) unless row.site
 
-      possible(site).each_index.sum { |path| ways_on(key, path) }
+      pairs = possible(row.site).each_index.map do |path|
+        pair_on(key, path)
+      end
+      added(pairs)
     end
 
-    # The ways through the site row keyed key on its path at
-    # index path: the ways of the rows it runs on that path,
-    # multiplied, each given that path's outcomes.
-    def ways_on(key, path)
-      site = @rows[key].site
-      outcomes = possible(site)[path]
-      running = @children.fetch(key, []).group_by do |child|
+    # The pair of row, no site: leaving for a return or a raise,
+    # else going on.
+    def plain(row)
+      LEAVING.include?(row.top) ? [0, 1] : [1, 0]
+    end
+
+    # The pair of the site row keyed key on its path at index
+    # path: the rows it runs on that path, one after another, each
+    # given that path's outcomes; every way of it leaving when the
+    # path takes an arm that leaves.
+    def pair_on(key, path)
+      outcomes = possible(@rows[key].site)[path]
+      pairs = running(key, path).map do |child|
+        child_pair(child, outcomes)
+      end
+      pair = CardWays.sequence(pairs)
+      leaving(key).include?(path) ? [0, pair.sum] : pair
+    end
+
+    # The keys of the rows the site row keyed key runs on its path
+    # at index path, in the order they are written.
+    def running(key, path)
+      runs = @children.fetch(key, []).group_by do |child|
         @places[child]['on'].include?(path)
       end
-      ways = running.fetch(true, []).map do |child|
-        child_ways(child, outcomes)
-      end
-      ways.reduce(1, :*)
+      runs.fetch(true, [])
     end
 
-    # The ways through the row keyed child, its parent's path
-    # having outcomes: all of them, for a row that gives nothing;
-    # else only those of its paths that give its leaf the outcome
-    # that path has, or that give what is not known.
-    def child_ways(child, outcomes)
+    # The pair of the row keyed child, its parent's path having
+    # outcomes: all of its own, for a row that gives nothing; else
+    # those of only its paths that give its leaf the outcome that
+    # path has, or that give what is not known.
+    def child_pair(child, outcomes)
       place = @places[child]
       gives = place['gives']
-      return ways_of(child) if gives.nil?
+      return pair_of(child) if gives.nil?
 
-      outcome = outcomes[place['leaf']]
-      fits = [nil, outcome]
-      gives.each_index.sum do |path|
-        fits.include?(gives[path]) ? ways_on(child, path) : 0
+      fits = [nil, outcome_of(outcomes, place)]
+      pairs = gives.each_index.map do |path|
+        fits.include?(gives[path]) ? pair_on(child, path) : [0, 0]
       end
+      added(pairs)
+    end
+
+    # The outcome on a parent's path, outcomes, of the leaf place
+    # names.
+    def outcome_of(outcomes, place)
+      outcomes[place['leaf']]
+    end
+
+    # The indices of the paths of the site row keyed key that take
+    # an arm whose code returns or raises.
+    def leaving(key)
+      site = @sites.fetch(@rows[key].site)
+      regions = CardTree.regions_of(@source, key, site)
+      left = regions.group_by do |region|
+        region.arm && @source.byteslice(region.range).match?(LEAVES)
+      end
+      left.fetch(true, []).flat_map(&:on)
+    end
+
+    # pairs added up, each part on its own.
+    def added(pairs)
+      pairs.reduce([0, 0]) { |(a, b), (c, d)| [a + c, b + d] }
     end
 
     # The possible paths of the site named site.
