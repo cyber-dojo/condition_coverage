@@ -21,16 +21,17 @@ class ProjectsTest < TidTest
   test '4WXv20', %w(
   | Example: the nested_conditions project's kata.rb
   | It has || sites, chains, and nested and grouped conditions.
-  | It has an any? folded into an ||, with a site inside its
-  | block, a new scope.
+  | It has an any? wholly an operand of an ||, so a site of its
+  | own, with a site inside its block, a new scope.
   | It has an and whose operand is a command call.
   | All of them run unchanged when instrumented.
   | Their paths never taken are listed in source order.
   ) do |t|
     stdout, stderr, status = run_project('nested_conditions', t.dir)
     never = 'path never taken:'
-    any = "source/kata.rb:17:4 #{never} `ids`"
+    any = "source/kata.rb:17:8 #{never} `ids`"
     block = '`ok?(id) && id.size == 2`'
+    call = '`ids.any? { |id| ok?(id) && id.size == 2 }`'
     expected = [
       "source/kata.rb:5:4 #{never} " \
       "`id.start_with?('N')` false, `id.size == 6` false",
@@ -42,12 +43,11 @@ class ProjectsTest < TidTest
       "`id.start_with?('G')` false, `id.end_with?('G')` true",
       "source/kata.rb:13:4 #{never} `ok?(id)` true, " \
       "`id.start_with?('G')` false, `id.end_with?('G')` false",
-      "#{any} 0 items, `ids.empty?` false",
-      "#{any} 1 item, #{block} false, `ids.empty?` true",
-      "#{any} 1 item, #{block} false, `ids.empty?` false",
+      "source/kata.rb:17:4 #{never} " \
+      "#{call} false, `ids.empty?` false",
+      "#{any} 1 item, #{block} false",
       "#{any} 2+ items, #{block} true",
-      "#{any} 2+ items, #{block} false, `ids.empty?` true",
-      "#{any} 2+ items, #{block} false, `ids.empty?` false",
+      "#{any} 2+ items, #{block} false",
       "source/kata.rb:17:20 #{never} " \
       '`ok?(id)` true, `id.size == 2` false',
       "source/kata.rb:17:20 #{never} `ok?(id)` false",

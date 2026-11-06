@@ -747,12 +747,12 @@ class KernelTest < TidTest
   test '6rTS5e', %w(
   | Example: ids.select { |id| id.odd? }.any? &&
   | ids.all? { |id| id > 0 }
-  | Both block calls fold into the && site, as one expression.
-  | The select sits inside the leaf ids.select { ... }.any?, so
-  | the card shows the select's rows, headed select {, then
-  | the leaf's own row, }.any?, so they read as the code does.
-  | The all? is the &&'s operand itself, so the card shows it
-  | as a nested condition, its value following from its path.
+  | The select sits inside the leaf ids.select { ... }.any?, and
+  | folds into the && site: its fold shows the select's rows,
+  | headed select {, then the leaf's own row, }.any?, so they
+  | read as the code does.
+  | The all? is the &&'s operand itself, so it is a site of its
+  | own, the &&'s fold showing it as one leaf.
   ) do |t|
     t.write(<<~RUBY, 'both_html.rb')
       module Both
@@ -770,10 +770,11 @@ class KernelTest < TidTest
     page = File.read("#{t.dir}/files/both_html.rb.html")
     tree = fold_at(page, 'both_html.rb:3')
     operators = tree.elements.to_a('.//*[@data-operator]')
-    expected = ['&&', 'select {', 'all?']
+    expected = ['&&', 'select {']
     assert_equal(expected, operators.map { text_of(_1) })
     texts = tree.elements.to_a('.//*[@data-operand]/*[@data-text]')
-    expected = ['ids', 'id.odd?', '}.any?', 'ids', 'id > 0']
+    all = 'ids.all? { |id| id > 0 }'
+    expected = ['ids', 'id.odd?', '}.any?', all]
     assert_equal(expected, texts.map { text_of(_1) })
   end
 
@@ -1075,12 +1076,14 @@ class KernelTest < TidTest
 
   test '6rTS4d', %w(
   | Example: if ids.any? { |id| id.start_with?('L') && id.size > 1 }
-  | There are two sites: the if, with the any? folded into its
-  | predicate, and the && in the block, a new scope.
+  | There are three sites: the if, its predicate wholly the any?,
+  | the any?, a site of its own, and the && in the block, a new
+  | scope.
   | led? is called with [], ['Lx'], and ['ab', 'cd'].
   | It still returns :not, :led, :not.
   | The exit report prints the paths each site never took.
-  | Eg the if never had `ids` 1 item with the block false.
+  | Eg the any? never had `ids` 1 item with the block false; the
+  | if took both its arms.
   ) do |t|
     t.write(<<~RUBY, 'led.rb')
       module Team
@@ -1099,8 +1102,8 @@ class KernelTest < TidTest
     assert_equal %i[not led not], led
     block = "`id.start_with?('L') && id.size > 1`"
     expected = [
-      "led.rb:3:4 path never taken: `ids` 1 item, #{block} false",
-      "led.rb:3:4 path never taken: `ids` 2+ items, #{block} true",
+      "led.rb:3:11 path never taken: `ids` 1 item, #{block} false",
+      "led.rb:3:11 path never taken: `ids` 2+ items, #{block} true",
       'led.rb:3:23 path never taken: ' \
       "`id.start_with?('L')` true, `id.size > 1` false"
     ].join("\n")
@@ -1630,15 +1633,10 @@ class KernelTest < TidTest
     t.start { report :html }
     t.load::Fee.fee(false, true)
     t.report
-    expected = {
-      t.file => {
-        '2:2' => {
-          '3:4' => { 'parent' => nil, 'in' => nil, 'on' => nil },
-          '4:6' => { 'parent' => '3:4', 'in' => 'then', 'on' => [0] }
-        }
-      }
-    }
-    assert_equal expected, t.json['tree']
+    top = PathCoverage::CardTree::TOP
+    inner = { 'parent' => '3:4', 'in' => 'then', 'on' => [0] }
+    card = { '3:4' => top, '4:6' => top.merge(inner) }
+    assert_equal({ t.file => { '2:2' => card } }, t.json['tree'])
   end
 
   test '6rTS6p', %w(
@@ -1654,13 +1652,8 @@ class KernelTest < TidTest
     t.start { report :html }
     t.load('rate.rb')
     t.report
-    expected = {
-      'rate.rb' => {
-        '2:0' => {
-          '2:9' => { 'parent' => nil, 'in' => nil, 'on' => nil }
-        }
-      }
-    }
+    top = PathCoverage::CardTree::TOP
+    expected = { 'rate.rb' => { '2:0' => { '2:9' => top } } }
     assert_equal expected, t.json['tree']
   end
 
@@ -1685,10 +1678,9 @@ class KernelTest < TidTest
       row.values_at('at', 'top', 'paths', 'taken')
     end
     assert_equal [['2:24', '?:', 2, 2], ['2:29', '?:', 2, 1]], rows
-    tree = {
-      '2:24' => { 'parent' => nil, 'in' => nil, 'on' => nil },
-      '2:29' => { 'parent' => '2:24', 'in' => 'then', 'on' => [0] }
-    }
+    top = PathCoverage::CardTree::TOP
+    inner = { 'parent' => '2:24', 'in' => 'then', 'on' => [0] }
+    tree = { '2:24' => top, '2:29' => top.merge(inner) }
     assert_equal tree, t.json['tree'][t.file]['2:2']
   end
 

@@ -11,21 +11,29 @@ module PathCoverage
   module CardTree
     # Part of a site's code that a row can be inside: an arm of
     # statements, or a leaf; owner the key of the site's row,
-    # range its bytes, arm its arm's name, nil for a leaf, and on
-    # the indices of the site's possible paths that run it.
-    Region = Data.define(:owner, :range, :arm, :on)
+    # range its bytes, arm its arm's name, nil for a leaf, on
+    # the indices of the site's possible paths that run it, and
+    # leaf a leaf's index among the site's leaves, nil for an arm.
+    Region = Data.define(:owner, :range, :arm, :on, :leaf)
 
     # The place of a row inside no other row's site.
-    TOP = { 'parent' => nil, 'in' => nil, 'on' => nil }.freeze
+    TOP = {
+      'parent' => nil, 'in' => nil, 'on' => nil,
+      'leaf' => nil, 'gives' => nil
+    }.freeze
 
     # Example: def f(a); if a then 1 end; end gives the value
     # row 1 its parent, the if, in its then arm, on its path 0.
     # { def site => { "line:column" => { 'parent' =>, 'in' =>,
-    # 'on' => } } } for each def in source, a row keyed by where
-    # it is named. parent is the "line:column" of the site the
-    # row runs inside, in the name of its arm, on the indices of
-    # that site's possible paths, as SitePaths.possible orders
-    # them, that run the row; each nil for a row at the top.
+    # 'on' =>, 'leaf' =>, 'gives' => } } } for each def in
+    # source, a row keyed by where it is named. parent is the
+    # "line:column" of the site the row runs inside, in the name
+    # of its arm, on the indices of that site's possible paths,
+    # as SitePaths.possible orders them, that run the row, leaf
+    # the index of that site's leaf holding it, and gives, for a
+    # row whose site is the whole of that leaf, the leaf's
+    # outcome on each of the row's own possible paths, nil where
+    # not known; each nil where it does not apply.
     def self.of(source, path, sites = nil)
       sites = Manifest.sites(source, path) if sites.nil?
       cards = MethodStatements.of(source, path, sites)
@@ -34,13 +42,19 @@ module PathCoverage
 
     # { "line:column" => its place } for each of rows, a card's,
     # each placed in the innermost region of another row's site
-    # holding where it starts.
+    # holding all of its own site's code, or, for a row that is
+    # no site, where it starts: a site starting where its child
+    # does, eg an || whose first operand is an any?, holds that
+    # child, and is not held by it.
     def self.nested(source, sites, rows)
       starts = line_starts(source)
       regions = card_regions(source, sites, rows)
       rows.to_h do |row|
+        at = starts[row.line - 1] + row.column
+        site = row.site ? sites.fetch(row.site) : nil
+        span = site ? site.extent : at...(at + 1)
         key = key_of(row)
-        [key, placed(key, starts[row.line - 1] + row.column, regions)]
+        [key, placed(key, span, regions, site)]
       end
     end
 
@@ -52,23 +66,37 @@ module PathCoverage
       end
     end
 
-    # The place of the row keyed key, starting at byte at: in
-    # the site owning the smallest region of another row holding
-    # at, as place gives it; TOP for a row in no such region.
-    def self.placed(key, at, regions)
-      holding = holding(key, at, regions)
+    # The place of the row keyed key, its code the bytes span,
+    # site its Condition, nil for a row that is no site: in the
+    # site owning the smallest region of another row holding
+    # span, as place gives it; TOP for a row in no such region.
+    def self.placed(key, span, regions, site)
+      holding = holding(key, span, regions)
       inner = smallest(holding)
       return TOP if inner.nil?
 
       owner = inner.owner
-      place(owner, holding.group_by(&:owner).fetch(owner))
+      own = holding.group_by(&:owner).fetch(owner)
+      place(owner, own).merge(leaf_place(own, site))
     end
 
-    # The regions of regions holding byte at, but for those of the
-    # row keyed key itself.
-    def self.holding(key, at, regions)
+    # The leaf and gives of a row's place, own being the regions
+    # of its parent holding it, site its Condition: the index of
+    # the innermost leaf holding it; and, when site is the whole
+    # of that leaf, site's value on each of its possible paths,
+    # as its kind gives them, the leaf's outcome there.
+    def self.leaf_place(own, site)
+      leaf = smallest(own.reject(&:arm))
+      whole = leaf && site&.extent == leaf.range
+      gives = whole ? SitePaths.values(site) : nil
+      { 'leaf' => leaf&.leaf, 'gives' => gives }
+    end
+
+    # The regions of regions holding all of the bytes span, but
+    # for those of the row keyed key itself.
+    def self.holding(key, span, regions)
       held = regions.group_by do |region|
-        region.owner != key && region.range.cover?(at)
+        region.owner != key && region.range.cover?(span)
       end
       held.fetch(true, [])
     end
@@ -104,7 +132,8 @@ module PathCoverage
         skipped = possible.each_index.group_by do |i|
           possible[i][index].nil?
         end
-        Region.new(owner:, range:, arm: nil, on: skipped.fetch(false))
+        on = skipped.fetch(false)
+        Region.new(owner:, range:, arm: nil, on:, leaf: index)
       end
     end
 
@@ -132,8 +161,9 @@ module PathCoverage
 
       cells = node[:cells]
       on = cells.each_index.group_by { cells[_1] }.fetch(true, [])
-      name = arm.kind.to_s
-      [Region.new(owner:, range: arm.extent, arm: name, on:), *body]
+      own = Region.new(owner:, range: arm.extent, arm: arm.kind.to_s,
+                       on:, leaf: nil)
+      [own, *body]
     end
 
     # The "line:column" key of row, from its name.

@@ -43,7 +43,10 @@ class FoldMatrixTest < TidTest
   | Example: a && b as the operand of (X) && c, and every other
   | kind of site in every other position
   | One expression is one site, whatever sites nest in it and
-  | wherever they sit.
+  | wherever they sit; but for a block method's call whose value
+  | follows from its path, eg any?, that is wholly an operand,
+  | a predicate, an if's test or a ?:'s arm: it is a site of its
+  | own, so two.
   | The rewritten code returns what the uninstrumented code does.
   | Every path recorded is one of the site's possible paths.
   ) do |t|
@@ -75,10 +78,20 @@ class FoldMatrixTest < TidTest
       ["#{kind} as #{position}", sites.size, same, impossible]
     end
     expected = cases.map do |kind, position, _|
-      ["#{kind} as #{position}", 1, true, []]
+      own = OWN_KINDS.include?(kind) && OWN_PLACES.include?(position)
+      ["#{kind} as #{position}", own ? 2 : 1, true, []]
     end
     assert_equal expected, actual
   end
+
+  # The kinds that are a site of their own when wholly a leaf or
+  # an arm.
+  OWN_KINDS = %w(
+    any? all? none? find_index take_while select
+  ).freeze
+
+  # The positions where an expression is wholly a leaf or an arm.
+  OWN_PLACES = %w(operand predicate if arm).freeze
 
   test 'Fm7k02', %w(
   | Example: a && b as the operand of (X) && c, with && ignored,

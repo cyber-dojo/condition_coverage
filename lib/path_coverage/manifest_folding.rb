@@ -1,4 +1,6 @@
 require_relative 'condition'
+require_relative 'site'
+require_relative 'site_paths'
 
 module PathCoverage
   # The part of the manifest's visitor that folds every site in one
@@ -7,9 +9,43 @@ module PathCoverage
   # Condition of that leaf, rather than noted as a site of its own.
   # A new scope, eg a block's body or an if's arm, stops the
   # collecting, so a site in it is a site of its own. It relies on
-  # its includer's condition_of, chain_condition, safe_chain? and
-  # extent_of.
+  # its includer's condition_of, chain_condition, safe_chain?,
+  # block_site? and extent_of.
   module ManifestFolding
+    # The sites that fold into the leaf operand, as collected
+    # finds them; none for a leaf that is wholly a block method's
+    # call whose value follows from its path, which is visited as
+    # a site of its own, as the leaf's outcome is that value.
+    def leaf_sites(operand)
+      unless valued?(operand)
+        return collected { operand.accept(self) }
+      end
+
+      scoped { operand.accept(self) }
+      []
+    end
+
+    # True for a block method's call that is a site, not ignored,
+    # whose value follows from its path, eg any?, but not find.
+    def valued?(node)
+      node.type == :call_node && block_site?(node) &&
+        VALUED.include?(node.name.to_s) && !ignored?(node)
+    end
+
+    # The one outcome each of a site's values gives a leaf.
+    GIVEN = { [true] => :truthy, [false] => :falsy }.freeze
+
+    # The one outcome the leaf node can have, as the site it wholly
+    # is gives it on every one of its paths, eg :truthy for a
+    # select, whose array is truthy; nil when its paths give both,
+    # or node is no such site.
+    def given_outcome(node)
+      return nil unless valued?(node)
+
+      site = @sites.fetch(Site.at(@path, site_loc(node)))
+      GIVEN[SitePaths.values(site).uniq]
+    end
+
     # node's Condition as a site nested in a leaf: a &. chain's
     # with its value as its last leaf, as its leaf's outcome
     # follows from it.
@@ -43,16 +79,10 @@ module PathCoverage
     # range as a leaf, or, with inner sites found in it, a Condition
     # named contains: those sites, then range, the leaf's outcome,
     # fixed as :nonempty when nonempty. A leaf that is wholly one
-    # block method's call whose value follows from its path is
-    # that call alone, needing no outcome of its own.
+    # block method's call whose value follows from its path never
+    # comes here: it is a site of its own, as leaf_sites has it.
     def contained(inner, range, nonempty: false)
       return range if inner.empty?
-
-      only = inner.first
-      if inner.size == 1 && only.extent == range &&
-         VALUED.include?(only.operator)
-        return only
-      end
 
       fixed = nonempty ? { range => :nonempty } : {}
       Condition.new(operator: CONTAINS, operands: [*inner, range],

@@ -221,11 +221,12 @@ module PathCoverage
       # commands and fixed leaves where it is one; or, when sites
       # that fold are found inside it, the leaf with them nested.
       def leaf(operand)
-        inner = collected { operand.accept(self) }
+        inner = leaf_sites(operand)
         loc = operand.location
         range = loc.start_offset...loc.end_offset
         @notes[:commands] << range if Manifest.command?(operand)
-        outcome = Manifest.fixed_outcome(operand)
+        outcome = Manifest.fixed_outcome(operand) ||
+                  given_outcome(operand)
         @notes[:fixed][range] = outcome if outcome
         nonempty = nonempty_call?(operand, inner)
         contained(inner, range, nonempty:)

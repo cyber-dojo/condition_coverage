@@ -230,40 +230,30 @@ class SitePathsTest < TidTest
 
   test 'Sp3x99', %w(
   | Example: ids.any? { |i| i.odd? } && c
-  | The any? is the &&'s first operand, so its path decides
-  | the &&: true exactly when an answer was true.
-  | So c is only evaluated on any?'s true paths.
+  | The any? is a site of its own, the &&'s first leaf its
+  | value, true or false, so c is evaluated only where that
+  | leaf is true. Which of the any?'s paths give true is its
+  | card tree's gives.
   ) do
     source = "def k(ids, c) = ids.any? { |i| i.odd? } && c\n"
     sites = PathCoverage::Manifest.sites(source, 'k.rb')
-    expected = [
-      ['0 items', nil, nil],
-      ['1 item', true, true], ['1 item', true, false],
-      ['1 item', false, nil],
-      ['2+ items', true, true], ['2+ items', true, false],
-      ['2+ items', false, nil]
-    ]
-    actual = PathCoverage::SitePaths.possible(sites.values.first)
-    assert_equal expected, actual
+    assert_equal %w(k.rb:1:16 k.rb:1:20), sites.keys
+    actual = PathCoverage::SitePaths.possible(sites['k.rb:1:16'])
+    assert_equal [[true, true], [true, false], [false, nil]], actual
   end
 
   test 'Sp3x9a', %w(
   | Example: ids.select { |i| i.odd? }.any? { |i| i > 1 } && c
-  | The leaf holds two sites, the any? the whole of it, so the
-  | leaf's outcome is the any?'s value: true exactly when an
-  | answer was true, and so c is evaluated only then.
+  | The leaf is wholly the any?, a site of its own, as is the
+  | select, its receiver: so three sites, the &&'s first leaf
+  | the any?'s value, and c evaluated only where it is true.
   ) do
     source = 'def k(ids, c) = ' \
              "ids.select { |i| i.odd? }.any? { |i| i > 1 } && c\n"
     sites = PathCoverage::Manifest.sites(source, 'k.rb')
-    paths = PathCoverage::SitePaths.possible(sites.values.first)
-    any = paths.map { |path| path[2..4] }.uniq
-    expected = [
-      ['0 items', nil, false], ['1 item', true, true],
-      ['1 item', false, false], ['2+ items', true, true],
-      ['2+ items', false, false]
-    ]
-    assert_equal expected, any
+    assert_equal %w(k.rb:1:16 k.rb:1:42 k.rb:1:20), sites.keys
+    actual = PathCoverage::SitePaths.possible(sites['k.rb:1:16'])
+    assert_equal [[true, true], [true, false], [false, nil]], actual
   end
 
   test 'Sp3x95', %w(
@@ -318,18 +308,15 @@ class SitePathsTest < TidTest
   | Example: xs.select { |x| x > 1 } || []
   | select always returns an array, which is truthy, however
   | many items it was called with and whatever they answered.
-  | So it is never false, and the [] never runs.
+  | It is a site of its own, and its every path gives the ||'s
+  | leaf true: so that leaf is never false, and the [] never
+  | runs.
   ) do
     source = "def k(xs) = xs.select { |x| x > 1 } || []\n"
     sites = PathCoverage::Manifest.sites(source, 'k.rb')
-    expected = [
-      ['0 items', nil, nil],
-      ['1 item', 'all true', nil], ['1 item', 'all false', nil],
-      ['2+ items', 'all true', nil], ['2+ items', 'all false', nil],
-      ['2+ items', 'both', nil]
-    ]
-    actual = PathCoverage::SitePaths.possible(sites.values.first)
-    assert_equal expected, actual
+    assert_equal %w(k.rb:1:12 k.rb:1:15), sites.keys
+    actual = PathCoverage::SitePaths.possible(sites['k.rb:1:12'])
+    assert_equal [[true, nil]], actual
   end
 
   private

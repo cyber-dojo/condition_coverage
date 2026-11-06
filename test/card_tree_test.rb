@@ -18,14 +18,12 @@ class CardTreeTest < TidTest
       end
     RUBY
     expected = {
-      'k.rb:1:0' => {
-        '2:2' => { 'parent' => nil, 'in' => nil, 'on' => nil },
-        '3:4' => { 'parent' => '2:2', 'in' => 'then', 'on' => [0] },
-        '3:14' => { 'parent' => '3:4', 'in' => 'then', 'on' => [0] },
-        '3:21' => { 'parent' => '3:4', 'in' => 'else', 'on' => [1] }
-      }
+      '2:2' => [nil, nil, nil, nil, nil],
+      '3:4' => ['2:2', 'then', [0], nil, nil],
+      '3:14' => ['3:4', 'then', [0], nil, nil],
+      '3:21' => ['3:4', 'else', [1], nil, nil]
     }
-    assert_equal expected, PathCoverage::CardTree.of(source, 'k.rb')
+    assert_equal expected, places(source)
   end
 
   test 'Ct8e02', %w(
@@ -34,6 +32,9 @@ class CardTreeTest < TidTest
   | each of its parent's paths that evaluate that leaf: the ?:
   | runs only where select called its block with an item, not
   | where a was false, nor where select had 0 items.
+  | It is the whole of its leaf, select's block, so gives what
+  | its paths give it: not known, as neither arm's truthiness
+  | is noted.
   ) do
     source = <<~RUBY
       def kept(xs, a)
@@ -41,14 +42,10 @@ class CardTreeTest < TidTest
       end
     RUBY
     expected = {
-      'k.rb:1:0' => {
-        '2:2' => { 'parent' => nil, 'in' => nil, 'on' => nil },
-        '2:23' => {
-          'parent' => '2:2', 'in' => nil, 'on' => (2..11).to_a
-        }
-      }
+      '2:2' => [nil, nil, nil, nil, nil],
+      '2:23' => ['2:2', nil, (2..11).to_a, 2, [nil, nil]]
     }
-    assert_equal expected, PathCoverage::CardTree.of(source, 'k.rb')
+    assert_equal expected, places(source)
   end
 
   test 'Ct8e03', %w(
@@ -65,12 +62,10 @@ class CardTreeTest < TidTest
       end
     RUBY
     expected = {
-      'k.rb:1:0' => {
-        '2:2' => { 'parent' => nil, 'in' => nil, 'on' => nil },
-        '4:4' => { 'parent' => '2:2', 'in' => 'else', 'on' => [1] }
-      }
+      '2:2' => [nil, nil, nil, nil, nil],
+      '4:4' => ['2:2', 'else', [1], nil, nil]
     }
-    assert_equal expected, PathCoverage::CardTree.of(source, 'k.rb')
+    assert_equal expected, places(source)
   end
 
   test 'Ct8e04', %w(
@@ -87,14 +82,53 @@ class CardTreeTest < TidTest
       end
     RUBY
     expected = {
-      'k.rb:1:0' => {
-        '2:2' => { 'parent' => nil, 'in' => nil, 'on' => nil },
-        '2:26' => {
-          'parent' => '2:2', 'in' => 'then', 'on' => [0, 1]
-        }
-      }
+      '2:2' => [nil, nil, nil, nil, nil],
+      '2:26' => ['2:2', 'then', [0, 1], 2, nil]
     }
-    assert_equal expected, PathCoverage::CardTree.of(source, 'k.rb')
+    assert_equal expected, places(source)
+  end
+
+  test 'Ct8e07', %w(
+  | Example: led?, an || of an any? and xs.empty?
+  | The || starts where the any?'s receiver, xs, does, yet it is
+  | the any?'s parent, not its child: a site is placed where its
+  | whole code lies, not just where it starts.
+  ) do
+    source = <<~RUBY
+      def led?(xs)
+        xs.any? { |x| x.odd? } || xs.empty?
+      end
+    RUBY
+    gives = [false, true, false, true, false]
+    expected = {
+      '2:2' => [nil, nil, nil, nil, nil],
+      '2:5' => ['2:2', nil, [0, 1, 2], 0, gives],
+      '2:16' => ['2:5', nil, [1, 2, 3, 4], 1, nil]
+    }
+    assert_equal expected, places(source)
+  end
+
+  test 'Ct8e06', %w(
+  | Example: odd?, an && of a and an any?
+  | A row in a leaf of its parent names that leaf, by its
+  | index. A row that is the whole of that leaf, as the any? is,
+  | also names what each of its own possible paths gives the
+  | leaf: the any?'s value, false with 0 items, else its last
+  | answer. The any?'s block's row is inside a leaf, not all of
+  | it, so gives nothing.
+  ) do
+    source = <<~RUBY
+      def odd?(a, xs)
+        a && xs.any? { |x| x.odd? }
+      end
+    RUBY
+    gives = [false, true, false, true, false]
+    expected = {
+      '2:2' => [nil, nil, nil, nil, nil],
+      '2:10' => ['2:2', nil, [0, 1], 1, gives],
+      '2:21' => ['2:10', nil, [1, 2, 3, 4], 1, nil]
+    }
+    assert_equal expected, places(source)
   end
 
   test 'Ct8e05', %w(
@@ -103,7 +137,8 @@ class CardTreeTest < TidTest
   | Every row placed in a parent is placed in a row of its own
   | card, on some of that parent's possible paths and on none
   | it does not have: no row hangs from nothing, or runs on no
-  | path at all.
+  | path at all. And no row is its own ancestor: following
+  | parents from any row reaches the top.
   ) do
     root = File.expand_path('..', __dir__)
     globs = %w(lib/**/*.rb test/*.rb demo/source/*.rb)
@@ -116,6 +151,15 @@ class CardTreeTest < TidTest
 
   private
 
+  # [parent, in, on, leaf, gives] of each row of source's one
+  # card, its def's on line 1, as if source were k.rb.
+  def places(source)
+    rows = PathCoverage::CardTree.of(source, 'k.rb')['k.rb:1:0']
+    rows.transform_values do |place|
+      place.values_at('parent', 'in', 'on', 'leaf', 'gives')
+    end
+  end
+
   # The misfits, as misfits gives them, of every card of source,
   # as if it were k.rb.
   def misplaced_in(source)
@@ -123,8 +167,18 @@ class CardTreeTest < TidTest
     tree = PathCoverage::CardTree.of(source, 'k.rb', sites)
     tree.values.flat_map do |rows|
       inner = rows.values - [PathCoverage::CardTree::TOP]
-      misfits(rows.keys, inner, sites)
+      misfits(rows.keys, inner, sites) + looped(rows)
     end
+  end
+
+  # The key each row of rows, a card's places, reaches after as
+  # many steps up its parents as rows has rows: none, unless some
+  # row is its own ancestor, as every other walk reaches the top.
+  def looped(rows)
+    reached = rows.keys.map do |key|
+      rows.size.times.reduce(key) { |at, _| rows.dig(at, 'parent') }
+    end
+    reached.compact
   end
 
   # Each parent of inner, the places of a card's rows that have

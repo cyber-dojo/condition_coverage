@@ -101,7 +101,8 @@ module PathCoverage
       ]
     end
 
-    # One arm of a ternary, statements its code: a ternary is a
+    # One arm of a ternary, statements its code: a ternary, or a
+    # block method's call whose value follows from its path, is a
     # site of its own, as an if's arm holding an if is, so the arm
     # is plain; another condition folds in as its body, being part
     # of the one expression, as does a plain arm with sites inside
@@ -110,7 +111,7 @@ module PathCoverage
     def arm_of(kind, statements)
       written = grouped(statements.body.first)
       extent = extent_of(statements)
-      body = if ternary?(written)
+      body = if ternary?(written) || valued?(written)
                own_site(statements)
              else
                arm_body(written, statements, extent)
@@ -118,8 +119,8 @@ module PathCoverage
       Arm.new(kind:, extent:, body:)
     end
 
-    # No body, for an arm, statements its code, whose ternary is a
-    # site of its own: visited in a new scope, so it is noted as one.
+    # No body, for an arm, statements its code, whose one site is
+    # a site of its own: visited in a new scope, so noted as one.
     def own_site(statements)
       scoped { statements.accept(self) }
       nil

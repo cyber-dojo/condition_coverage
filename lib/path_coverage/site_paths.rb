@@ -16,6 +16,14 @@ module PathCoverage
       end
     end
 
+    # Example: [false, true, false, true, false] for an any?.
+    # site's value on each of its possible paths, in the order
+    # possible gives them, nil where not known.
+    def self.values(site)
+      ways = Kinds.of(site.operator).root_ways(site, site.fixed)
+      ways.map(&:last)
+    end
+
     # [[{ leaf range => outcome }, value], ...] for each way
     # node can be evaluated, value being the outcome of node as
     # a whole, as its kind gives them; fixed is the site's

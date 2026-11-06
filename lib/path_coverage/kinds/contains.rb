@@ -53,7 +53,9 @@ module PathCoverage
           return Block.items?(receiver, outcomes)
         end
         whole = inner.to_h { |site| [site.extent, site] }[range]
-        whole && value_on(whole, outcomes, fixed)
+        return nil if whole.nil?
+
+        value_on(whole, outcomes, fixed)
       end
 
       # site's value on its way that took outcomes, one of its

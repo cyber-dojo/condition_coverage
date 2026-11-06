@@ -728,6 +728,26 @@ class ManifestTest < TidTest
     assert_equal expected, actual
   end
 
+  test '6asybc', %w(
+  | Example: a && xs.any? { |x| x.odd? }
+  | A leaf that is wholly a block method's call whose value
+  | follows from its path is a site of its own, as a ?: in a
+  | ?:'s arm is, the leaf holding it a plain leaf: each is a
+  | row of its own card, the card's tree saying what the call's
+  | paths give the leaf.
+  ) do
+    source = <<~RUBY
+      def k(a, xs)
+        a && xs.any? { |x| x.odd? }
+      end
+    RUBY
+    both = condition('&&', 15...16, 20...42, extent: 15...42)
+    any = condition('any?', 20...22, 34...40, extent: 20...42)
+    expected = { 'k.rb:2:2' => both, 'k.rb:2:10' => any }
+    actual = PathCoverage::Manifest.sites(source, 'k.rb')
+    assert_equal expected, actual
+  end
+
   test '6asyb4', %w(
   | Example: a block whose one expression is a modifier unless,
   | a modifier if, or a rescue modifier
