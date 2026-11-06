@@ -21,7 +21,7 @@ module PathCoverage
       attrs = [
         %(id="paths-#{first}" data-first="#{first}"),
         %(data-col="#{column}" data-last="#{card['last']}"),
-        %(data-status="#{status(rows)}" hidden="hidden")
+        %(data-status="#{status(card)}" hidden="hidden")
       ].join(' ')
       head = title_row(first, card, rows) + columns_row
       %(<div class="#{GRID}" #{attrs}>) +
@@ -45,26 +45,33 @@ module PathCoverage
         .sub(%(class="#{GRID}"), %(class="#{GRID} top-level"))
     end
 
-    # Each row's, a site's with the rows tree gives for that site
-    # folded under it; rows as the JSON report lists a card's.
+    # Each row's, a site's with the rows tree gives for that site,
+    # headed as its row is, folded under it; rows as the JSON
+    # report lists a card's.
     def self.body(rows, &tree)
       rows.map do |row|
         site = row['site']
-        folded = tree&.call(site) if site
+        folded = tree&.call(site, row['top']) if site
         row_of(row, folds: !folded.nil?) + fold(site, folded)
       end.join
     end
 
-    # covered when every row's taken is known and is all of its
-    # paths; gaps otherwise, as a row not known may have one.
-    def self.status(rows)
-      done = rows.all? { |row| row['taken'] == row['paths'] }
+    # card's status: covered when every row's taken is known and
+    # is all of its paths, and its method was called, if it is a
+    # method's; gaps otherwise, as a row not known may have one,
+    # and a method never called, even of no rows, ran none of its
+    # code.
+    def self.status(card)
+      rows = card['rows']
+      done = rows.all? { |row| row['taken'] == row['paths'] } &&
+             card['calls'] != 0
       done ? 'covered' : 'gaps'
     end
 
-    # The row level with the def: card's name, *its ways, then
-    # how many of its rows' paths were not taken, those of rows
-    # not known among them, and how many were.
+    # The row level with the def: card's name and how many times
+    # it was called, *its ways, then how many of its rows' paths
+    # were not taken, those of rows not known among them, and how
+    # many were.
     def self.title_row(first, card, rows)
       seen = rows.map { _1['taken'] }.compact.sum
       paths = rows.map { _1['paths'] }
@@ -73,7 +80,23 @@ module PathCoverage
         (MethodStatements.size(paths) - seen).to_s, seen.to_s
       ]
       attrs = %(class="prow calls" data-line="#{first}")
-      row(attrs, CGI.escapeHTML(card['name'].to_s), cells)
+      row(attrs, title_label(card), cells)
+    end
+
+    # The label of card's title row: its name, escaped, then how
+    # many times its method was called.
+    def self.title_label(card)
+      CGI.escapeHTML(card['name'].to_s) + call_count(card['calls'])
+    end
+
+    # Example: 3 as <span class="call-count">&times;3</span>.
+    # How many times a method was called, after its name, a gap,
+    # never, for 0; none for a top card, or when not known.
+    def self.call_count(calls)
+      return '' if calls.nil?
+
+      css = calls.zero? ? 'call-count never' : 'call-count'
+      %(<span class="#{css}">&times;#{calls}</span>)
     end
 
     # The row naming the not taken and taken columns.
@@ -101,17 +124,11 @@ module PathCoverage
 
     # Example: if, a site's top, as <span class="k">if</span>.
     # A row's top, text, coloured as the code pane colours the
-    # code it quotes, eg if, def and return as keywords; but
-    # value and (), which name kinds of statement and quote no
-    # code, escaped and plain.
+    # code it quotes, eg if and return as keywords, as
+    # HtmlSyntax.label colours it.
     def self.top(text)
-      return CGI.escapeHTML(text) if KINDS.include?(text)
-
-      HtmlSyntax.fragment(text)
+      HtmlSyntax.label(text)
     end
-
-    # The tops that name a kind of statement, quoting no code.
-    KINDS = %w[value ()].freeze
 
     # The arrow left of the line:column at of a row, its glyph,
     # as style.css draws it, pointing down while its fold is shut

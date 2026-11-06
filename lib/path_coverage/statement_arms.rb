@@ -12,6 +12,39 @@ module PathCoverage
     # card.
     UNSEEN = %i[block_node begin_node def_node lambda_node].freeze
 
+    # Example: if/else for if a then 1 else 2 end.
+    # operator, a site node's, with /else after it when node is an
+    # if or an unless with an else, so its row names both arms;
+    # operator alone for any other, eg a ?:, whose arms are ? and :.
+    def with_else(operator, node)
+      return operator unless %w[if unless].include?(operator)
+
+      clause = operator == 'if' ? node.subsequent : node.else_clause
+      clause&.type == :else_node ? "#{operator}/else" : operator
+    end
+
+    # The tops of statements that end a path, leaving the method.
+    LEAVING = %w[return raise].freeze
+
+    # True for a row that shapes its method's paths: a site, or a
+    # return or a raise, which ends a path. Any other, eg x = 1,
+    # runs exactly where what holds it does, so is no row.
+    def shapes?(node)
+      site?(node) || LEAVING.include?(top_of(node))
+    end
+
+    # Where node, a def, is entered: its body's start, or, for an
+    # endless def, whose body is one expression, its byte range,
+    # to be wrapped; before its end for an empty body.
+    def entry_at(node)
+      body = node.body
+      return node.end_keyword_loc.start_offset if body.nil?
+
+      loc = body.location
+      start = loc.start_offset
+      node.equal_loc ? start...loc.end_offset : start
+    end
+
     # Example: return a ? 1 : 2 if x gives the ?:.
     # The sites inside site that are sites of their own, in the
     # order they are written: in its leaves, eg a modifier if's

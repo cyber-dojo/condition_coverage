@@ -315,6 +315,59 @@ class HtmlFileTest < TidTest
     assert_equal [], tree.elements.to_a('.//*[@data-arm]')
   end
 
+  test 'gae580', %w(
+  | Example: if order[:gift] && its next line (order[:wrap])
+  | A leaf written over two lines reads as one in its fold, its
+  | line break and indent one space, so its row stays one line.
+  ) do
+    trees = {
+      1 => [
+        {
+          operator: 'if', counts: [1, 1], cells: [nil, nil],
+          operands: [
+            { text: "order[:gift] &&\n     (order[:wrap])",
+              cells: [true, false] }
+          ]
+        }
+      ]
+    }
+    tree = tree_of(trees[1])
+    texts = tree.elements.to_a('.//*[@data-operand]/*[@data-text]')
+    expected = ['order[:gift] && (order[:wrap])']
+    assert_equal(expected, texts.map { text_of(_1) })
+  end
+
+  test 'gae579', %w(
+  | Example: return total if order[:pickup], its predicate false
+  | on one path and true on the other
+  | Its arm returns, so its fold has a row for it, return,
+  | marking each path that leaves the method there, the true
+  | one, blank on the other.
+  ) do
+    trees = {
+      1 => [
+        {
+          operator: 'if', counts: [1, 1], cells: [nil, nil],
+          operands: [
+            { text: 'order[:pickup]', cells: [false, true] },
+            {
+              arm: :then, text: 'return total',
+              cells: [false, true], body: nil
+            }
+          ]
+        }
+      ]
+    }
+    tree = tree_of(trees[1])
+
+    rows = tree.elements.to_a('.//*[@data-leaves]')
+    actual = rows.map do |row|
+      cells = row.elements.to_a('*[@data-cell]').map { cell_of(_1) }
+      [text_of(row.elements['*[@data-label]']), *cells]
+    end
+    assert_equal [['return', '', 'leaves']], actual
+  end
+
   test 'gae566', %w(
   | Example: x ? :a : :b
   | A ?:'s fold keeps a row for each arm, ? and :, as its arms

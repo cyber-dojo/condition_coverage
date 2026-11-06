@@ -84,10 +84,14 @@ module PathCoverage
     # of its parent holding it, site its Condition: the index of
     # the innermost leaf holding it; and, when site is the whole
     # of that leaf, site's value on each of its possible paths,
-    # as its kind gives them, the leaf's outcome there.
+    # as its kind gives them, the leaf's outcome there. Neither
+    # for a row that is no site, a return or a raise, which gives
+    # its parent nothing.
     def self.leaf_place(own, site)
+      return { 'leaf' => nil, 'gives' => nil } if site.nil?
+
       leaf = smallest(own.reject(&:arm))
-      whole = leaf && site&.extent == leaf.range
+      whole = leaf && site.extent == leaf.range
       gives = whole ? SitePaths.values(site) : nil
       { 'leaf' => leaf&.leaf, 'gives' => gives }
     end

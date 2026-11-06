@@ -193,9 +193,8 @@ class KernelTest < TidTest
   | Example: report :html, and fee with two ifs called once,
   | with true then false
   | index.html's Total row shows its total within each method:
-  | 5 / 8 63%, fee's card: its two
-  | 1-path statements reached and one of each if's two, and,
-  | in the ifs' thens, member's write reached, big's not.
+  | 2 / 4 50%, fee's card: one of each if's two paths, its
+  | writes and value no rows.
   ) do |t|
     t.write(<<~RUBY, 'fee.rb')
       module Fee
@@ -217,7 +216,7 @@ class KernelTest < TidTest
 
     index = REXML::Document.new(File.read("#{t.dir}/index.html"))
     total = index.elements.to_a('//tfoot/tr/td')
-    expected = ['Total', '2', '5', '/ 8', '63%']
+    expected = ['Total', '2', '2', '/ 4', '50%']
     assert_equal(expected, total.map { text_of(_1) })
   end
 
@@ -322,8 +321,7 @@ class KernelTest < TidTest
   | dir
   | The JSON report holds the statements reached too.
   | So the render's index has the same Total row as the run's.
-  | Within each method: 5 / 8 63%, member's write in its then
-  | reached too.
+  | Within each method: 2 / 4 50%, one of each if's two paths.
   ) do |t|
     t.write(<<~RUBY, 'fee.rb')
       module Fee
@@ -364,7 +362,7 @@ class KernelTest < TidTest
 
     index = REXML::Document.new(File.read("#{later}/index.html"))
     total = index.elements.to_a('//tfoot/tr/td')
-    expected = ['Total', '2', '5', '/ 8', '63%']
+    expected = ['Total', '2', '2', '/ 4', '50%']
     assert_equal(expected, total.map { text_of(_1) })
   end
 
@@ -373,10 +371,8 @@ class KernelTest < TidTest
   | a report after fee(true, false), another after
   | fee(false, false) too, then a render of both reports
   | The render merges the paths and reaches of every report.
-  | So member was taken both ways, big false only, both
-  | 1-path statements reached, and member's write in its
-  | then reached, big's not.
-  | Within each method: 6 / 8 75%, not the first report's 5.
+  | So member was taken both ways, big false only.
+  | Within each method: 3 / 4 75%, not the first report's 2.
   ) do |t|
     t.write(<<~RUBY, 'fee_runs.rb')
       module Fee
@@ -423,7 +419,7 @@ class KernelTest < TidTest
     index = REXML::Document.new(File.read("#{later}/index.html"))
     total = index.elements.to_a('//tfoot/tr/td')
     methods = total.map { text_of(_1) }.last(3).join(' ')
-    assert_equal '6 / 8 75%', methods
+    assert_equal '3 / 4 75%', methods
   end
 
   test '6rTS4t', %w(
@@ -826,9 +822,9 @@ class KernelTest < TidTest
   | It writes a page per covered file too, eg crew.rb.html.
   | Each site on the page counts the paths it took.
   | It prints no gaps, since :gaps was not chosen.
-  | index.html's Total row shows 2 / 4 50% within each method:
-  | ok?'s one row reached, and one of crew?'s && row's three
-  | paths taken.
+  | index.html's Total row shows 1 / 3 33% within each method:
+  | one of crew?'s && row's three paths taken; ok?'s one
+  | statement is no row.
   ) do |t|
     t.write(<<~RUBY, 'crew.rb')
       module Crew
@@ -843,7 +839,7 @@ class KernelTest < TidTest
 
     index = REXML::Document.new(File.read("#{t.dir}/index.html"))
     total = index.elements.to_a('//tfoot/tr/td')
-    expected = ['Total', '1', '2', '/ 4', '50%']
+    expected = ['Total', '1', '1', '/ 3', '33%']
     assert_equal(expected, total.map { text_of(_1) })
     html = File.read("#{t.dir}/files/crew.rb.html")
     page = REXML::Document.new(html)
@@ -1025,9 +1021,8 @@ class KernelTest < TidTest
   | `member` false.
   | The JSON report's totals are [taken, possible]:
   | decisions [2, 4], one path of each if's two.
-  | methods [5, 8], fee's card: its two 1-path statements
-  | reached, one of each if's two, and, in the ifs' thens,
-  | member's write reached, big's not.
+  | methods [2, 4] too, fee's card having just its two ifs as
+  | rows, its writes and value none.
   ) do |t|
     t.write(<<~RUBY, 'fee.rb')
       module Fee
@@ -1050,7 +1045,7 @@ class KernelTest < TidTest
       'fee.rb:7:4 path never taken: `big` true'
     ].join("\n")
     assert_output("#{expected}\n") { t.report }
-    totals = { 'decisions' => [2, 4], 'methods' => [5, 8] }
+    totals = { 'decisions' => [2, 4], 'methods' => [2, 4] }
     assert_equal totals, t.json['totals']
   end
 
@@ -1146,8 +1141,8 @@ class KernelTest < TidTest
   | At exit it prints a line per total, as SimpleCov prints its
   | line and branch coverage.
   | Within decisions: 2 / 4, one of each if's two paths.
-  | Within methods: 5 / 8, fee's card, member's write in its
-  | then reached, big's not.
+  | Within methods: 2 / 4 too, fee's card having just its two
+  | ifs as rows.
   ) do |t|
     t.write(<<~RUBY, 'fee.rb')
       module Fee
@@ -1167,7 +1162,7 @@ class KernelTest < TidTest
     t.load('fee.rb')::Fee.fee(true, false)
     printed = capture_io { t.report }.first
     decisions = "Path coverage within decisions: 2 / 4 (50.00%)\n"
-    methods = "Path coverage within methods: 5 / 8 (62.50%)\n"
+    methods = "Path coverage within methods: 2 / 4 (50.00%)\n"
     assert_equal decisions + methods, printed
   end
 
@@ -1360,8 +1355,8 @@ class KernelTest < TidTest
   | Example: ship, a write then a value, and zero, an endless
   | def of 0, measured within methods, ship called twice and
   | zero once
-  | Each statement that is no site is counted each time it
-  | runs, by its name.
+  | Each def is counted each time it is called, by its own
+  | site's name; its write and value, no rows, are not counted.
   | Each method returns what the same code, uninstrumented,
   | returns.
   ) do |t|
@@ -1384,10 +1379,7 @@ class KernelTest < TidTest
     plain = calls.call(Plain6rTS6a)
     actual = calls.call(ship)
     assert_equal [[6, 8, 0], plain], [actual, actual]
-    expected = {
-      'ship6a.rb:3:4' => 2, 'ship6a.rb:4:4' => 2,
-      'ship6a.rb:6:18' => 1
-    }
+    expected = { 'ship6a.rb:2:2' => 2, 'ship6a.rb:6:2' => 1 }
     assert_equal expected, PathCoverage.recorder.reached
     assert_output('', '') { t.report }
   end
@@ -1396,9 +1388,9 @@ class KernelTest < TidTest
   | Example: ship, a write, a return if empty, then a value,
   | measured within methods, called once with a full order
   | Its card in the HTML report shows each row's taken, and
-  | its JSON report holds each statement's reaches.
-  | The write and the value were reached, so each has its 1
-  | path taken; the if's then never ran, so it has 1 of 2.
+  | its JSON report holds ship's call-count.
+  | The if is its one row, its then never run, so 1 of 2; the
+  | write and the value are no rows.
   ) do |t|
     t.write(<<~RUBY, 'ship6b.rb')
       module Ship
@@ -1413,13 +1405,9 @@ class KernelTest < TidTest
     t.load('ship6b.rb')::Ship.ship(3)
     t.report
     page = File.read("#{t.dir}/files/ship6b.rb.html")
-    expected = [
-      %w(ship 3), %w(line:col taken),
-      %w(3:04 1), %w(4:13 1), %w(5:04 1)
-    ]
+    expected = [%w(ship 1), %w(line:col taken), %w(4:13 1)]
     assert_equal expected, card_taken(page, 2)
-    expected = { 'ship6b.rb:3:4' => 1, 'ship6b.rb:5:4' => 1 }
-    assert_equal expected, t.json['reached']
+    assert_equal({ 'ship6b.rb:2:2' => 1 }, t.json['reached'])
   end
 
   test '6rTS6c', %w(
@@ -1572,9 +1560,9 @@ class KernelTest < TidTest
   | with big true
   | The JSON report lists fee's card, under its def's site, as
   | its page draws it: its name, first and last lines, the ways
-  | through it, and a row per statement, with its paths, how
-  | many were taken, and its site, so a reader finds a card's
-  | gap without the page.
+  | through it, how many times it was called, and a row per
+  | statement, with its paths, how many were taken, and its
+  | site, so a reader finds a card's gap without the page.
   ) do |t|
     t.write(<<~RUBY)
       module Fee
@@ -1587,6 +1575,7 @@ class KernelTest < TidTest
     expected = {
       "#{t.file}:2:2" => {
         'name' => 'fee', 'first' => 2, 'last' => 2, 'ways' => 2,
+        'calls' => 1,
         'rows' => [
           { 'at' => '2:26', 'top' => '?:', 'paths' => 2, 'taken' => 1,
             'site' => "#{t.file}:2:26" }
@@ -1602,6 +1591,7 @@ class KernelTest < TidTest
   | The JSON report lists its top card too, under the site of
   | its first line's start, titled Rate, its scope, as its page
   | draws it, so a reader finds a gap outside every def too.
+  | It is no method's, so has no calls.
   ) do |t|
     t.write(<<~RUBY, 'rate.rb')
       module Rate
@@ -1614,6 +1604,7 @@ class KernelTest < TidTest
     expected = {
       'rate.rb:2:0' => {
         'name' => 'Rate', 'first' => 2, 'last' => 2, 'ways' => 2,
+        'calls' => nil,
         'rows' => [
           { 'at' => '2:32', 'top' => '?:', 'paths' => 2, 'taken' => 1,
             'site' => 'rate.rb:2:32' }
@@ -1694,6 +1685,82 @@ class KernelTest < TidTest
     assert_equal tree, t.json['tree'][t.file]['2:2']
   end
 
+  test '6rTS6r', %w(
+  | Example: module Fee holding fee, called once, its report then
+  | holding no reaches, as one the :post reporter sent does,
+  | rendered from that report alone
+  | How many times fee was called is not known, so its card says
+  | nothing of it, rather than saying it was never called.
+  ) do |t|
+    t.write(<<~RUBY)
+      module Fee
+        def self.fee(big) = big ? 10 : 5
+      end
+    RUBY
+    t.start
+    t.load::Fee.fee(true)
+    capture_io { t.report }
+    sent = "#{t.dir}/sent.json"
+    File.write(sent, JSON.generate(t.json.except('reached')))
+    later = "#{t.dir}/later"
+    FileUtils.mkdir_p(later)
+    config = PathCoverage::Configuration.new do
+      root t.dir
+      cover '*.rb'
+      coverage_dir later
+      report :html
+    end
+    PathCoverage::Render.from_json(config, [sent])
+    page = File.read("#{later}/files/#{t.file}.html")
+    title = card_taken(page, 2).first
+    counted = page.include?('class="call-count')
+    assert_equal [%w(fee 1), false], [title, counted]
+  end
+
+  test '6rTS6s', %w(
+  | Example: module Pick holding pick, an if of a with an else,
+  | and size, an if of a with an elsif, each called once
+  | The if's fold is headed if/else, as its card row is, and
+  | names where its else keyword is, line 5, columns 4 to 8, so
+  | hovering over that else in the code can open the if's fold,
+  | as hovering over its if does. An if whose else arm is an
+  | elsif is headed if, and has no else keyword, so names none:
+  | its elsif is a site, with a fold, of its own.
+  ) do |t|
+    t.write(<<~RUBY)
+      module Pick
+        def self.pick(a)
+          if a
+            1
+          else
+            2
+          end
+        end
+
+        def self.size(a)
+          if a > 9
+            :big
+          elsif a > 1
+            :some
+          end
+        end
+      end
+    RUBY
+    t.start { report :html }
+    pick = t.load::Pick
+    pick.pick(true)
+    pick.size(5)
+    t.report
+    page = File.read("#{t.dir}/files/#{t.file}.html")
+    elses = [3, 11].map do |line|
+      fold = fold_at(page, "#{t.file}:#{line}")
+      first = fold.elements['.//*[@class="row"]']
+      label = text_of(first.elements['*[@data-operator]'])
+      [label, first.attributes['data-else']]
+    end
+    assert_equal [['if/else', '5,4,5,8'], ['if', nil]], elses
+  end
+
   test '6rTS6m', %w(
   | Example: two starts in one process, eg two tests, each over
   | its own rate.rb, a ?: whose site has the same name in both,
@@ -1734,12 +1801,14 @@ class KernelTest < TidTest
   end
 
   # [label, last cell's text] of each row of the statement card
-  # of the def at line first in page.
+  # of the def at line first in page, a title's label its name,
+  # its call-count left out.
   def card_taken(page, first)
     card = page[/id="paths-#{first}".*$/]
+    count = %r{<span class="call-count[^>]*>[^<]*</span>}
     card.scan(%r{<div class="prow[^>]*>(.*?)</div>}).map do |(row)|
-      texts = row.scan(%r{<span[^>]*>([^<]*)</span>}).flatten
-      [texts.first, texts.last]
+      texts = row.sub(count, '').scan(%r{<span[^>]*>([^<]*)</span>})
+      [texts.flatten.first, texts.flatten.last]
     end
   end
 end

@@ -4,7 +4,8 @@ require 'path_coverage/card_ways'
 
 class CardTreeTest < TidTest
   test 'Ct8e01', %w(
-  | Example: pick, an if of a && b holding an if of b
+  | Example: pick, an if of a && b holding an if of b, each arm
+  | of which returns
   | Each row of pick's card names its parent, the site whose
   | arm it is in, that arm, and on, the parent's possible paths
   | it runs on, by their index: the inner if runs only on the
@@ -16,7 +17,7 @@ class CardTreeTest < TidTest
     source = <<~RUBY
       def pick(a, b)
         if a && b
-          if b then 1 else 2 end
+          if b then return 1 else return 2 end
         end
       end
     RUBY
@@ -25,7 +26,7 @@ class CardTreeTest < TidTest
       '2:5' => ['2:2', nil, [0, 1], 0, [true, false, false]],
       '3:4' => ['2:2', 'then', [0], nil, nil],
       '3:14' => ['3:4', 'then', [0], nil, nil],
-      '3:21' => ['3:4', 'else', [1], nil, nil]
+      '3:28' => ['3:4', 'else', [1], nil, nil]
     }
     assert_equal expected, places(source)
   end
@@ -173,31 +174,31 @@ class CardTreeTest < TidTest
     gives = [false, true, false, true, false]
     expected = {
       '2:2' => [nil, nil, nil, nil, nil],
-      '2:5' => ['2:2', nil, [0, 1, 2], 0, gives],
-      '2:16' => ['2:5', nil, [1, 2, 3, 4], 1, nil]
+      '2:5' => ['2:2', nil, [0, 1, 2], 0, gives]
     }
     assert_equal expected, places(source)
   end
 
   test 'Ct8e06', %w(
-  | Example: odd?, an && of a and an any?
+  | Example: big?, an && of a and an any? whose block compares
+  | each item with a ?:
   | A row in a leaf of its parent names that leaf, by its
   | index. A row that is the whole of that leaf, as the any? is,
   | also names what each of its own possible paths gives the
   | leaf: the any?'s value, false with 0 items, else its last
-  | answer. The any?'s block's row is inside a leaf, not all of
-  | it, so gives nothing.
+  | answer. The ?: in the any?'s block is inside a leaf, not all
+  | of it, so gives nothing.
   ) do
     source = <<~RUBY
-      def odd?(a, xs)
-        a && xs.any? { |x| x.odd? }
+      def big?(a, xs, lim)
+        a && xs.any? { |x| x > (lim ? 1 : 2) }
       end
     RUBY
     gives = [false, true, false, true, false]
     expected = {
       '2:2' => [nil, nil, nil, nil, nil],
       '2:10' => ['2:2', nil, [0, 1], 1, gives],
-      '2:21' => ['2:10', nil, [1, 2, 3, 4], 1, nil]
+      '2:30' => ['2:10', nil, [1, 2, 3, 4], 1, nil]
     }
     assert_equal expected, places(source)
   end

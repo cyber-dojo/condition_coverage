@@ -6,7 +6,7 @@ require 'path_coverage/within_methods'
 class HtmlStatementsTest < TidTest
   test 'Hs4q01', %w(
   | Example: ship, an if with only its then taken, its then's
-  | call reached, then a value not known
+  | return reached, then a raise not known
   | Its card is a hidden grid, level with its def, line 1,
   | to its last line, 6.
   | Its title row has its name, its complexity, then how many
@@ -29,9 +29,9 @@ class HtmlStatementsTest < TidTest
     source = <<~RUBY
       def ship(order)
         if order.paid?
-          order.pack
+          return order.pack
         end
-        order
+        raise 'unpaid'
       end
     RUBY
     site = 'k.rb:1:0'
@@ -46,8 +46,8 @@ class HtmlStatementsTest < TidTest
       ['ship', '*2', '2', '2'],
       ['line:col', '', 'not taken', 'taken'],
       ['2:02', 'if', '1', '1'],
-      ['3:04', '()', '0', '1'],
-      ['5:02', 'value', '?', '?']
+      ['3:04', 'return', '0', '1'],
+      ['5:02', 'raise', '?', '?']
     ], cells(html)
     counts = '<span class="pcell not-taken">1</span>' \
              '<span class="pcell was-taken">1</span>'
@@ -56,7 +56,6 @@ class HtmlStatementsTest < TidTest
     assert_includes html, none
     top = '<span class="pcell"><span class="k">if</span></span>'
     assert_includes html, top
-    assert_includes html, '<span class="pcell">value</span>'
   end
 
   test 'Hs4q02', %w(
@@ -75,36 +74,35 @@ class HtmlStatementsTest < TidTest
   end
 
   test 'Hs4q03', %w(
-  | Example: ship, an if then a value, the if's tree rows given
+  | Example: ship, an if then a raise, the if's tree rows given
   | for the if's site, the only site asked for
   | The if's row starts with an arrow, left of its line:col,
   | showing whether its fold is open, as a click on the row
   | opens or closes it.
   | Straight after the if's row is its fold, hidden until
   | then, holding the if's rows as its tree draws them.
-  | The rows of the call in its then and of the value are no
-  | sites, so have no arrow and no fold.
+  | The raise's row is no site, so has no arrow and no fold.
   ) do
     source = <<~RUBY
       def ship(order)
         if order.paid?
           order.pack
         end
-        order
+        raise 'unpaid'
       end
     RUBY
     site = 'k.rb:1:0'
     rows = PathCoverage::MethodStatements.of(source, 'k.rb')[site]
     tree = '<div class="row">if</div>'
     asked = []
-    html = card(site, :ship, rows, [1, 1, nil], 6) do |at|
+    html = card(site, :ship, rows, [1, nil], 6) do |at|
       asked << at
       tree
     end
     assert_equal ['k.rb:2:2'], asked
     order = html.scan(/<div class="(prow[^"]*|fold)"/).flatten
     expected = ['prow calls', 'prow columns', 'prow site'] +
-               %w(fold prow prow)
+               %w(fold prow)
     assert_equal expected, order
     row = [
       '<div class="prow site" data-line="2">',
@@ -122,40 +120,42 @@ class HtmlStatementsTest < TidTest
   end
 
   test 'Hs4q04', %w(
-  | Example: install, defining discount, writing rates, then
-  | returning
-  | Each top that is code is coloured as the code pane colours
-  | it: def and return as keywords, = as the pane leaves it.
-  | value and (), naming kinds of statement, quote no code, so
-  | are plain.
+  | Example: install, an if/else returning rates if frozen,
+  | else raising
+  | Each top is coloured as the code pane colours it: if, else
+  | and return as keywords, if/else each of its words, raise, a
+  | call, as the pane leaves it.
   ) do
     source = <<~RUBY
       def install(rates)
-        def discount(total) = total / 2
-        @rates = rates
-        rates.freeze
-        return rates
+        if rates.frozen?
+          return rates
+        else
+          raise 'mutable'
+        end
       end
     RUBY
     site = 'k.rb:1:0'
     rows = PathCoverage::MethodStatements.of(source, 'k.rb')[site]
-    html = card(site, :install, rows, [1, 1, 1, 1], 6)
+    html = card(site, :install, rows, [1, 1, 1], 7)
     cell = '<span class="pcell">'
     top = %r{\d+:\d+</span>#{cell}(.*?)</span><span class="pcell n}
     tops = html.scan(top)
     keyword = ->(word) { %(<span class="k">#{word}</span>) }
     expected = [
-      keyword.call('def'), '=', '()', keyword.call('return')
+      "#{keyword.call('if')}/#{keyword.call('else')}",
+      keyword.call('return'), 'raise'
     ]
     assert_equal expected, tops.flatten
   end
 
   test 'Hs4q05', %w(
-  | Example: a top-level line, FEE = two ?:s, the first's then
-  | taken, the second's else
+  | Example: a top-level line, FEE = two ?:s, each taken both
+  | ways
   | Its card is a top card, titled file, its scope, level with that
   | line and ending there, its rows a ?: each, as a method's
-  | card's rows are, each with its fold.
+  | card's rows are, each with its fold. Every path of both is
+  | taken, so it is covered.
   | It is marked top-level, a class no other part of the page
   | has, so no style of another part shows it when hidden.
   ) do
@@ -163,7 +163,7 @@ class HtmlStatementsTest < TidTest
       FEE = (ENV['BIG'] ? 10 : 0) + (ENV['VIP'] ? 5 : 0)
     RUBY
     rows = PathCoverage::MethodStatements.top_rows(source, 'k.rb')
-    listed = listed('k.rb:1:0', 'file', rows, [1, 1], 1)
+    listed = listed('k.rb:1:0', 'file', rows, [2, 2], 1)
     statements = PathCoverage::HtmlStatements
     html = statements.top_card('k.rb:1:0', listed) do |at|
       %(<div class="row">#{at}</div>)
@@ -171,19 +171,23 @@ class HtmlStatementsTest < TidTest
     open = '<div class="pathgrid statements top-level" id="paths-1"'
     assert_includes html, open
     assert_includes html, 'data-first="1" data-col="0" data-last="1"'
+    assert_includes html, 'data-status="covered"'
     assert_equal [
-      ['file', '*4', '2', '2'],
+      ['file', '*4', '0', '4'],
       ['line:col', '', 'not taken', 'taken'],
-      ['1:18', '?:', '1', '1'],
-      ['1:42', '?:', '1', '1']
+      ['1:18', '?:', '0', '2'],
+      ['1:42', '?:', '0', '2']
     ], cells(html)
     assert_includes html, 'data-site="k.rb:1:42"'
   end
 
   test 'Hs4q06', %w(
-  | Example: initialize, a def with no statements
-  | Its card has no rows, so no path it could leave untaken: it
-  | is covered, its title row 0 not taken of 0.
+  | Example: initialize, a def with no statements, called once,
+  | then never called
+  | Its card has no rows, so no path it could leave untaken, its
+  | title row 0 not taken of 0; its title says how many times
+  | it was called, x1, and so it is covered. Never called, x0,
+  | it has a gap, so it cannot read as covered.
   ) do
     source = <<~RUBY
       class Shop
@@ -192,10 +196,15 @@ class HtmlStatementsTest < TidTest
     RUBY
     site = 'k.rb:2:2'
     rows = PathCoverage::MethodStatements.of(source, 'k.rb')[site]
-    html = card(site, :initialize, rows, [], 2)
-    assert_includes html, 'data-status="covered"'
-    title = cells(html).first
-    assert_equal ['initialize', '*1', '0', '0'], title
+    actual = [1, 0].map do |calls|
+      html = card(site, [:initialize, calls], rows, [], 2)
+      [html[/data-status="(\w+)"/, 1], cells(html).first]
+    end
+    expected = [
+      ['covered', ['initialize &times;1', '*1', '0', '0']],
+      ['gaps', ['initialize &times;0', '*1', '0', '0']]
+    ]
+    assert_equal expected, actual
   end
 
   private
@@ -207,22 +216,26 @@ class HtmlStatementsTest < TidTest
     PathCoverage::HtmlStatements.card(site, listed, &)
   end
 
-  # The card the JSON report lists at site, named name, ending
-  # on line last, its rows' taken as taken gives them, its ways
-  # its rows' paths multiplied, as one after another: what every
-  # card here folds to, none holding another's rows.
-  def listed(site, name, rows, taken, last)
+  # The card the JSON report lists at site, named, its name, or
+  # [its name, how many times it was called], ending on line
+  # last, its rows' taken as taken gives them, its ways its rows'
+  # paths multiplied, as one after another: what every card here
+  # folds to, none holding another's rows.
+  def listed(site, named, rows, taken, last)
+    name, calls = Array(named)
     ways = rows.map(&:paths).reduce(1, :*)
-    named = [name, last, ways]
-    PathCoverage::WithinMethods.card(site, named, rows.zip(taken))
+    card = [name, last, ways, calls]
+    PathCoverage::WithinMethods.card(site, card, rows.zip(taken))
   end
 
   # The texts of each row of html's grid: its label, then each
-  # of its cells.
+  # of its cells; a title's call-count read as part of its label.
   def cells(html)
     rows = html.scan(%r{<div class="prow[^"]*"[^>]*>(.*?)</div>})
+    count = %r{<span class="call-count[^>]*>([^<]*)</span>}
     rows.map do |(row)|
-      row.scan(%r{<span[^>]*>([^<]*)</span>}).flatten
+      plain = row.sub(count, ' \1')
+      plain.scan(%r{<span[^>]*>([^<]*)</span>}).flatten
     end
   end
 end

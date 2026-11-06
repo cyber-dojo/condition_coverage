@@ -10,11 +10,19 @@ module PathCoverage
   # The tree of a site, from SiteTree.of, as its row's fold in a
   # card shows it: a grid whose columns are the site's paths.
   module HtmlTree
-    # A site's row, naming its operator and each path's count,
-    # then the rows of its operands.
+    # A site's row, naming its operator and each path's count, and
+    # where its else keyword is, if it has one, then the rows of
+    # its operands.
     def self.site_rows(site)
       counts = HtmlCells.counts(site[:counts])
-      [row(at(site), operator(site), counts), *operand_rows(site, '')]
+      attrs = at(site) + else_attr(site[:else_at])
+      [row(attrs, operator(site), counts), *operand_rows(site, '')]
+    end
+
+    # The data-else attribute of a site whose else keyword is at
+    # else_at, [line, column, line, column]; '' for none.
+    def self.else_attr(else_at)
+      else_at ? %( data-else="#{else_at.join(',')}") : ''
     end
 
     # SPIKE: the data-at attribute of a node located in its
@@ -47,9 +55,21 @@ module PathCoverage
     # branch, any operands of its own indented to under.
     def self.node_rows(operand, branch, under)
       return arm_rows(operand, branch, under) if operand.key?(:arm)
+      return [leaves_row(operand, branch)] if operand.key?(:leaves)
       return [operand_row(operand, branch)] unless operand[:operator]
 
       [subtree_row(operand, branch), *operand_rows(operand, under)]
+    end
+
+    # The row of an arm that leaves the method, as leaving gives
+    # it: return or raise, coloured as code, marking each path
+    # that leaves there.
+    def self.leaves_row(node, branch)
+      word = HtmlSyntax.fragment(node[:leaves])
+      lead = HtmlBranch.cell(branch) +
+             %(<span class="arm" data-label="">#{word}</span>)
+      cells = HtmlCells.of(node[:cells], HtmlCells::LEAVES)
+      row(' data-leaves=""', lead, cells)
     end
 
     # A ternary's arm's row, ? for then and : for else: an arm
@@ -78,14 +98,25 @@ module PathCoverage
     # as its arms are part of its one expression; for any other,
     # eg an if, a ||= or a case, no arm, as which arm a path takes
     # follows from its leaves, but each arm's body, eg a when's
-    # patterns, which are leaves of its own.
+    # patterns, which are leaves of its own, and, for an arm that
+    # returns or raises, where paths leave the method.
     def self.shown(condition)
       operands = condition[:operands]
       return operands if condition[:operator] == '?:'
 
       operands.flat_map do |operand|
-        operand.key?(:arm) ? [operand[:body]].compact : [operand]
+        next [operand] unless operand.key?(:arm)
+
+        [operand[:body], leaving(operand)].compact
       end
+    end
+
+    # { leaves: return or raise, cells: } for arm when its code
+    # returns or raises, cells marking the paths that took it, so
+    # left the method; nil for an arm that does neither.
+    def self.leaving(arm)
+      word = arm[:text].to_s[LEAVES, 1]
+      word && { leaves: word, cells: arm[:cells] }
     end
 
     # operands with each node standing for the nodes its kind
@@ -117,14 +148,17 @@ module PathCoverage
     # as the code it is part of.
     def self.operator(condition)
       label = condition.fetch(:label) { condition[:operator] }
-      name = HtmlSyntax.fragment(label)
+      name = HtmlSyntax.label(label)
       %(<span class="operator" data-operator="">#{name}</span>)
     end
 
     # One operand's row: its branch, text, coloured as the code it
-    # is, and its outcome on each path.
+    # is, written over more than one line read as one, each line
+    # break and the indent around it one space, and its outcome on
+    # each path.
     def self.operand_row(operand, branch)
-      text = HtmlSyntax.fragment(operand[:text].to_s)
+      one_line = operand[:text].to_s.gsub(/\s*\n\s*/, ' ')
+      text = HtmlSyntax.fragment(one_line)
       lead = HtmlBranch.cell(branch) +
              %(<span class="text" data-text="">#{text}</span>)
       attrs = %( data-operand=""#{at(operand)})

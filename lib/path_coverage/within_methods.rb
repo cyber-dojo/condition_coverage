@@ -94,7 +94,7 @@ module PathCoverage
         site = "#{path}:#{span.begin}:0"
         taken = rows.zip(MethodStatements.taken(rows, site_paths))
         ways = CardWays.card(source, sites, rows)
-        named = [scopes[span.begin], span.end, ways]
+        named = [scopes[span.begin], span.end, ways, nil]
         [site, card(site, named, taken)]
       end
     end
@@ -147,20 +147,22 @@ module PathCoverage
       MethodStatements.of(source, path, sites).to_h do |site, rows|
         taken = MethodStatements.taken(rows, paths, reached)
         ways = CardWays.card(source, sites, rows)
-        named = [names[site], lasts[site], ways]
+        calls = reached&.fetch(site, 0)
+        named = [names[site], lasts[site], ways, calls]
         [site, card(site, named, rows.zip(taken))]
       end
     end
 
     # The card of the def at site, named name, ending on line
-    # last, with ways through it, as ways folds them: its first
-    # line, from site, and a row for each [statement, taken] of
-    # rows.
-    def self.card(site, (name, last, ways), rows)
+    # last, with ways through it, as ways folds them, and calls,
+    # how many times it was called, nil for a top card, which is no
+    # method's, or when not known: its first line, from site, and
+    # a row for each [statement, taken] of rows.
+    def self.card(site, (name, last, ways, calls), rows)
       first = Integer(site.split(':')[-2])
       listed = rows.map { |statement, count| row(statement, count) }
       { 'name' => name, 'first' => first, 'last' => last,
-        'ways' => ways, 'rows' => listed }
+        'ways' => ways, 'calls' => calls, 'rows' => listed }
     end
 
     # A card's row: statement's line:column, as its page labels

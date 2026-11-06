@@ -33,12 +33,6 @@ module PathCoverage
       new(source, rows, places, sites).total
     end
 
-    # The tops of rows that leave the method.
-    LEAVING = %w[return raise].freeze
-
-    # An arm that leaves the method, by its code's start.
-    LEAVES = /\A(?:return|raise)\b/
-
     # The pair of rows one after another, from their pairs: the
     # ways that go on through them all, and those that leave at
     # one of them, having gone on through every one before it.
@@ -65,23 +59,17 @@ module PathCoverage
       CardWays.sequence(tops).sum
     end
 
-    # The pair of the row keyed key: a return's or a raise's
-    # leaves, any other row that is no site goes on; a site's adds
-    # up its paths' pairs.
+    # The pair of the row keyed key: a site's adds up its paths'
+    # pairs; any other row is a return or a raise, as no other is
+    # a row, so leaves.
     def pair_of(key)
       row = @rows[key]
-      return plain(row) unless row.site
+      return [0, 1] unless row.site
 
       pairs = possible(row.site).each_index.map do |path|
         pair_on(key, path)
       end
       added(pairs)
-    end
-
-    # The pair of row, no site: leaving for a return or a raise,
-    # else going on.
-    def plain(row)
-      LEAVING.include?(row.top) ? [0, 1] : [1, 0]
     end
 
     # The pair of the site row keyed key on its path at index

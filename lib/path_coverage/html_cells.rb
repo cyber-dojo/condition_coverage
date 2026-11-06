@@ -22,6 +22,11 @@ module PathCoverage
     # that took it, else blank.
     TAKEN = { true => ['', 'taken'], false => [''] }.freeze
 
+    # [text, mark] of the cell of an arm that returns or raises:
+    # leaves on a path that took it, so left the method there,
+    # else blank.
+    LEAVES = { true => ['', 'leaves'], false => [''] }.freeze
+
     # The cells of values, each named as names gives it.
     def self.of(values, names = OUTCOMES)
       values.map { |value| cell(*names[value]) }.join

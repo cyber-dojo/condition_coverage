@@ -156,10 +156,12 @@ module PathCoverage
       attr_reader :methods, :names, :lasts, :reaches, :sites
 
       # Notes node's name, its last line, its body statements as
-      # its rows, those in its sites' arms too, none for an empty
-      # body, and where each row that is no site is reached.
+      # its rows, those in its sites' arms too, but only those that
+      # shape its paths, as shapes? has it, none for an empty body,
+      # and where each row that is no site is reached.
       def visit_def_node(node)
-        tops = rows_in(statements_of(node.body))
+        written = rows_in(statements_of(node.body))
+        tops = written.select { shapes?(_1) }
         site = Site.of(@path, node)
         @methods[site] = tops.map { |top| row_of(top) }
         note_def(site, node)
@@ -167,16 +169,22 @@ module PathCoverage
         super
       end
 
-      # Notes the name and last line of node, the def at site.
+      # Notes the name and last line of node, the def at site, and
+      # where it is entered, reached under site's own name, so its
+      # card can say how many times it was called.
       def note_def(site, node)
         @names[site] = node.name
         @lasts[site] = node.location.end_line
+        @reaches[site] = entry_at(node)
       end
 
-      # Notes where each of tops that is no site is reached: its
-      # byte offset, or, endless, its byte range.
+      # Notes where each of tops that is no site, a return or a
+      # raise, is reached: its byte offset, or, endless, its byte
+      # range.
       def note_reaches(tops, endless:)
-        tops.reject { site?(_1) }.each do |top|
+        tops.each do |top|
+          next if site?(top)
+
           loc = top.location
           start = loc.start_offset
           at = endless ? start...loc.end_offset : start
@@ -259,14 +267,15 @@ module PathCoverage
 
       # What statement is as written: a site's operator, eg if,
       # when decision mode has a site where it starts, an elsif
-      # being elsif, as written; else = for a write, () for a
+      # being elsif, as written, an if or unless with an else
+      # if/else or unless/else; else = for a write, () for a
       # call, raise for a raise of the method's own, as it leaves
       # the method, return for a return, def for a def inside it,
       # value for anything else.
       def top_of(statement)
         site = site_at(statement)
         return 'elsif' if site && elsif?(statement)
-        return site.operator if site
+        return with_else(site.operator, statement) if site
         return 'raise' if raise?(statement)
         return '=' if write?(statement)
 

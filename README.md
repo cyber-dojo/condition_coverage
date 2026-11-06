@@ -58,8 +58,8 @@ Clicking a row's `▼` opens it:
     are explained below.
 
 Hovering over code in the open card's method opens the tree holding
-that code, its row lit, or, for code in no tree, eg `x = 42`, lights
-its statement's row. A long piece of code scrolls within its row.
+that code, its row lit, or, for a `return` or `raise`, lights its row.
+A long piece of code scrolls within its row.
 
 ### Boolean: `T` `F`
 
@@ -353,21 +353,26 @@ cannot be closed is the lesser error than hiding one that can.
 ### Methods
 
 Each method has a card, named by the `path:line:column` of its `def`,
-with a row per top-level statement. A row that is a site counts its
-paths; any other row is one path, taken when the statement is reached.
-A method's total adds up its rows. A file's code outside any method
-gets a card of its own.
+with a row for each statement that shapes its paths: each site, and
+each `return` or `raise`, which ends a path. Any other statement, eg
+`x = 1`, runs exactly when what holds it does, so is no row. A site's
+row counts its paths; a `return` or `raise` row is one path, taken
+when it is reached. A method's total adds up its rows. Its title says
+how many times it was called, so a method never called is a gap,
+even one with no rows. A file's code outside any method gets a card
+of its own.
 
-The JSON report's `cards` hold each card's rows:
+The JSON report's `cards` hold each card's rows, its `ways` (the ways
+one call can go through it) and its `calls`:
 
 ```json
 "cards": {
   "label.rb:1:0": {
-    "name": "label", "first": 1, "last": 7,
+    "name": "label", "first": 1, "last": 7, "ways": 2, "calls": 1,
     "rows": [
       { "at": "2:02", "top": "if", "paths": 2, "taken": 1, "site": "label.rb:2:2" },
-      { "at": "3:04", "top": "value", "paths": 1, "taken": 1, "site": null },
-      { "at": "5:04", "top": "value", "paths": 1, "taken": 0, "site": null }
+      { "at": "3:04", "top": "return", "paths": 1, "taken": 1, "site": null },
+      { "at": "5:04", "top": "return", "paths": 1, "taken": 0, "site": null }
     ]
   }
 }

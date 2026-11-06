@@ -2,6 +2,10 @@ module PathCoverage
   # The operators whose predicate picks an arm.
   CHOICES = %w[?: if unless].freeze
 
+  # An arm whose code leaves the method, by its code's start: a
+  # return or a raise, captured.
+  LEAVES = /\A(return|raise)\b/
+
   # The operator of a safe-navigation chain, eg user&.account.
   SAFE = '&.'.freeze
 

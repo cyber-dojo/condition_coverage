@@ -290,9 +290,11 @@ body[data-open] button.lnum:focus-visible { outline: none; }
   background: var(--surface); color: var(--fg); font: 600 12px var(--font-code);
 }
 /* A cell's mark, drawn in place of a letter: a tick for a path
-   that took an arm or called its operand, a disc for a &.
-   receiver not nil, an empty set for one nil. */
+   that took a ?:'s arm, a return arrow for one that left the
+   method at a return or a raise, a disc for a &. receiver not
+   nil, an empty set for one nil. */
 .row .cell[data-mark="taken"]::before { content: "\2713"; }
+.row .cell[data-mark="leaves"]::before { content: "\21A9"; }
 .row .cell[data-mark="present"]::before { content: "\25CF"; }
 .row .cell[data-mark="absent"]::before { content: "\2205"; }
 /* Hovering a cell with hover text, eg a path's count or a &.
@@ -427,7 +429,7 @@ body.dragging { cursor: col-resize; user-select: none; }
 .statements .prow.calls .plabel { width: auto; }
 .statements .plabel + .pcell { flex: 1; min-width: 56px; text-align: left; }
 .statements .prow.site, .statements .prow.site .pcell { cursor: pointer; }
-.statements .prow.site:hover .pcell, .statements .prow.site:hover .plabel { color: var(--link); }
+.statements .prow.site:hover .pcell:not(.not-taken):not(.was-taken), .statements .prow.site:hover .plabel { color: var(--link); }
 .statements .prow.columns .plabel, .statements .prow.columns .pcell { color: var(--muted); }
 /* A card's paths not taken are orange and those taken blue, as a
    status always is; its column titles are too, as their key. None
@@ -436,6 +438,10 @@ body.dragging { cursor: col-resize; user-select: none; }
 .statements .pcell.was-taken,
 .statements .pcell.not-taken.none { color: var(--ok); }
 .prow.calls .plabel { color: var(--fg); }
+/* How many times a card's method was called, after its name; a gap,
+   never called, coloured as one. */
+.call-count { margin-left: 6px; color: var(--muted); font-weight: 400; }
+.call-count.never { color: var(--bad); font-weight: 600; }
 /* Hovering a card's row lights its line in the code; hovering a
    fold's row marks the characters of its operand. */
 .src.lit { background: var(--cond-tint); }

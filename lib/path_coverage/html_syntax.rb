@@ -133,6 +133,17 @@ module PathCoverage
       html(text, of(text).fetch(1, []))
     end
 
+    # Example: if/else as <span class="k">if</span>/<span
+    # class="k">else</span>.
+    # A row's or a fold's label, coloured as fragment colours it;
+    # but a label naming a choice and its else, eg if/else, each of
+    # its words, as code would read /else as a regexp's start.
+    def self.label(text)
+      return fragment(text) unless text.match?(%r{\A\w+/else\z})
+
+      text.split('/').map { fragment(_1) }.join('/')
+    end
+
     # A ternary's arm's label, eg ? total > 100, as HTML: its ? or
     # : coloured as an operator, the code after it as code.
     def self.ternary_arm(label)
