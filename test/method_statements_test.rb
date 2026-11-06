@@ -85,8 +85,8 @@ class MethodStatementsTest < TidTest
   test 'St3e05', %w(
   | Example: label, writing a ternary's value then returning it
   | A write is looked through, so its row is the ternary's:
-  | named ?: and at the ternary's column, as decision mode
-  | names it, not at the write's.
+  | named ?: and at the ternary's ?, as decision mode names
+  | it, not at the write's.
   ) do
     source = <<~RUBY
       def label(items)
@@ -97,7 +97,7 @@ class MethodStatementsTest < TidTest
     rows = statements(source)['k.rb:1:0'].map do |row|
       [row.line, row.column, row.top]
     end
-    assert_equal [[2, 9, '?:'], [3, 2, 'value']], rows
+    assert_equal [[2, 22, '?:'], [3, 2, 'value']], rows
   end
 
   test 'St3e06', %w(
@@ -115,7 +115,7 @@ class MethodStatementsTest < TidTest
     rows = statements(source)['k.rb:1:0'].map do |row|
       [row.line, row.column, row.top]
     end
-    expected = [[2, 11, '?:'], [2, 28, '?:'], [3, 2, 'value']]
+    expected = [[2, 15, '?:'], [2, 35, '?:'], [3, 2, 'value']]
     assert_equal expected, rows
   end
 
@@ -436,7 +436,7 @@ class MethodStatementsTest < TidTest
     expected = {
       'k.rb:1:0' => [[2, 9, 'if', 2], [3, 2, 'def', 1],
                      [6, 17, 'if', 2]],
-      'k.rb:3:2' => [[4, 4, '?:', 2]]
+      'k.rb:3:2' => [[4, 15, '?:', 2]]
     }
     assert_equal expected, rows
   end
@@ -458,7 +458,7 @@ class MethodStatementsTest < TidTest
     rows = statements(source)['k.rb:1:0'].map do |row|
       [row.line, row.column, row.top, row.paths]
     end
-    expected = [[2, 2, '=', 1], [2, 20, '?:', 2], [3, 2, 'value', 1]]
+    expected = [[2, 2, '=', 1], [2, 33, '?:', 2], [3, 2, 'value', 1]]
     assert_equal expected, rows
   end
 
@@ -490,7 +490,7 @@ class MethodStatementsTest < TidTest
     end
     expected = [
       [2, 2, 'if', 2], [3, 4, '=', 1], [4, 2, 'elsif', 2],
-      [5, 15, 'if', 2], [7, 12, '?:', 2], [9, 2, 'value', 1]
+      [5, 15, 'if', 2], [7, 16, '?:', 2], [9, 2, 'value', 1]
     ]
     assert_equal expected, rows
   end
@@ -694,7 +694,8 @@ class MethodStatementsTest < TidTest
   | call on a ?:'s value
   | A site inside another site that is a site of its own, as
   | a modifier if's arm and a &. receiver are, is a row too,
-  | after the site holding it.
+  | the site and those inside it in the order they are named,
+  | left to right: the ?: before the modifier if it is in.
   ) do
     source = <<~RUBY
       def label(node, kind)
@@ -706,9 +707,25 @@ class MethodStatementsTest < TidTest
       [row.line, row.column, row.top]
     end
     expected = [
-      [2, 26, 'if'], [2, 9, '?:'], [3, 2, '&.'], [3, 3, '?:']
+      [2, 14, '?:'], [2, 26, 'if'], [3, 2, '&.'], [3, 12, '?:']
     ]
     assert_equal expected, rows
+  end
+
+  test 'St3e35', %w(
+  | Example: ship, a ?: whose predicate is a || b
+  | The || is a site of its own inside the ?:, named where it
+  | starts, before the ?:'s ?, so its row comes first.
+  ) do
+    source = <<~RUBY
+      def ship(a, b)
+        a || b ? 0 : 7
+      end
+    RUBY
+    rows = statements(source)['k.rb:1:0'].map do |row|
+      [row.line, row.column, row.top]
+    end
+    assert_equal [[2, 2, '||'], [2, 9, '?:']], rows
   end
 
   test 'St3e32', %w(
@@ -743,8 +760,8 @@ class MethodStatementsTest < TidTest
       [{ path: [true], count: counts[0] },
        { path: [false], count: counts[1] }]
     end
-    paths = { 'k.rb:1:7' => taken.call([3, 0]),
-              'k.rb:2:15' => taken.call([1, 1]) }
+    paths = { 'k.rb:1:24' => taken.call([3, 0]),
+              'k.rb:2:19' => taken.call([1, 1]) }
     statements = PathCoverage::MethodStatements
     assert_equal [1, 2], statements.top_level(source, 'k.rb', paths)
   end
@@ -771,7 +788,7 @@ class MethodStatementsTest < TidTest
       [row.line, row.column, row.top, row.paths, row.site]
     end
     expected = [
-      [1, 7, '?:', 2, 'k.rb:1:7'], [1, 31, '?:', 2, 'k.rb:1:31'],
+      [1, 18, '?:', 2, 'k.rb:1:18'], [1, 42, '?:', 2, 'k.rb:1:42'],
       [2, 0, 'if', 2, 'k.rb:2:0'], [4, 0, 'elsif', 2, 'k.rb:4:0']
     ]
     assert_equal expected, actual

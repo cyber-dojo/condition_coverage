@@ -82,12 +82,14 @@ class ProjectsTest < TidTest
   | Example: total -= 10 if order.fetch(:total) > 100 && ...
   | The project measures methods too.
   | It prints its site gaps.
-  | The modifier if's site is named at its keyword (5:16).
+  | The modifier if's site is named at its keyword (5:16), and
+  | took both its paths; its predicate's && is a site of its
+  | own, named where it starts (5:19), with one gap.
   | fee still runs unchanged when instrumented.
   ) do |t|
     stdout, stderr, status = run_project('two_decisions', t.dir)
     expected = [
-      'source/shop.rb:5:16 path never taken: ' \
+      'source/shop.rb:5:19 path never taken: ' \
       '`order.fetch(:total) > 100` true, `order.fetch(:paid)` false'
     ].join("\n")
     assert_equal "#{expected}\n", stdout

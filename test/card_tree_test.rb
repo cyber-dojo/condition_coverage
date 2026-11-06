@@ -9,7 +9,9 @@ class CardTreeTest < TidTest
   | arm it is in, that arm, and on, the parent's possible paths
   | it runs on, by their index: the inner if runs only on the
   | outer's one path that takes its then arm. A row at the top
-  | of the method has none of these.
+  | of the method has none of these. The &&, the outer if's
+  | predicate, is a row in that if's one leaf, giving it true
+  | only where a and b are.
   ) do
     source = <<~RUBY
       def pick(a, b)
@@ -20,6 +22,7 @@ class CardTreeTest < TidTest
     RUBY
     expected = {
       '2:2' => [nil, nil, nil, nil, nil],
+      '2:5' => ['2:2', nil, [0, 1], 0, [true, false, false]],
       '3:4' => ['2:2', 'then', [0], nil, nil],
       '3:14' => ['3:4', 'then', [0], nil, nil],
       '3:21' => ['3:4', 'else', [1], nil, nil]
@@ -44,7 +47,7 @@ class CardTreeTest < TidTest
     RUBY
     expected = {
       '2:2' => [nil, nil, nil, nil, nil],
-      '2:23' => ['2:2', nil, (2..11).to_a, 2, [nil, nil]]
+      '2:25' => ['2:2', nil, (2..11).to_a, 2, [nil, nil]]
     }
     assert_equal expected, places(source)
   end
@@ -64,7 +67,7 @@ class CardTreeTest < TidTest
     RUBY
     expected = {
       '2:2' => [nil, nil, nil, nil, nil],
-      '4:4' => ['2:2', 'else', [1], nil, nil]
+      '4:6' => ['2:2', 'else', [1], nil, nil]
     }
     assert_equal expected, places(source)
   end
@@ -84,7 +87,7 @@ class CardTreeTest < TidTest
     RUBY
     expected = {
       '2:2' => [nil, nil, nil, nil, nil],
-      '2:26' => ['2:2', 'then', [0, 1], 2, nil]
+      '2:28' => ['2:2', 'then', [0, 1], 2, nil]
     }
     assert_equal expected, places(source)
   end

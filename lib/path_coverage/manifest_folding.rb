@@ -13,16 +13,23 @@ module PathCoverage
   # block_site? and extent_of.
   module ManifestFolding
     # The sites that fold into the leaf operand, as collected
-    # finds them; none for a leaf that is wholly a block method's
-    # call whose value follows from its path, which is visited as
-    # a site of its own, as the leaf's outcome is that value.
+    # finds them; none for a leaf that is wholly a site of its own,
+    # as own_site? has it, visited as one, as the leaf's outcome is
+    # its value.
     def leaf_sites(operand)
-      unless valued?(operand)
+      unless own_site?(operand)
         return collected { operand.accept(self) }
       end
 
       scoped { operand.accept(self) }
       []
+    end
+
+    # True for a leaf that is wholly a site of its own: a block
+    # method's call whose value follows from its path, or an && or
+    # ||, eg a predicate, not ignored.
+    def own_site?(node)
+      valued?(node) || (operator?(node) && !ignored?(node))
     end
 
     # True for a block method's call that is a site, not ignored,
@@ -40,7 +47,7 @@ module PathCoverage
     # select, whose array is truthy; nil when its paths give both,
     # or node is no such site.
     def given_outcome(node)
-      return nil unless valued?(node)
+      return nil unless own_site?(node)
 
       site = @sites.fetch(Site.at(@path, site_loc(node)))
       GIVEN[SitePaths.values(site).uniq]

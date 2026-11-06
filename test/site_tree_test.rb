@@ -130,7 +130,8 @@ class SiteTreeTest < TidTest
   test 'EuNs80', %w(
   | Example: if order.big? && order.new? 5 else 7 end
   | An if's tree is the same as a ternary's.
-  | The predicate decides which arm each path took.
+  | Its predicate, an && here, is one leaf, the && a site of
+  | its own; the predicate decides which arm each path took.
   | Both arms (5 and 7) are plain, so the if's value is nil.
   ) do
     source = <<~RUBY
@@ -144,29 +145,16 @@ class SiteTreeTest < TidTest
     RUBY
     site = PathCoverage::Manifest.sites(source, 'k.rb').values.first
     paths = [
-      { path: [true, true], count: 1 },
-      { path: [true, false], count: 0 },
-      { path: [false, nil], count: 2 }
+      { path: [true], count: 1 },
+      { path: [false], count: 2 }
     ]
     expected = {
-      operator: 'if', counts: [0, 1, 2],
-      cells: [nil, nil, nil],
+      operator: 'if', counts: [1, 2],
+      cells: [nil, nil],
       operands: [
-        {
-          operator: '&&', cells: [false, true, false],
-          operands: [
-            { text: 'order.big?', cells: [true, true, false] },
-            { text: 'order.new?', cells: [false, true, nil] }
-          ]
-        },
-        {
-          arm: :then, text: '5',
-          cells: [false, true, false], body: nil
-        },
-        {
-          arm: :else, text: '7',
-          cells: [true, false, true], body: nil
-        }
+        { text: 'order.big? && order.new?', cells: [true, false] },
+        { arm: :then, text: '5', cells: [true, false], body: nil },
+        { arm: :else, text: '7', cells: [false, true], body: nil }
       ]
     }
     actual = PathCoverage::SiteTree.of(source, site, paths)

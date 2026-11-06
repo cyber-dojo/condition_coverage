@@ -279,15 +279,16 @@ class ManifestTest < TidTest
     RUBY
     arms = [arm(:then, 26...29), arm(:else, 32...35)]
     ternary = condition('?:', 16...23, *arms, extent: 16...35)
-    expected = { 'k.rb:2:2' => ternary }
+    expected = { 'k.rb:2:10' => ternary }
     actual = PathCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end
 
   test '6asy91', %w(
-  | a ternary whose predicate is an && nests the &&
-  | inside its site, as an operand of the other operator
-  | nests, rather than the && being a site of its own
+  | a ternary whose predicate is an && is a site of one leaf,
+  | its predicate, and the && a site of its own, as a block
+  | method's call wholly a leaf is: each a row of its own card,
+  | the card's tree saying what the &&'s paths give that leaf
   ) do
     source = <<~RUBY
       def kata?(id)
@@ -296,8 +297,8 @@ class ManifestTest < TidTest
     RUBY
     both = condition('&&', 16...23, 27...35, extent: 16...35)
     arms = [arm(:then, 38...41), arm(:else, 44...47)]
-    ternary = condition('?:', both, *arms, extent: 16...47)
-    expected = { 'k.rb:2:2' => ternary }
+    ternary = condition('?:', 16...35, *arms, extent: 16...47)
+    expected = { 'k.rb:2:22' => ternary, 'k.rb:2:2' => both }
     actual = PathCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end
@@ -317,7 +318,7 @@ class ManifestTest < TidTest
       '?:', 16...23, arm(:then, 26...50, both), arm(:else, 53...56),
       extent: 16...56
     )
-    expected = { 'k.rb:2:2' => ternary }
+    expected = { 'k.rb:2:10' => ternary }
     actual = PathCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end
@@ -336,7 +337,7 @@ class ManifestTest < TidTest
       '?:', 16...23, arm(:then, 26...29), arm(:else, 32...56, both),
       extent: 16...56
     )
-    expected = { 'k.rb:2:2' => ternary }
+    expected = { 'k.rb:2:10' => ternary }
     actual = PathCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end
@@ -356,7 +357,7 @@ class ManifestTest < TidTest
       extent: 16...59
     )
     inner = condition('&&', 41...42, 46...51, extent: 41...51)
-    expected = { 'k.rb:2:2' => ternary, 'k.rb:2:27' => inner }
+    expected = { 'k.rb:2:10' => ternary, 'k.rb:2:27' => inner }
     actual = PathCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end
@@ -365,7 +366,9 @@ class ManifestTest < TidTest
   | a ternary that is an arm of a ternary, in parentheses,
   | is a site of its own, the arm holding it a plain arm, as an
   | if's arm holding an if is: each is a row of its own card,
-  | the card's tree placing the inner in the outer's then arm
+  | the card's tree placing the inner in the outer's then arm.
+  | Each is named at its ?, so a ternary never shares the name
+  | of a site starting where it does, eg its predicate's.
   ) do
     source = <<~RUBY
       def k(x, y)
@@ -380,7 +383,7 @@ class ManifestTest < TidTest
       '?:', 14...15, arm(:then, 18...29), arm(:else, 32...33),
       extent: 14...33
     )
-    expected = { 'k.rb:2:2' => outer, 'k.rb:2:7' => inner }
+    expected = { 'k.rb:2:4' => outer, 'k.rb:2:9' => inner }
     actual = PathCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end
@@ -388,8 +391,9 @@ class ManifestTest < TidTest
   test '6asya0', %w(
   | Example: if order.big? && order.new?
   | The if is a site, named if.
-  | Its first operand is its predicate.
-  | Here that is the && site, nested inside it.
+  | Its first operand is its predicate, one leaf.
+  | Here that is the &&, a site of its own, named where it
+  | starts.
   | Its other operands are its then arm (5) and else arm (7).
   | Its extent is "if order.big? && order.new?".
   | The arms are outside the extent, as they are statements.
@@ -405,10 +409,10 @@ class ManifestTest < TidTest
     RUBY
     both = condition('&&', 20...30, 34...44, extent: 20...44)
     choice = condition(
-      'if', both, arm(:then, 49...50), arm(:else, 62...63),
+      'if', 20...44, arm(:then, 49...50), arm(:else, 62...63),
       extent: 17...44
     )
-    expected = { 'k.rb:2:2' => choice }
+    expected = { 'k.rb:2:2' => choice, 'k.rb:2:5' => both }
     actual = PathCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end
@@ -510,6 +514,7 @@ class ManifestTest < TidTest
   | It is not named at the column of return (2).
   | Its then arm is "return 1", the code left of the unless.
   | Its extent is "unless a && b".
+  | Its predicate, a && b, is one leaf, the && a site of its own.
   ) do
     source = <<~RUBY
       def k(a, b)
@@ -518,9 +523,9 @@ class ManifestTest < TidTest
     RUBY
     both = condition('&&', 30...31, 35...36, extent: 30...36)
     choice = condition(
-      'unless', both, arm(:then, 14...22), extent: 23...36
+      'unless', 30...36, arm(:then, 14...22), extent: 23...36
     )
-    expected = { 'k.rb:2:11' => choice }
+    expected = { 'k.rb:2:11' => choice, 'k.rb:2:18' => both }
     actual = PathCoverage::Manifest.sites(source, 'k.rb')
     assert_equal expected, actual
   end

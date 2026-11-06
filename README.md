@@ -58,7 +58,8 @@ Clicking a row's `▼` opens it:
     are explained below.
 
 Hovering over code in the open card's method opens the tree holding
-that code, its row lit. A long piece of code scrolls within its row.
+that code, its row lit, or, for code in no tree, eg `x = 42`, lights
+its statement's row. A long piece of code scrolls within its row.
 
 ### Boolean: `T` `F`
 
@@ -245,8 +246,10 @@ source/kata.rb:4:24 never reached
 ### Decisions
 
 A site is named by the `path:line:column` where it starts, the path
-relative to `root`. A site in a covered file the run never loaded is
-still reported, as `never reached`.
+relative to `root`; but an `if` or `unless` at its keyword, a `?:` at
+its `?`, and a block method's call at its method, so no two sites
+share a name. A site in a covered file the run never loaded is still
+reported, as `never reached`.
 
 A path is the outcome of each leaf one evaluation of the site reached, in
 order; a leaf that short-circuiting skipped is not on it. Each leaf is

@@ -186,13 +186,16 @@ module PathCoverage
 
       # Example: if a then x = 1 end gives the if, then the write.
       # The nodes statements' rows are for, flat, in the order
-      # they are written: each statement's tops, each followed by
-      # the sites of their own inside it, then the rows of its
-      # arms' statements, when it has any.
+      # they are written: each statement's tops, each with the
+      # sites of their own inside it, in the order they are named,
+      # eg a || before the ?: whose predicate it is, then the rows
+      # of its arms' statements, when it has any.
       def rows_in(statements)
         statements.flat_map do |statement|
           tops = top_nodes(statement).flat_map do |top|
-            [top, *inner_sites(top), *rows_in(arms_of(top))]
+            named = [top, *inner_sites(top)]
+            ordered = named.sort_by { site_loc(_1).start_offset }
+            [*ordered, *rows_in(arms_of(top))]
           end
           tops + body_rows(statement)
         end

@@ -174,10 +174,10 @@ class HtmlStatementsTest < TidTest
     assert_equal [
       ['file', '*4', '2', '2'],
       ['line:col', '', 'not taken', 'taken'],
-      ['1:07', '?:', '1', '1'],
-      ['1:31', '?:', '1', '1']
+      ['1:18', '?:', '1', '1'],
+      ['1:42', '?:', '1', '1']
     ], cells(html)
-    assert_includes html, 'data-site="k.rb:1:31"'
+    assert_includes html, 'data-site="k.rb:1:42"'
   end
 
   test 'Hs4q06', %w(

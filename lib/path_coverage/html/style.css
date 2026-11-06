@@ -441,7 +441,9 @@ body.dragging { cursor: col-resize; user-select: none; }
 .src.lit { background: var(--cond-tint); }
 mark.chars { background: var(--lit); color: inherit; border-radius: 3px; box-shadow: 0 0 0 2px var(--lit); }
 /* The fold row of the code under the pointer, lit as marked code is. */
-.fold .row.hovered { background: var(--lit); border-radius: 3px; }
+.fold .row.hovered, .statements .prow.hovered {
+  background: var(--lit); border-radius: 3px;
+}
 .fold .row[data-at] { cursor: default; }
 .fold .row[data-at]:hover { background: rgba(255, 255, 255, 0.08); }
 

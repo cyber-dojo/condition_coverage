@@ -98,18 +98,19 @@ class KernelTest < TidTest
     RUBY
     t.start
     t.load('fee.rb')::Fee.fee(true)
-    expected = "fee.rb:2:25 path never taken: `member` false\n"
+    expected = "fee.rb:2:32 path never taken: `member` false\n"
     assert_output(expected) { t.report }
   end
 
   test '6rTS43', %w(
   | Example: user[:member] || user[:vip] ? 5 : 7, called once
-  | Each evaluation's path through the site is recorded.
-  | Each path never taken is printed as a gap.
+  | The ?: is a site of one leaf, its predicate, and the || a
+  | site of its own; each evaluation's path through each is
+  | recorded, and each path never taken printed as a gap.
   | The JSON report has every path's count, and each leaf's
   | span.
-  | Its totals give decisions as [taken, possible]: [1, 3],
-  | and methods the same, fee's card being the one ?: row.
+  | Its totals give decisions as [taken, possible]: [2, 5],
+  | and methods the same, fee's card having the ?: and || rows.
   ) do |t|
     t.write(<<~RUBY, 'fee.rb')
       module Fee
@@ -118,8 +119,10 @@ class KernelTest < TidTest
     RUBY
     t.start
     t.load('fee.rb')::Fee.fee({ member: true })
+    either = '`user[:member] || user[:vip]`'
     never = 'fee.rb:2:23 path never taken: `user[:member]` false'
     expected = [
+      "fee.rb:2:51 path never taken: #{either} false",
       "#{never}, `user[:vip]` true",
       "#{never}, `user[:vip]` false"
     ].join("\n")
@@ -127,6 +130,13 @@ class KernelTest < TidTest
 
     json = t.json
     expected = {
+      'fee.rb:2:51' => {
+        'leaves' => [%w(2:23 2:50)],
+        'taken' => [
+          { 'path' => [true], 'count' => 1 },
+          { 'path' => [false], 'count' => 0 }
+        ]
+      },
       'fee.rb:2:23' => {
         'leaves' => [%w(2:23 2:36), %w(2:40 2:50)],
         'taken' => [
@@ -137,7 +147,7 @@ class KernelTest < TidTest
       }
     }
     assert_equal expected, json['paths']
-    totals = { 'decisions' => [1, 3], 'methods' => [1, 3] }
+    totals = { 'decisions' => [2, 5], 'methods' => [2, 5] }
     assert_equal totals, json['totals']
   end
 
@@ -1516,7 +1526,7 @@ class KernelTest < TidTest
     page = File.read("#{t.dir}/files/rate.rb.html")
     top = '<div class="pathgrid statements top-level" id="paths-1"'
     assert_includes page, top
-    expected = [%w(file 1), %w(line:col taken), %w(1:07 1)]
+    expected = [%w(file 1), %w(line:col taken), %w(1:30 1)]
     assert_equal expected, card_taken(page, 1)
   end
 
@@ -1535,7 +1545,7 @@ class KernelTest < TidTest
     t.load('rate.rb')
     t.report
     page = File.read("#{t.dir}/files/rate.rb.html")
-    expected = [%w(Rate 1), %w(line:col taken), %w(2:09 1)]
+    expected = [%w(Rate 1), %w(line:col taken), %w(2:32 1)]
     assert_equal expected, card_taken(page, 2)
   end
 
@@ -1553,7 +1563,7 @@ class KernelTest < TidTest
     t.load('rate.rb')
     t.report
     page = File.read("#{t.dir}/files/rate.rb.html")
-    expected = [%w(Rate 1), %w(line:col taken), %w(2:09 1)]
+    expected = [%w(Rate 1), %w(line:col taken), %w(2:32 1)]
     assert_equal expected, card_taken(page, 2)
   end
 
@@ -1578,8 +1588,8 @@ class KernelTest < TidTest
       "#{t.file}:2:2" => {
         'name' => 'fee', 'first' => 2, 'last' => 2, 'ways' => 2,
         'rows' => [
-          { 'at' => '2:22', 'top' => '?:', 'paths' => 2, 'taken' => 1,
-            'site' => "#{t.file}:2:22" }
+          { 'at' => '2:26', 'top' => '?:', 'paths' => 2, 'taken' => 1,
+            'site' => "#{t.file}:2:26" }
         ]
       }
     }
@@ -1605,8 +1615,8 @@ class KernelTest < TidTest
       'rate.rb:2:0' => {
         'name' => 'Rate', 'first' => 2, 'last' => 2, 'ways' => 2,
         'rows' => [
-          { 'at' => '2:09', 'top' => '?:', 'paths' => 2, 'taken' => 1,
-            'site' => 'rate.rb:2:9' }
+          { 'at' => '2:32', 'top' => '?:', 'paths' => 2, 'taken' => 1,
+            'site' => 'rate.rb:2:32' }
         ]
       }
     }
@@ -1635,7 +1645,7 @@ class KernelTest < TidTest
     t.report
     top = PathCoverage::CardTree::TOP
     inner = { 'parent' => '3:4', 'in' => 'then', 'on' => [0] }
-    card = { '3:4' => top, '4:6' => top.merge(inner) }
+    card = { '3:4' => top, '4:10' => top.merge(inner) }
     assert_equal({ t.file => { '2:2' => card } }, t.json['tree'])
   end
 
@@ -1653,7 +1663,7 @@ class KernelTest < TidTest
     t.load('rate.rb')
     t.report
     top = PathCoverage::CardTree::TOP
-    expected = { 'rate.rb' => { '2:0' => { '2:9' => top } } }
+    expected = { 'rate.rb' => { '2:0' => { '2:32' => top } } }
     assert_equal expected, t.json['tree']
   end
 
@@ -1677,10 +1687,10 @@ class KernelTest < TidTest
     rows = t.json['cards']["#{t.file}:2:2"]['rows'].map do |row|
       row.values_at('at', 'top', 'paths', 'taken')
     end
-    assert_equal [['2:24', '?:', 2, 2], ['2:29', '?:', 2, 1]], rows
+    assert_equal [['2:26', '?:', 2, 2], ['2:31', '?:', 2, 1]], rows
     top = PathCoverage::CardTree::TOP
-    inner = { 'parent' => '2:24', 'in' => 'then', 'on' => [0] }
-    tree = { '2:24' => top, '2:29' => top.merge(inner) }
+    inner = { 'parent' => '2:26', 'in' => 'then', 'on' => [0] }
+    tree = { '2:26' => top, '2:31' => top.merge(inner) }
     assert_equal tree, t.json['tree'][t.file]['2:2']
   end
 
@@ -1704,7 +1714,7 @@ class KernelTest < TidTest
         coverage_dir run_dir
       end
       t.load("#{run}/rate.rb")
-      gap = 'rate.rb:1:7 path never taken: ' \
+      gap = 'rate.rb:1:30 path never taken: ' \
             "`ENV.key?('RATE6rTS6m')` true\n"
       assert_output(gap) { exit_report.call }
       JSON.parse(File.read("#{run_dir}/path_coverage.json"))

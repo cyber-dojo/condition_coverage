@@ -11,15 +11,16 @@ module PathCoverage
     # being an if_node with no if keyword.
     CHOICE_TYPES = %i[if_node unless_node].freeze
 
-    # Where node's site starts: a &. chain's start; a block
-    # method's call at its method; an if's or an unless's
-    # keyword, which a modifier's statement comes before;
-    # anything else's own start.
+    # Where node's site is named: a &. chain's start; a block
+    # method's call at its method; a ternary at its ?, so it never
+    # shares the name of a site starting where it does, eg its
+    # predicate; an if's or an unless's keyword, which a
+    # modifier's statement comes before; anything else's own start.
     def site_loc(node)
       return node.location if safe_chain?(node)
       return node.message_loc if node.type == :call_node
       return node.location unless CHOICE_TYPES.include?(node.type)
-      return node.location if ternary?(node)
+      return node.then_keyword_loc if ternary?(node)
 
       keyword_loc(node)
     end
@@ -148,13 +149,13 @@ module PathCoverage
       node.type == :if_node && node.if_keyword_loc.nil?
     end
 
-    # A ternary's or an if's predicate as its operand: an && or
-    # || nested as a Condition, as is a &. chain, its value its
-    # last leaf, anything else a leaf.
+    # A ternary's or an if's predicate as its operand: a &. chain
+    # nested as a Condition, its value its last leaf; anything
+    # else a leaf, an && or || among them, as a site of its own,
+    # as leaf_sites has it.
     def predicate_of(node)
       predicate = grouped(node.predicate)
       return leaf(predicate) if ignored?(predicate)
-      return condition_of(predicate) if operator?(predicate)
       if safe_chain?(predicate)
         return chain_condition(predicate, value: true)
       end

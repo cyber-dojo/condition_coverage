@@ -77,7 +77,7 @@ class TestHelperTest < TidTest
     t.start { report :html }
     t.load
     t.report
-    taken = t.json['paths']["#{t.file}:1:7"]['taken']
+    taken = t.json['paths']["#{t.file}:1:31"]['taken']
     assert_equal([0, 1], taken.map { _1['count'] })
     assert File.exist?("#{t.dir}/index.html")
   end
