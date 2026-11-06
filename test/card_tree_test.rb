@@ -1,5 +1,6 @@
 require_relative 'test_helper'
 require 'path_coverage/card_tree'
+require 'path_coverage/card_ways'
 
 class CardTreeTest < TidTest
   test 'Ct8e01', %w(
@@ -86,6 +87,39 @@ class CardTreeTest < TidTest
       '2:26' => ['2:2', 'then', [0, 1], 2, nil]
     }
     assert_equal expected, places(source)
+  end
+
+  test 'Ct8e08', %w(
+  | Example: fee, an if holding a ?: of an &&; two, two ?:s one
+  | after another; led?, an || of an any? whose block is an &&
+  | The ways through a card fold its tree: rows one after
+  | another multiply, and a site adds up its paths, each times
+  | the ways of the rows it runs on that path; a row that is the
+  | whole of a leaf counts only its paths that give the leaf the
+  | outcome the path has.
+  | fee: then 3, else 1, so 4. two: 2 times 2, so 4. led?: the
+  | ||'s true path takes the 2 any? paths giving true, 1 way
+  | each; each false path takes its 3 giving false, 1 + 2 + 2.
+  ) do
+    source = <<~RUBY
+      def fee(member, paid, big)
+        if member
+          paid && big ? 5 : 10
+        else
+          0
+        end
+      end
+      def two(a, b)
+        x = a ? 1 : 2
+        y = b ? 3 : 4
+        [x, y]
+      end
+      def led?(xs)
+        xs.any? { |x| x.odd? && x > 1 } || xs.empty?
+      end
+    RUBY
+    expected = { 'k.rb:1:0' => 4, 'k.rb:8:0' => 4, 'k.rb:13:0' => 12 }
+    assert_equal expected, PathCoverage::CardWays.of(source, 'k.rb')
   end
 
   test 'Ct8e07', %w(

@@ -208,10 +208,13 @@ class HtmlStatementsTest < TidTest
   end
 
   # The card the JSON report lists at site, named name, ending
-  # on line last, its rows' taken as taken gives them.
+  # on line last, its rows' taken as taken gives them, its ways
+  # its rows' paths multiplied, as one after another: what every
+  # card here folds to, none holding another's rows.
   def listed(site, name, rows, taken, last)
-    counted = rows.zip(taken)
-    PathCoverage::WithinMethods.card(site, name, last, counted)
+    ways = rows.map(&:paths).reduce(1, :*)
+    named = [name, last, ways]
+    PathCoverage::WithinMethods.card(site, named, rows.zip(taken))
   end
 
   # The texts of each row of html's grid: its label, then each

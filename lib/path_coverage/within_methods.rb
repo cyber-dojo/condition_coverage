@@ -1,5 +1,6 @@
 require 'prism'
 require_relative 'card_tree'
+require_relative 'card_ways'
 require_relative 'html_statements'
 require_relative 'method_statements'
 require_relative 'source_lines'
@@ -92,7 +93,9 @@ module PathCoverage
       spans(path, parsed, lines).to_h do |span, rows|
         site = "#{path}:#{span.begin}:0"
         taken = rows.zip(MethodStatements.taken(rows, site_paths))
-        [site, card(site, scopes[span.begin], span.end, taken)]
+        ways = CardWays.card(source, sites, rows)
+        named = [scopes[span.begin], span.end, ways]
+        [site, card(site, named, taken)]
       end
     end
 
@@ -143,18 +146,21 @@ module PathCoverage
       lasts = MethodStatements.lasts(source, path, sites)
       MethodStatements.of(source, path, sites).to_h do |site, rows|
         taken = MethodStatements.taken(rows, paths, reached)
-        [site, card(site, names[site], lasts[site], rows.zip(taken))]
+        ways = CardWays.card(source, sites, rows)
+        named = [names[site], lasts[site], ways]
+        [site, card(site, named, rows.zip(taken))]
       end
     end
 
-    # The card of the def at site named name, ending on line
-    # last: its first line, from site, and a row for each
-    # [statement, taken] of rows.
-    def self.card(site, name, last, rows)
+    # The card of the def at site, named name, ending on line
+    # last, with ways through it, as ways folds them: its first
+    # line, from site, and a row for each [statement, taken] of
+    # rows.
+    def self.card(site, (name, last, ways), rows)
       first = Integer(site.split(':')[-2])
       listed = rows.map { |statement, count| row(statement, count) }
       { 'name' => name, 'first' => first, 'last' => last,
-        'rows' => listed }
+        'ways' => ways, 'rows' => listed }
     end
 
     # A card's row: statement's line:column, as its page labels

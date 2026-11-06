@@ -1,4 +1,5 @@
 require_relative 'test_helper'
+require 'path_coverage/card_ways'
 require 'path_coverage/method_statements'
 
 class MethodStatementsTest < TidTest
@@ -162,8 +163,8 @@ class MethodStatementsTest < TidTest
   | Example: fee, a write, four ifs, then a value
   | Its size is the sum of its rows' paths,
   | 1+2+2+2+2+1 = 10, the paths its tests are to take.
-  | Its complexity is their product, 1*2*2*2*2*1 = 16, as its
-  | rows run in sequence, each path of one going on to each
+  | Its ways are their product, 1*2*2*2*2*1 = 16, as its rows
+  | run one after another, each path of one going on to each
   | of the next.
   ) do
     source = <<~RUBY
@@ -179,7 +180,7 @@ class MethodStatementsTest < TidTest
     paths = statements(source)['k.rb:1:0'].map(&:paths)
     assert_equal [10, 16], [
       PathCoverage::MethodStatements.size(paths),
-      PathCoverage::MethodStatements.complexity(paths)
+      PathCoverage::CardWays.of(source, 'k.rb')['k.rb:1:0']
     ]
   end
 

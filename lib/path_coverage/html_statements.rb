@@ -12,9 +12,9 @@ module PathCoverage
     # Example: ship, an if then a value, gives its title row,
     # the column titles, then an if row and a value row.
     # The card at site drawn from card, as the JSON report lists
-    # it, as WithinMethods.card gives it: its name, its last line
-    # and its rows. tree, when given, gives a row's site's tree
-    # rows, folded under its row.
+    # it, as WithinMethods.card gives it: its name, its last line,
+    # the ways through it and its rows. tree, when given, gives a
+    # row's site's tree rows, folded under its row.
     def self.card(site, card, &)
       first, column = site.split(':').last(2)
       rows = card['rows']
@@ -23,7 +23,7 @@ module PathCoverage
         %(data-col="#{column}" data-last="#{card['last']}"),
         %(data-status="#{status(rows)}" hidden="hidden")
       ].join(' ')
-      head = title_row(first, card['name'], rows) + columns_row
+      head = title_row(first, card, rows) + columns_row
       %(<div class="#{GRID}" #{attrs}>) +
         %(#{head}#{body(rows, &)}</div>)
     end
@@ -62,18 +62,18 @@ module PathCoverage
       done ? 'covered' : 'gaps'
     end
 
-    # The row level with the def: its name, *complexity, then
-    # how many of its paths were not taken, those of rows not
-    # known among them, and how many were.
-    def self.title_row(first, name, rows)
+    # The row level with the def: card's name, *its ways, then
+    # how many of its rows' paths were not taken, those of rows
+    # not known among them, and how many were.
+    def self.title_row(first, card, rows)
       seen = rows.map { _1['taken'] }.compact.sum
       paths = rows.map { _1['paths'] }
       cells = [
-        "*#{MethodStatements.complexity(paths)}",
+        "*#{card['ways']}",
         (MethodStatements.size(paths) - seen).to_s, seen.to_s
       ]
       attrs = %(class="prow calls" data-line="#{first}")
-      row(attrs, CGI.escapeHTML(name.to_s), cells)
+      row(attrs, CGI.escapeHTML(card['name'].to_s), cells)
     end
 
     # The row naming the not taken and taken columns.

@@ -372,13 +372,32 @@ order `paths` lists them. A row at the method's top has none of these.
 "tree": {
   "label.rb": {
     "1:0": {
-      "2:2": { "parent": null, "in": null, "on": null },
-      "3:4": { "parent": "2:2", "in": "then", "on": [0] },
-      "5:4": { "parent": "2:2", "in": "else", "on": [1] }
+      "2:2": { "parent": null, "in": null, "on": null, "leaf": null, "gives": null },
+      "3:4": { "parent": "2:2", "in": "then", "on": [0], "leaf": null, "gives": null },
+      "5:4": { "parent": "2:2", "in": "else", "on": [1], "leaf": null, "gives": null }
     }
   }
 }
 ```
+
+A row inside one of its parent's leaves names that `leaf`, by index.
+A row that is the whole of that leaf, like the `any?` here, also
+`gives` the leaf's outcome on each of its own paths, `null` where not
+known:
+
+```ruby
+def led?(xs)
+  xs.any? { |x| x.odd? } || xs.empty?
+end
+```
+
+```json
+"2:5": { "parent": "2:2", "in": null, "on": [0, 1, 2], "leaf": 0,
+         "gives": [false, true, false, true, false] }
+```
+
+Its 5 paths are 0 items, then 1 item and 2+ items, each with a last
+answer true or false.
 
 ### Reporters
 

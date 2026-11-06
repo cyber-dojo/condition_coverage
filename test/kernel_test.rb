@@ -1562,9 +1562,10 @@ class KernelTest < TidTest
   | Example: module Fee holding fee, a def of a ?:, called once
   | with big true
   | The JSON report lists fee's card, under its def's site, as
-  | its page draws it: its name, first and last lines, and a
-  | row per statement, with its paths, how many were taken, and
-  | its site, so a reader finds a card's gap without the page.
+  | its page draws it: its name, first and last lines, the ways
+  | through it, and a row per statement, with its paths, how
+  | many were taken, and its site, so a reader finds a card's
+  | gap without the page.
   ) do |t|
     t.write(<<~RUBY)
       module Fee
@@ -1576,7 +1577,7 @@ class KernelTest < TidTest
     t.report
     expected = {
       "#{t.file}:2:2" => {
-        'name' => 'fee', 'first' => 2, 'last' => 2,
+        'name' => 'fee', 'first' => 2, 'last' => 2, 'ways' => 2,
         'rows' => [
           { 'at' => '2:22', 'top' => '?:', 'paths' => 2, 'taken' => 1,
             'site' => "#{t.file}:2:22" }
@@ -1603,7 +1604,7 @@ class KernelTest < TidTest
     t.report
     expected = {
       'rate.rb:2:0' => {
-        'name' => 'Rate', 'first' => 2, 'last' => 2,
+        'name' => 'Rate', 'first' => 2, 'last' => 2, 'ways' => 2,
         'rows' => [
           { 'at' => '2:09', 'top' => '?:', 'paths' => 2, 'taken' => 1,
             'site' => 'rate.rb:2:9' }

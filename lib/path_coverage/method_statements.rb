@@ -110,15 +110,6 @@ module PathCoverage
       paths.sum
     end
 
-    # Example: rows of 1, 2 and 2 paths, [1, 2, 2], have
-    # complexity 4.
-    # The paths through a method as a whole: paths, its rows'
-    # paths, multiplied, as each path of one row goes on to each
-    # of the next.
-    def self.complexity(paths)
-      paths.reduce(1, :*)
-    end
-
     # Example: an if row with only its then taken gives 1.
     # How many paths of each row were taken: for a site's row,
     # its paths with a count, paths being Result#paths; for any
